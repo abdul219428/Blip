@@ -12,5 +12,7 @@ dependencies = [
     "pynput>=1.7",
 ]
 
+[tool.setuptools]
+py-modules = ["blip"]
 [project.scripts]
 blip = "blip:main"
