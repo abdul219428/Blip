@@ -18,8 +18,8 @@ Notes are appended (with a timestamp) to `~/blip.md`.
 
 ```bash
 # Clone the repo
-git clone https://github.com/abdul219428/Bilp.git
-cd Bilp
+git clone https://github.com/abdul219428/Blip.git
+cd Blip
 
 # Install dependencies
 pip install -r requirements.txt
