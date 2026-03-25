@@ -19,7 +19,7 @@ Notes are appended (with a timestamp) to `~/blip.md`.
 
 Blip runs on any PC that has Python 3.9+ with `tkinter` available:
 
-- **Windows**: notes are written to `~\blip.md` (your user home folder)
+- **Windows**: notes are written to your user home folder, typically `C:\Users\<you>\blip.md`
 - **macOS**: notes are written to `~/blip.md`
 - **Linux**: notes are written to `~/blip.md`
 
