@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "blip"
+version = "0.1.0"
+description = "A global hotkey brain dump — press, type, gone."
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "pynput>=1.7",
+]
+
+[tool.setuptools]
+py-modules = ["blip"]
+[project.scripts]
+blip = "blip:main"
