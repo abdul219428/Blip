@@ -1,2 +1,61 @@
-# Bilp
-A global hotkey brain dump — press, type, gone.
+# Blip ⚡
+
+A tiny Python utility for quickly capturing thoughts with a global hotkey.
+
+**Press `Ctrl + Shift + Space` → type your thought → hit `Enter`. Done.**
+
+Notes are appended (with a timestamp) to `~/blip.md`.
+
+---
+
+## Requirements
+
+- Python 3.9+
+- `tkinter` (included with most Python installations)
+- [`pynput`](https://pypi.org/project/pynput/)
+
+## Installation
+
+```bash
+# Clone the repo
+git clone https://github.com/abdul219428/Bilp.git
+cd Bilp
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+Or install as a command-line tool:
+
+```bash
+pip install .
+```
+
+## Usage
+
+```bash
+python blip.py
+# or, if installed via pip:
+blip
+```
+
+| Key | Action |
+|-----|--------|
+| `Ctrl + Shift + Space` | Open the capture window |
+| `Enter` | Save note and close window |
+| `Escape` | Dismiss window without saving |
+
+Notes are written to `~/blip.md` in the format:
+
+```
+- [2024-01-15 09:30] Remember to buy milk
+```
+
+## Configuration
+
+Edit the constants at the top of `blip.py`:
+
+| Constant | Default | Description |
+|----------|---------|-------------|
+| `HOTKEY` | `<ctrl>+<shift>+<space>` | Global hotkey combination |
+| `OUTPUT_FILE` | `~/blip.md` | Path to the notes file |
