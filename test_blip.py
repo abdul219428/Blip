@@ -99,3 +99,22 @@ def test_append_note_error_handling(tmp_path):
         assert result is False
     finally:
         blip_mod.OUTPUT_FILE = original
+
+
+def test_show_hide_state():
+    """show_window and hide_window toggle is_visible correctly."""
+    import blip as blip_mod
+
+    root = tk.Tk()
+    root.withdraw()
+    app = blip_mod.Blip(root)
+
+    assert app.is_visible is False
+
+    app.show_window()
+    assert app.is_visible is True
+
+    app.hide_window()
+    assert app.is_visible is False
+
+    root.destroy()
