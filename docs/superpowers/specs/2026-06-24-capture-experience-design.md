@@ -96,7 +96,7 @@ Always visible, unobtrusive. Uses theme's `muted` color.
 | Theme | BG | FG | Input BG | Accent | Muted | Error |
 |-------|----|----|----------|--------|-------|-------|
 | `tokyo-night` (default) | `#1a1b26` | `#a9b1d6` | `#24283b` | `#7aa2f7` | `#565f89` | `#f7768e` |
-| `light` | `#eff1f5` | `#4c4f69` | `#ccd0da` | `#40a02b` | `#8c8fa1` | `#d20f39` |
+| `light` | `#faf4ed` | `#575279` | `#f2e9e1` | `#d7827e` | `#9893a5` | `#b4637a` |
 | `dracula` | `#282a36` | `#f8f8f2` | `#44475a` | `#bd93f9` | `#6272a4` | `#ff5555` |
 | `gruvbox` | `#282828` | `#ebdbb2` | `#3c3836` | `#b8bb26` | `#665c54` | `#fb4934` |
 | `mono` | `#0a0a0a` | `#d0d0d0` | `#1a1a1a` | `#d0d0d0` | `#4a4a4a` | `#ff3333` |
