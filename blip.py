@@ -16,6 +16,7 @@ import subprocess
 import sys
 import threading
 import json
+import re
 from dataclasses import dataclass
 
 # ── Data ──────────────────────────────────────────────────────────────────────
@@ -115,6 +116,23 @@ def load_config(config_path: Path) -> BlipConfig:
         theme=merged["theme"],
         window_size=merged["window_size"],
     )
+
+
+_TAG_RE = re.compile(r"(?:^|\s)#(\w+)")
+
+
+def parse_smart_tags(text: str) -> str:
+    """Prepend smart-tag emojis to text. Tags stay inline for searchability."""
+    matches = _TAG_RE.findall(text)
+    seen = []
+    for tag in matches:
+        tag_lower = tag.lower()
+        if tag_lower in SMART_TAGS and tag_lower not in seen:
+            seen.append(tag_lower)
+    if not seen:
+        return text
+    prefix = " ".join(SMART_TAGS[t] for t in seen)
+    return f"{prefix} {text}"
 
 
 def platform_font() -> str:

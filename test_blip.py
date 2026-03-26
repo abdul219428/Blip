@@ -180,3 +180,30 @@ def test_load_config_unknown_theme(tmp_path):
     cfg_file.write_text(json.dumps({"theme": "nonexistent"}), encoding="utf-8")
     config = load_config(cfg_file)
     assert config.theme == "tokyo-night"
+
+
+def test_parse_tags_smart():
+    """Smart tags get emoji prefixes prepended to text."""
+    from blip import parse_smart_tags
+    result = parse_smart_tags("Review PR #42 #todo #urgent")
+    assert result.startswith("☐ 🔴 ")
+    assert "Review PR #42 #todo #urgent" in result
+
+
+def test_parse_tags_dedup():
+    """Duplicate smart tags produce only one emoji prefix."""
+    from blip import parse_smart_tags
+    result = parse_smart_tags("do thing #todo and also #todo")
+    # Should have exactly one ☐, not two
+    assert result.count("☐") == 1
+
+
+def test_parse_tags_url_safe():
+    """URL fragments are not matched as tags."""
+    from blip import parse_smart_tags
+    result = parse_smart_tags("see http://example.com#section for details")
+    # No emoji should be prepended — #section is not a standalone tag
+    assert not result.startswith("☐")
+    assert not result.startswith("🔴")
+    assert not result.startswith("⭐")
+    assert not result.startswith("💡")
