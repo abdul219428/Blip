@@ -167,9 +167,6 @@ Expected: FAIL — `ImportError` (load_config / BlipConfig not defined)
 Add after the `LOG_FILE` line and before the logger setup in `blip.py`:
 
 ```python
-from dataclasses import dataclass
-
-
 @dataclass
 class BlipConfig:
     hotkey: str = "<ctrl>+<shift>+<space>"
@@ -235,7 +232,7 @@ def load_config(config_path: Path) -> BlipConfig:
     )
 ```
 
-Also add `import json` at the top of `blip.py` (with the other imports).
+Also add `import json` and `from dataclasses import dataclass` at the top of `blip.py` (with the other imports).
 
 Note: The logger is used inside `load_config`, but the logger is defined right after this code. Move the logger setup **before** `load_config` so it's available. The order should be:
 1. Data dicts (THEMES, WINDOW_SIZES, SMART_TAGS)
@@ -583,6 +580,10 @@ def hide_autocomplete(self):
     if self.autocomplete_popup:
         self.autocomplete_popup.destroy()
         self.autocomplete_popup = None
+
+def _ac_confirm(self, event=None):
+    """Stub — no-op. Task 6 adds full implementation."""
+    return "break"
 ```
 
 - [ ] **Step 4: Update on_submit for Text widget**
@@ -590,6 +591,9 @@ def hide_autocomplete(self):
 ```python
 def on_submit(self, event=None):
     """Save the note and show visual feedback."""
+    # If autocomplete is open, Enter confirms the selection instead of saving
+    if self.autocomplete_popup:
+        return self._ac_confirm(event)
     text = self.text.get("1.0", "end-1c").strip()
     if not text:
         return "break"
@@ -810,7 +814,9 @@ def _on_escape(self, event=None):
     return "break"
 
 def _on_key_release(self, event=None):
-    """Check if we should show/update/hide the autocomplete popup."""
+    """Check if we should show/update/hide the autocomplete popup, and grow widget."""
+    self._grow_text_widget()
+
     # Get text from cursor backwards to find # trigger
     cursor_pos = self.text.index(tk.INSERT)
     line_start = self.text.index(f"{cursor_pos} linestart")
