@@ -15,6 +15,8 @@ import os
 import subprocess
 import sys
 import threading
+import json
+from dataclasses import dataclass
 
 # ── Data ──────────────────────────────────────────────────────────────────────
 THEMES = {
@@ -48,6 +50,71 @@ logger.setLevel(logging.WARNING)
 _handler = logging.FileHandler(LOG_FILE, encoding="utf-8")
 _handler.setFormatter(logging.Formatter("[%(asctime)s] %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M"))
 logger.addHandler(_handler)
+
+
+@dataclass
+class BlipConfig:
+    hotkey: str = "<ctrl>+<shift>+<space>"
+    output_file: Path = None
+    log_file: Path = None
+    theme: str = "tokyo-night"
+    window_size: str = "default"
+
+    def __post_init__(self):
+        if self.output_file is None:
+            self.output_file = Path.home() / "blip.md"
+        if self.log_file is None:
+            self.log_file = Path.home() / "blip.log"
+
+
+def load_config(config_path: Path) -> BlipConfig:
+    """Load config from JSON file, merging with defaults."""
+    defaults = {
+        "hotkey": "<ctrl>+<shift>+<space>",
+        "output_file": str(Path.home() / "blip.md"),
+        "log_file": str(Path.home() / "blip.log"),
+        "theme": "tokyo-night",
+        "window_size": "default",
+    }
+
+    if not config_path.exists():
+        logger.info("No config file found — creating %s with defaults", config_path)
+        try:
+            config_path.parent.mkdir(parents=True, exist_ok=True)
+            config_path.write_text(json.dumps(defaults, indent=2), encoding="utf-8")
+        except OSError:
+            logger.warning("Could not create config file %s", config_path, exc_info=True)
+        return BlipConfig()
+
+    try:
+        data = json.loads(config_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as e:
+        logger.warning("Bad config file %s: %s — using defaults", config_path, e)
+        return BlipConfig()
+
+    merged = {**defaults, **data}
+
+    # Validate theme
+    if merged["theme"] not in THEMES:
+        logger.warning("Unknown theme '%s' — falling back to tokyo-night", merged["theme"])
+        merged["theme"] = "tokyo-night"
+
+    # Validate window_size
+    if merged["window_size"] not in WINDOW_SIZES:
+        logger.warning("Unknown window_size '%s' — falling back to default", merged["window_size"])
+        merged["window_size"] = "default"
+
+    # Expand ~ paths
+    output_file = Path(merged["output_file"]).expanduser()
+    log_file = Path(merged["log_file"]).expanduser()
+
+    return BlipConfig(
+        hotkey=merged["hotkey"],
+        output_file=output_file,
+        log_file=log_file,
+        theme=merged["theme"],
+        window_size=merged["window_size"],
+    )
 
 
 def platform_font() -> str:

@@ -5,6 +5,7 @@ from unittest.mock import patch
 from pathlib import Path
 import tkinter as tk
 import re
+import json
 
 
 def test_platform_font_windows():
@@ -139,3 +140,43 @@ def test_window_size_presets():
     for name, size in WINDOW_SIZES.items():
         assert set(size.keys()) == required, f"Size '{name}' missing keys"
         assert size["lines"] <= size["max_lines"], f"Size '{name}' lines > max_lines"
+
+
+def test_load_config_defaults(tmp_path):
+    """No config file → returns default BlipConfig."""
+    from blip import load_config, BlipConfig
+    config = load_config(tmp_path / "nonexistent.json")
+    assert isinstance(config, BlipConfig)
+    assert config.hotkey == "<ctrl>+<shift>+<space>"
+    assert config.theme == "tokyo-night"
+    assert config.window_size == "default"
+    # Config file should be created with defaults
+    assert (tmp_path / "nonexistent.json").exists()
+
+
+def test_load_config_partial(tmp_path):
+    """Partial JSON → missing keys filled from defaults."""
+    from blip import load_config
+    cfg_file = tmp_path / "blip.json"
+    cfg_file.write_text(json.dumps({"theme": "dracula"}), encoding="utf-8")
+    config = load_config(cfg_file)
+    assert config.theme == "dracula"
+    assert config.hotkey == "<ctrl>+<shift>+<space>"  # filled from default
+
+
+def test_load_config_malformed(tmp_path):
+    """Bad JSON → warning logged, defaults returned."""
+    from blip import load_config
+    cfg_file = tmp_path / "blip.json"
+    cfg_file.write_text("{bad json!!!", encoding="utf-8")
+    config = load_config(cfg_file)
+    assert config.theme == "tokyo-night"  # all defaults
+
+
+def test_load_config_unknown_theme(tmp_path):
+    """Unknown theme → falls back to tokyo-night."""
+    from blip import load_config
+    cfg_file = tmp_path / "blip.json"
+    cfg_file.write_text(json.dumps({"theme": "nonexistent"}), encoding="utf-8")
+    config = load_config(cfg_file)
+    assert config.theme == "tokyo-night"
