@@ -31,3 +31,6 @@ Thumbs.db
 *.swo
 .idea/
 .vscode/
+
+# Brainstorming sessions
+.superpowers/
