@@ -10,10 +10,19 @@ from datetime import datetime
 from pathlib import Path
 import queue
 from pynput import keyboard
+import logging
+import sys
 
 # ── Config ────────────────────────────────────────────────────────────────────
 HOTKEY      = "<ctrl>+<shift>+<space>"
 OUTPUT_FILE = Path.home() / "blip.md"
+LOG_FILE = Path.home() / "blip.log"
+
+logger = logging.getLogger("blip")
+logger.setLevel(logging.WARNING)
+_handler = logging.FileHandler(LOG_FILE, encoding="utf-8")
+_handler.setFormatter(logging.Formatter("[%(asctime)s] %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M"))
+logger.addHandler(_handler)
 # ─────────────────────────────────────────────────────────────────────────────
 
 
