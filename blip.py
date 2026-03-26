@@ -11,7 +11,10 @@ from pathlib import Path
 import queue
 from pynput import keyboard
 import logging
+import os
+import subprocess
 import sys
+import threading
 
 # ── Config ────────────────────────────────────────────────────────────────────
 HOTKEY      = "<ctrl>+<shift>+<space>"
@@ -44,6 +47,52 @@ def configure_dpi() -> None:
             ctypes.windll.shcore.SetProcessDpiAwareness(1)
         except (AttributeError, OSError):
             pass
+
+
+def create_tray_icon(app_queue: queue.Queue) -> None:
+    """Create and run a system tray icon on a daemon thread."""
+    try:
+        import pystray
+        from PIL import Image, ImageDraw, ImageFont
+    except ImportError:
+        logger.warning("pystray or Pillow not installed — skipping tray icon")
+        return
+
+    img = Image.new("RGBA", (64, 64), (30, 30, 46, 255))
+    draw = ImageDraw.Draw(img)
+    try:
+        font = ImageFont.truetype("arial", 40)
+    except OSError:
+        font = ImageFont.load_default()
+    bbox = draw.textbbox((0, 0), "⚡", font=font)
+    x = (64 - (bbox[2] - bbox[0])) // 2 - bbox[0]
+    y = (64 - (bbox[3] - bbox[1])) // 2 - bbox[1]
+    draw.text((x, y), "⚡", fill=(205, 214, 244, 255), font=font)
+
+    def open_notes():
+        path = str(OUTPUT_FILE)
+        if sys.platform == "win32":
+            os.startfile(path)
+        elif sys.platform == "darwin":
+            subprocess.run(["open", path], check=False)
+        else:
+            subprocess.run(["xdg-open", path], check=False)
+
+    def quit_app(icon):
+        icon.stop()
+        app_queue.put("QUIT")
+
+    menu = pystray.Menu(
+        pystray.MenuItem("Blip ⚡", None, enabled=False),
+        pystray.Menu.SEPARATOR,
+        pystray.MenuItem("Open blip.md", lambda: open_notes()),
+        pystray.MenuItem("Quit", quit_app),
+    )
+
+    icon = pystray.Icon("blip", img, "Blip", menu)
+
+    thread = threading.Thread(target=icon.run, daemon=True)
+    thread.start()
 
 
 class Blip:
@@ -107,16 +156,18 @@ class Blip:
         self.root.geometry(f"+{(sw - w) // 2}+{(sh - h) // 3}")
 
     def poll_queue(self):
-        """Check the queue for messages from the pynput listener thread."""
+        """Check the queue for messages from the pynput/tray threads."""
         try:
             while True:
                 msg = self.queue.get_nowait()
                 if msg == "SHOW":
                     self.show_window()
+                elif msg == "QUIT":
+                    self.root.quit()
+                    return
         except queue.Empty:
             pass
-        finally:
-            self.root.after(100, self.poll_queue)
+        self.root.after(100, self.poll_queue)
 
     def show_window(self):
         """Reveal the window, clear past text, and steal focus."""
@@ -177,18 +228,26 @@ def main():
     root = tk.Tk()
     app = Blip(root)
 
+    create_tray_icon(app.queue)
+
     def on_hotkey():
         app.queue.put("SHOW")
 
-    listener = keyboard.GlobalHotKeys({HOTKEY: on_hotkey})
-    listener.start()
+    try:
+        listener = keyboard.GlobalHotKeys({HOTKEY: on_hotkey})
+        listener.start()
+    except Exception:
+        logger.error("Failed to register global hotkey %s", HOTKEY, exc_info=True)
+        print(f"ERROR: Could not register hotkey {HOTKEY}. See ~/blip.log for details.")
+        listener = None
 
     try:
         root.mainloop()
     except KeyboardInterrupt:
         print("\nBlip stopped.")
     finally:
-        listener.stop()
+        if listener is not None:
+            listener.stop()
 
 
 if __name__ == "__main__":
