@@ -8,7 +8,7 @@ Extends Blip with a config file, multi-line input, smart tags with autocomplete,
 
 ```json
 {
-  "hotkey": "<ctrl>+<shift>+b",
+  "hotkey": "<ctrl>+<shift>+<space>",
   "output_file": "~/blip.md",
   "log_file": "~/blip.log",
   "theme": "tokyo-night",
@@ -78,7 +78,7 @@ A faded label below the input showing all 4 smart tags:
 ```
 ☐ #todo  🔴 #urgent  ⭐ #important  💡 #idea
 ```
-Always visible, unobtrusive. Uses theme's muted text color.
+Always visible, unobtrusive. Uses theme's `muted` color.
 
 ### Autocomplete popup
 - Triggered when user types `#`
@@ -92,14 +92,14 @@ Always visible, unobtrusive. Uses theme's muted text color.
 
 4 built-in themes stored as a `THEMES` dict in blip.py:
 
-| Theme | BG | FG | Input BG | Accent |
-|-------|----|----|----------|--------|
-| `tokyo-night` (default) | `#1a1b26` | `#a9b1d6` | `#24283b` | `#7aa2f7` |
-| `light` | `#eff1f5` | `#4c4f69` | `#ccd0da` | `#40a02b` |
-| `dracula` | `#282a36` | `#f8f8f2` | `#44475a` | `#bd93f9` |
-| `gruvbox` | `#282828` | `#ebdbb2` | `#3c3836` | `#b8bb26` |
+| Theme | BG | FG | Input BG | Accent | Muted | Error |
+|-------|----|----|----------|--------|-------|-------|
+| `tokyo-night` (default) | `#1a1b26` | `#a9b1d6` | `#24283b` | `#7aa2f7` | `#565f89` | `#f7768e` |
+| `light` | `#eff1f5` | `#4c4f69` | `#ccd0da` | `#40a02b` | `#8c8fa1` | `#d20f39` |
+| `dracula` | `#282a36` | `#f8f8f2` | `#44475a` | `#bd93f9` | `#6272a4` | `#ff5555` |
+| `gruvbox` | `#282828` | `#ebdbb2` | `#3c3836` | `#b8bb26` | `#665c54` | `#fb4934` |
 
-Each theme provides: bg, fg, entry_bg, accent (used for flash border, autocomplete highlight, hint accents).
+Each theme provides: bg, fg, entry_bg, accent (flash border success, autocomplete highlight), muted (footer hints, keybinding hints), error (flash border on save failure).
 
 ## 6. Window Size Presets
 
@@ -173,4 +173,4 @@ All tests use `tmp_path` fixtures, no tkinter dependency.
 - Phase 1's hardcoded WINDOW_WIDTH replaced by window_size preset
 - `tk.Entry` → `tk.Text` changes the widget API (`.get()`, `.insert()`, `.delete()`)
 - Existing `on_submit()` and `append_note()` updated for multi-line format
-- Flash border continues to use accent color from active theme
+- Flash border continues to use accent color (success) and error color (failure) from active theme
