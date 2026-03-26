@@ -118,3 +118,24 @@ def test_show_hide_state():
     assert app.is_visible is False
 
     root.destroy()
+
+
+def test_theme_colors():
+    """Every theme has all 6 required color keys."""
+    from blip import THEMES
+    required = {"bg", "fg", "entry_bg", "accent", "muted", "error"}
+    assert len(THEMES) == 5
+    for name, colors in THEMES.items():
+        assert set(colors.keys()) == required, f"Theme '{name}' missing keys"
+        for key, val in colors.items():
+            assert val.startswith("#"), f"Theme '{name}'.{key} not a hex color"
+
+
+def test_window_size_presets():
+    """Every window size has width, lines, and max_lines."""
+    from blip import WINDOW_SIZES
+    required = {"width", "lines", "max_lines"}
+    assert len(WINDOW_SIZES) == 3
+    for name, size in WINDOW_SIZES.items():
+        assert set(size.keys()) == required, f"Size '{name}' missing keys"
+        assert size["lines"] <= size["max_lines"], f"Size '{name}' lines > max_lines"
