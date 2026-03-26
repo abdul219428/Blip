@@ -90,3 +90,16 @@ def _flush_note(
             line_number=line_number,
         )
     )
+
+
+def search_notes(notes: list[Note], query: str) -> list[Note]:
+    """Case-insensitive substring search. Multiple words are AND'd."""
+    words = query.lower().split()
+    if not words:
+        return list(notes)
+    return [n for n in notes if all(w in n.text.lower() for w in words)]
+
+
+def filter_by_tag(notes: list[Note], tag: str) -> list[Note]:
+    """Return only notes containing the given tag (without # prefix)."""
+    return [n for n in notes if tag in n.tags]

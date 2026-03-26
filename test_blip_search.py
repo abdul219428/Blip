@@ -82,3 +82,51 @@ def test_parse_notes_no_prefix(tmp_path):
 
     assert notes[0].is_done is False
     assert notes[0].tags == []
+
+
+def _make_notes_file(tmp_path):
+    """Helper: create a blip.md with several notes for search tests."""
+    f = tmp_path / "blip.md"
+    f.write_text(
+        "- [2026-03-26 14:30] ☐ buy milk and eggs #todo\n"
+        "- [2026-03-26 11:20] ⭐ team lunch next Tuesday #important\n"
+        "- [2026-03-25 09:15] 💡 voice capture idea #idea\n"
+        "- [2026-03-24 18:42] ☑ buy bread #todo\n",
+        encoding="utf-8",
+    )
+    return f
+
+
+def test_search_keyword(tmp_path):
+    """Substring match finds correct notes."""
+    from blip_search import parse_notes, search_notes
+    notes = parse_notes(_make_notes_file(tmp_path))
+    results = search_notes(notes, "buy")
+    assert len(results) == 2
+
+
+def test_search_case_insensitive(tmp_path):
+    """Search is case-insensitive."""
+    from blip_search import parse_notes, search_notes
+    notes = parse_notes(_make_notes_file(tmp_path))
+    results = search_notes(notes, "MILK")
+    assert len(results) == 1
+    assert "milk" in results[0].text
+
+
+def test_search_multi_word(tmp_path):
+    """Multiple words are AND'd."""
+    from blip_search import parse_notes, search_notes
+    notes = parse_notes(_make_notes_file(tmp_path))
+    results = search_notes(notes, "buy eggs")
+    assert len(results) == 1
+    assert "eggs" in results[0].text
+
+
+def test_filter_by_tag(tmp_path):
+    """Filters to only notes with given tag."""
+    from blip_search import parse_notes, filter_by_tag
+    notes = parse_notes(_make_notes_file(tmp_path))
+    results = filter_by_tag(notes, "todo")
+    assert len(results) == 2
+    assert all("todo" in n.tags for n in results)
