@@ -288,23 +288,139 @@ class Blip:
         self.text.configure(height=new_height)
 
     def _on_escape(self, event=None):
-        """Stub — dismiss window. Task 6 adds autocomplete-first logic."""
+        """Escape dismisses autocomplete first, then the window."""
+        if self.autocomplete_popup:
+            self.hide_autocomplete()
+            return "break"
         self.hide_window()
         return "break"
 
     def _on_key_release(self, event=None):
-        """Stub — no-op. Task 6 adds autocomplete trigger logic."""
-        pass
+        """Check if we should show/update/hide the autocomplete popup, and grow widget."""
+        self._grow_text_widget()
+
+        # Get text from cursor backwards to find # trigger
+        cursor_pos = self.text.index(tk.INSERT)
+        line_start = self.text.index(f"{cursor_pos} linestart")
+        line_text = self.text.get(line_start, cursor_pos)
+
+        # Find the last # in the current line segment
+        hash_idx = line_text.rfind("#")
+        if hash_idx == -1 or (hash_idx > 0 and line_text[hash_idx - 1] not in (" ", "\t")):
+            self.hide_autocomplete()
+            return
+
+        # Text after the #
+        fragment = line_text[hash_idx + 1:].lower()
+
+        # Filter matching smart tags
+        matches = [
+            (name, emoji) for name, emoji in SMART_TAGS.items()
+            if name.startswith(fragment)
+        ]
+
+        if not matches:
+            self.hide_autocomplete()
+            return
+
+        self.show_autocomplete(matches, hash_idx, cursor_pos)
 
     def hide_autocomplete(self):
-        """Stub — no-op when no popup exists. Task 6 adds full implementation."""
+        """Destroy the autocomplete popup if it exists."""
         if self.autocomplete_popup:
+            # Unbind navigation keys
+            self.text.unbind("<Up>")
+            self.text.unbind("<Down>")
+            self.text.unbind("<Tab>")
             self.autocomplete_popup.destroy()
             self.autocomplete_popup = None
 
     def _ac_confirm(self, event=None):
-        """Stub — no-op. Task 6 adds full implementation."""
+        """Insert the selected autocomplete tag."""
+        if not self.autocomplete_popup:
+            return
+        name, _ = self._ac_matches[self._ac_selected]
+        self._insert_tag(name)
         return "break"
+
+    def show_autocomplete(self, matches, hash_idx, cursor_pos):
+        """Show or update the autocomplete popup near the cursor."""
+        self.hide_autocomplete()
+        t = self.theme
+
+        popup = tk.Toplevel(self.root)
+        popup.overrideredirect(True)
+        popup.attributes("-topmost", True)
+        popup.configure(bg=t["entry_bg"])
+        self.autocomplete_popup = popup
+        self._ac_matches = matches
+        self._ac_selected = 0
+        self._ac_hash_idx = hash_idx
+
+        # Position near cursor
+        try:
+            bbox = self.text.bbox(cursor_pos)
+            if bbox:
+                x = self.text.winfo_rootx() + bbox[0]
+                y = self.text.winfo_rooty() + bbox[1] + bbox[3] + 4
+            else:
+                x = self.text.winfo_rootx()
+                y = self.text.winfo_rooty() + self.text.winfo_height()
+        except tk.TclError:
+            x = self.text.winfo_rootx()
+            y = self.text.winfo_rooty() + self.text.winfo_height()
+
+        popup.geometry(f"+{x}+{y}")
+
+        self._ac_labels = []
+        for i, (name, emoji) in enumerate(matches):
+            bg = t["accent"] if i == 0 else t["entry_bg"]
+            fg = t["bg"] if i == 0 else t["fg"]
+            lbl = tk.Label(
+                popup, text=f" {emoji} #{name} ", bg=bg, fg=fg,
+                font=(platform_font(), 10), anchor="w",
+            )
+            lbl.pack(fill="x", padx=2, pady=1)
+            lbl.bind("<Button-1>", lambda e, idx=i: self._click_autocomplete(idx))
+            self._ac_labels.append(lbl)
+
+        # Bind navigation keys on the text widget
+        self.text.bind("<Up>", self._ac_navigate)
+        self.text.bind("<Down>", self._ac_navigate)
+        self.text.bind("<Tab>", self._ac_confirm)
+
+    def _ac_navigate(self, event):
+        """Navigate autocomplete selection with arrow keys."""
+        if not self.autocomplete_popup:
+            return
+        t = self.theme
+        old = self._ac_selected
+        if event.keysym == "Up":
+            self._ac_selected = max(0, self._ac_selected - 1)
+        elif event.keysym == "Down":
+            self._ac_selected = min(len(self._ac_matches) - 1, self._ac_selected + 1)
+
+        # Update highlight
+        self._ac_labels[old].configure(bg=t["entry_bg"], fg=t["fg"])
+        self._ac_labels[self._ac_selected].configure(bg=t["accent"], fg=t["bg"])
+        return "break"
+
+    def _click_autocomplete(self, idx):
+        """Handle clicking an autocomplete option."""
+        name, _ = self._ac_matches[idx]
+        self._insert_tag(name)
+
+    def _insert_tag(self, tag_name):
+        """Replace the #fragment with the full tag name."""
+        # Delete from the # to the cursor
+        cursor_pos = self.text.index(tk.INSERT)
+        line_start = self.text.index(f"{cursor_pos} linestart")
+        line_text = self.text.get(line_start, cursor_pos)
+        hash_idx = line_text.rfind("#")
+        delete_from = f"{line_start}+{hash_idx}c"
+        self.text.delete(delete_from, cursor_pos)
+        self.text.insert(delete_from, f"#{tag_name}")
+        self.hide_autocomplete()
 
     def poll_queue(self):
         """Check the queue for messages from the pynput/tray threads."""
