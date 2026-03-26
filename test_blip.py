@@ -6,6 +6,17 @@ from pathlib import Path
 import tkinter as tk
 import re
 import json
+import pytest
+
+# Skip tkinter-dependent tests when display/Tcl is unavailable
+try:
+    _test_root = tk.Tk()
+    _test_root.destroy()
+    _has_display = True
+except tk.TclError:
+    _has_display = False
+
+needs_display = pytest.mark.skipif(not _has_display, reason="No display or Tcl unavailable")
 
 
 def test_platform_font_windows():
@@ -36,6 +47,7 @@ def test_platform_font_unknown():
         assert result == "TkDefaultFont"
 
 
+@needs_display
 def test_append_note_creates_file(tmp_path):
     """append_note creates the file and writes the correct format."""
     import blip as blip_mod
@@ -53,6 +65,7 @@ def test_append_note_creates_file(tmp_path):
     assert re.match(r"- \[\d{4}-\d{2}-\d{2} \d{2}:\d{2}\] test note\n", content)
 
 
+@needs_display
 def test_append_note_appends(tmp_path):
     """Multiple notes are appended, not overwritten."""
     import blip as blip_mod
@@ -71,6 +84,7 @@ def test_append_note_appends(tmp_path):
     assert "second" in lines[1]
 
 
+@needs_display
 def test_append_note_error_handling(tmp_path):
     """append_note returns False and logs on write failure."""
     import blip as blip_mod
@@ -84,6 +98,7 @@ def test_append_note_error_handling(tmp_path):
     assert result is False
 
 
+@needs_display
 def test_show_hide_state():
     """show_window and hide_window toggle is_visible correctly."""
     import blip as blip_mod
@@ -191,6 +206,7 @@ def test_parse_tags_url_safe():
     assert not result.startswith("💡")
 
 
+@needs_display
 def test_multiline_format(tmp_path):
     """Multi-line text uses indented continuation lines."""
     import blip as blip_mod
@@ -212,6 +228,7 @@ def test_multiline_format(tmp_path):
     assert lines[2] == "  line three"
 
 
+@needs_display
 def test_empty_submit_ignored(tmp_path):
     """Whitespace-only text is not saved."""
     import blip as blip_mod
