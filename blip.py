@@ -139,14 +139,19 @@ class Blip:
             self.append_note(text)
         self.hide_window()
 
-    def append_note(self, text: str) -> None:
-        """Append a timestamped note to blip.md."""
+    def append_note(self, text: str) -> bool:
+        """Append a timestamped note to blip.md. Returns True on success."""
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
         line = f"- [{timestamp}] {text}\n"
 
-        OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
-        with OUTPUT_FILE.open("a", encoding="utf-8") as f:
-            f.write(line)
+        try:
+            OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
+            with OUTPUT_FILE.open("a", encoding="utf-8") as f:
+                f.write(line)
+            return True
+        except OSError:
+            logger.error("Failed to write to %s", OUTPUT_FILE, exc_info=True)
+            return False
 
 
 def main():
