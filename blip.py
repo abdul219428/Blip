@@ -194,10 +194,14 @@ def create_tray_icon(app_queue: queue.Queue, config: BlipConfig) -> None:
         icon.stop()
         app_queue.put("QUIT")
 
+    def browse_notes():
+        app_queue.put("BROWSE")
+
     menu = pystray.Menu(
         pystray.MenuItem("Blip ⚡", None, enabled=False),
         pystray.Menu.SEPARATOR,
         pystray.MenuItem(f"Open {config.output_file.name}", lambda: open_notes()),
+        pystray.MenuItem("Browse Notes", lambda: browse_notes()),
         pystray.MenuItem("Quit", quit_app),
     )
 
@@ -432,12 +436,19 @@ class Blip:
                 msg = self.queue.get_nowait()
                 if msg == "SHOW":
                     self.show_window()
+                elif msg == "BROWSE":
+                    self._open_browse()
                 elif msg == "QUIT":
                     self.root.quit()
                     return
         except queue.Empty:
             pass
         self.root.after(100, self.poll_queue)
+
+    def _open_browse(self):
+        """Open the Browse Notes window."""
+        from blip_browse import BrowseWindow
+        BrowseWindow(self.root, self.config)
 
     def show_window(self):
         """Reveal the window, clear past text, and steal focus."""
