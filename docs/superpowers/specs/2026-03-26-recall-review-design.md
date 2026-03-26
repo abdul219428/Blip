@@ -31,7 +31,7 @@ class Note:
 
 - A line matching `^- \[\d{4}-\d{2}-\d{2} \d{2}:\d{2}\] ` starts a new note.
 - Subsequent lines indented with 2 spaces are continuation lines, joined to the previous note's `text` with `\n` (leading 2-space indent stripped).
-- Tags extracted via `#\w+` regex from the full text.
+- Tags extracted via `(?:^|\s)#(\w+)` regex from the full text (same pattern as `blip.py` — excludes URL fragments).
 - Smart-tag emoji prefixes (`☐`, `☑`, `🔴`, `⭐`, `💡`) are part of `text` — not stripped.
 - `is_done` is determined by presence of `☐` (False) or `☑` (True) in the text prefix. Notes without either are `is_done=False`.
 
@@ -46,8 +46,7 @@ Pure functions for note parsing, search, and mutation:
 | `parse_notes` | `(path: Path) → list[Note]` | Read blip.md into Note objects in a single pass |
 | `search_notes` | `(notes: list[Note], query: str) → list[Note]` | Case-insensitive substring match; multiple words are AND'd |
 | `filter_by_tag` | `(notes: list[Note], tag: str) → list[Note]` | Keep only notes containing the given tag |
-| `filter_by_date` | `(notes: list[Note], since: datetime \| None, until: datetime \| None) → list[Note]` | Date range filter (inclusive) |
-| `mark_done` | `(path: Path, note: Note) → bool` | Rewrite note's line: `☐` → `☑`. Returns True on success. |
+| `mark_done` | `(path: Path, note: Note) → bool` | Rewrite note's line: `☐` → `☑`. One-way only. Returns True on success. |
 
 **Search implementation**: `all(word in note.text.lower() for word in query.lower().split())`. No indexing, no tokenization. Fast enough for thousands of notes (<50ms for 10,000 entries).
 
@@ -113,11 +112,18 @@ Browse window UI using tkinter:
 
 ### Card design
 
-- **Left border**: Colored by primary tag — `#urgent` → red (`error` theme key), `#important` → yellow (`accent`), `#idea` → green, `#todo` → blue (`accent`), no tag → muted.
-- **Checkbox**: Only shown for notes with `#todo` tag. Click toggles `☐` ↔ `☑`.
+- **Left border**: Colored by primary tag using hardcoded hex values (consistent across all themes):
+  - `#urgent` → `#f7768e` (red)
+  - `#important` → `#e0af68` (amber)
+  - `#idea` → `#9ece6a` (green)
+  - `#todo` → `#7aa2f7` (blue)
+  - no recognized tag → theme `muted` color
+  These are stored in a `TAG_COLORS` dict in `blip_search.py`.
+- **Checkbox**: Only shown for notes with `#todo` tag. Click marks done (`☐` → `☑`, one-way).
 - **Done cards**: Text has strikethrough, entire card is dimmed (lower opacity).
 - **Multi-line notes**: Full text displayed (continuation lines visible).
 - **Tag pills**: Shown at bottom of card, styled with theme colors.
+- **Date group headers**: "TODAY", "YESTERDAY", or "MMM DD" for older dates (e.g., "MAR 24"). Uppercase for visual consistency.
 
 ### Interactions
 
@@ -125,7 +131,7 @@ Browse window UI using tkinter:
 |--------|--------|
 | Type in search box | Filters cards in real-time (debounced ~200ms after last keystroke) |
 | Click a tag filter pill | Toggle: show only notes with that tag. "All" clears all filters. |
-| Click `☐` on a card | Calls `mark_done()` → card updates to `☑`, text strikes through, card dims |
+| Click `☐` on a card | Calls `mark_done()` → `☐` becomes `☑`, text strikes through, card dims. One-way only — cannot un-done. |
 | `Escape` | Closes the browse window |
 | Mousewheel | Scrolls through cards |
 | Window close (X) | Same as Escape — closes window, daemon keeps running |
@@ -171,8 +177,8 @@ The "Browse Notes" action sends a `"browse"` message through the existing `app_q
 | `test_search_case_insensitive` | "MILK" matches "milk" |
 | `test_search_multi_word` | "milk eggs" matches notes containing both |
 | `test_filter_by_tag` | Filters to only notes with given tag |
-| `test_filter_by_date` | Since/until range works correctly |
 | `test_mark_done` | `☐` flipped to `☑` in file, returns True |
+| `test_mark_done_already_done` | Already `☑` → no change, returns True |
 
 ### `blip_browse.py` tests (~3 tests, display-dependent)
 
