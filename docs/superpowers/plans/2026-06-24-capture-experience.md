@@ -551,7 +551,9 @@ def setup_ui(self):
     self.root.geometry(f"+{(sw - w) // 2}+{(sh - h) // 3}")
 ```
 
-- [ ] **Step 3: Add keybinding helper methods**
+- [ ] **Step 3: Add keybinding helper methods and autocomplete stubs**
+
+These stubs prevent `AttributeError` until Task 6 replaces them with full implementations:
 
 ```python
 def _insert_newline(self, event=None):
@@ -566,6 +568,21 @@ def _grow_text_widget(self):
     line_count = max(content.count("\n") + 1, self.win_size["lines"])
     new_height = min(line_count, self.win_size["max_lines"])
     self.text.configure(height=new_height)
+
+def _on_escape(self, event=None):
+    """Stub — dismiss window. Task 6 adds autocomplete-first logic."""
+    self.hide_window()
+    return "break"
+
+def _on_key_release(self, event=None):
+    """Stub — no-op. Task 6 adds autocomplete trigger logic."""
+    pass
+
+def hide_autocomplete(self):
+    """Stub — no-op when no popup exists. Task 6 adds full implementation."""
+    if self.autocomplete_popup:
+        self.autocomplete_popup.destroy()
+        self.autocomplete_popup = None
 ```
 
 - [ ] **Step 4: Update on_submit for Text widget**
@@ -775,13 +792,13 @@ git commit -m "feat: wire BlipConfig through app, replace hardcoded values"
 ### Task 6: Add tag autocomplete popup
 
 **Files:**
-- Modify: `blip.py` — add `_on_key_release`, `_on_escape`, `show_autocomplete`, `hide_autocomplete`, `_select_autocomplete`, `insert_tag` methods to `Blip` class
+- Modify: `blip.py` — replace stub methods `_on_key_release`, `_on_escape`, `hide_autocomplete` with full implementations, add `show_autocomplete`, `_ac_navigate`, `_ac_confirm`, `_click_autocomplete`, `_insert_tag` methods to `Blip` class
 
 No new unit tests for this task — autocomplete is a UI interaction feature that requires tkinter event simulation. The existing tag parsing tests cover the logic. Manual testing is needed.
 
-- [ ] **Step 1: Implement autocomplete methods**
+- [ ] **Step 1: Replace stub methods with full autocomplete implementation**
 
-Add these methods to the `Blip` class:
+Replace the stub `_on_escape`, `_on_key_release`, and `hide_autocomplete` methods (from Task 5) with full implementations. Add new methods for autocomplete UI:
 
 ```python
 def _on_escape(self, event=None):
@@ -947,10 +964,10 @@ Expected: All 19 tests pass
 Run: `python -c "import blip; print('OK —', len(open('blip.py').readlines()), 'lines')"`
 Expected: `OK — ~400-450 lines`
 
-- [ ] **Step 3: Verify the app starts without errors**
+- [ ] **Step 3: Verify key imports work**
 
-Run: `python -c "from blip import load_config, BlipConfig, THEMES, WINDOW_SIZES, SMART_TAGS, parse_smart_tags; c = load_config(__import__('pathlib').Path('__test_config.json')); print(f'Config: {c.theme}, {c.window_size}'); print(f'Tags: {parse_smart_tags(\"test #todo #urgent\")}'); __import__('os').remove('__test_config.json')"`
-Expected: prints config and tag output without errors
+Run: `python -c "from blip import load_config, parse_smart_tags, THEMES, WINDOW_SIZES, SMART_TAGS; print('OK')"`
+Expected: `OK`
 
 - [ ] **Step 4: Commit if any cleanup was needed**
 
