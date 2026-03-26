@@ -10,11 +10,89 @@ from datetime import datetime
 from pathlib import Path
 import queue
 from pynput import keyboard
+import logging
+import os
+import subprocess
+import sys
+import threading
 
 # ── Config ────────────────────────────────────────────────────────────────────
 HOTKEY      = "<ctrl>+<shift>+<space>"
 OUTPUT_FILE = Path.home() / "blip.md"
+LOG_FILE = Path.home() / "blip.log"
+
+logger = logging.getLogger("blip")
+logger.setLevel(logging.WARNING)
+_handler = logging.FileHandler(LOG_FILE, encoding="utf-8")
+_handler.setFormatter(logging.Formatter("[%(asctime)s] %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M"))
+logger.addHandler(_handler)
 # ─────────────────────────────────────────────────────────────────────────────
+
+
+def platform_font() -> str:
+    """Return the native font family for the current OS."""
+    fonts = {
+        "win32": "Segoe UI",
+        "darwin": "Helvetica Neue",
+        "linux": "sans-serif",
+    }
+    return fonts.get(sys.platform, "TkDefaultFont")
+
+
+def configure_dpi() -> None:
+    """Enable DPI awareness on Windows so the UI renders crisply on HiDPI displays."""
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            ctypes.windll.shcore.SetProcessDpiAwareness(1)
+        except (AttributeError, OSError):
+            pass
+
+
+def create_tray_icon(app_queue: queue.Queue) -> None:
+    """Create and run a system tray icon on a daemon thread."""
+    try:
+        import pystray
+        from PIL import Image, ImageDraw, ImageFont
+    except ImportError:
+        logger.warning("pystray or Pillow not installed — skipping tray icon")
+        return
+
+    img = Image.new("RGBA", (64, 64), (30, 30, 46, 255))
+    draw = ImageDraw.Draw(img)
+    try:
+        font = ImageFont.truetype("arial", 40)
+    except OSError:
+        font = ImageFont.load_default()
+    bbox = draw.textbbox((0, 0), "⚡", font=font)
+    x = (64 - (bbox[2] - bbox[0])) // 2 - bbox[0]
+    y = (64 - (bbox[3] - bbox[1])) // 2 - bbox[1]
+    draw.text((x, y), "⚡", fill=(205, 214, 244, 255), font=font)
+
+    def open_notes():
+        path = str(OUTPUT_FILE)
+        if sys.platform == "win32":
+            os.startfile(path)
+        elif sys.platform == "darwin":
+            subprocess.run(["open", path], check=False)
+        else:
+            subprocess.run(["xdg-open", path], check=False)
+
+    def quit_app(icon):
+        icon.stop()
+        app_queue.put("QUIT")
+
+    menu = pystray.Menu(
+        pystray.MenuItem("Blip ⚡", None, enabled=False),
+        pystray.Menu.SEPARATOR,
+        pystray.MenuItem("Open blip.md", lambda: open_notes()),
+        pystray.MenuItem("Quit", quit_app),
+    )
+
+    icon = pystray.Icon("blip", img, "Blip", menu)
+
+    thread = threading.Thread(target=icon.run, daemon=True)
+    thread.start()
 
 
 class Blip:
@@ -43,7 +121,7 @@ class Blip:
             text="⚡  Blip",
             bg="#1e1e2e",
             fg="#cdd6f4",
-            font=("Segoe UI", 9),
+            font=(platform_font(), 9),
             anchor="w",
         ).pack(fill="x", pady=(0, 6))
 
@@ -54,7 +132,7 @@ class Blip:
             fg="#cdd6f4",
             insertbackground="#cdd6f4",
             relief="flat",
-            font=("Segoe UI", 12),
+            font=(platform_font(), 12),
         )
         self.entry.pack(ipady=6)
 
@@ -63,7 +141,7 @@ class Blip:
             text="Enter to save · Esc to cancel",
             bg="#1e1e2e",
             fg="#585b70",
-            font=("Segoe UI", 8),
+            font=(platform_font(), 8),
             anchor="w",
         ).pack(fill="x", pady=(4, 0))
 
@@ -78,16 +156,18 @@ class Blip:
         self.root.geometry(f"+{(sw - w) // 2}+{(sh - h) // 3}")
 
     def poll_queue(self):
-        """Check the queue for messages from the pynput listener thread."""
+        """Check the queue for messages from the pynput/tray threads."""
         try:
             while True:
                 msg = self.queue.get_nowait()
                 if msg == "SHOW":
                     self.show_window()
+                elif msg == "QUIT":
+                    self.root.quit()
+                    return
         except queue.Empty:
             pass
-        finally:
-            self.root.after(100, self.poll_queue)
+        self.root.after(100, self.poll_queue)
 
     def show_window(self):
         """Reveal the window, clear past text, and steal focus."""
@@ -103,42 +183,71 @@ class Blip:
             self.is_visible = False
             self.root.withdraw()
 
-    def on_submit(self, event=None):
-        """Save the note and hide the UI."""
-        text = self.entry.get().strip()
-        if text:
-            self.append_note(text)
-        self.hide_window()
+    def flash_border(self, color: str, then_hide: bool = True) -> None:
+        """Briefly flash the window border, then optionally hide."""
+        self.root.configure(bg=color)
+        self.root.after(300, lambda: self._reset_border(then_hide))
 
-    def append_note(self, text: str) -> None:
-        """Append a timestamped note to blip.md."""
+    def _reset_border(self, then_hide: bool) -> None:
+        """Reset border color and optionally hide the window."""
+        self.root.configure(bg="#1e1e2e")
+        if then_hide:
+            self.hide_window()
+
+    def on_submit(self, event=None):
+        """Save the note and show visual feedback."""
+        text = self.entry.get().strip()
+        if not text:
+            self.hide_window()
+            return
+        if self.append_note(text):
+            self.flash_border("#a6e3a1", then_hide=True)
+        else:
+            self.flash_border("#f38ba8", then_hide=False)
+
+    def append_note(self, text: str) -> bool:
+        """Append a timestamped note to blip.md. Returns True on success."""
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
         line = f"- [{timestamp}] {text}\n"
 
-        OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
-        with OUTPUT_FILE.open("a", encoding="utf-8") as f:
-            f.write(line)
+        try:
+            OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
+            with OUTPUT_FILE.open("a", encoding="utf-8") as f:
+                f.write(line)
+            return True
+        except OSError:
+            logger.error("Failed to write to %s", OUTPUT_FILE, exc_info=True)
+            return False
 
 
 def main():
+    configure_dpi()
     print(f"Blip is running. ({HOTKEY} to capture · Ctrl+C to quit)")
     print(f"Notes → {OUTPUT_FILE}")
 
     root = tk.Tk()
     app = Blip(root)
 
+    create_tray_icon(app.queue)
+
     def on_hotkey():
         app.queue.put("SHOW")
 
-    listener = keyboard.GlobalHotKeys({HOTKEY: on_hotkey})
-    listener.start()
+    try:
+        listener = keyboard.GlobalHotKeys({HOTKEY: on_hotkey})
+        listener.start()
+    except Exception:
+        logger.error("Failed to register global hotkey %s", HOTKEY, exc_info=True)
+        print(f"ERROR: Could not register hotkey {HOTKEY}. See ~/blip.log for details.")
+        listener = None
 
     try:
         root.mainloop()
     except KeyboardInterrupt:
         print("\nBlip stopped.")
     finally:
-        listener.stop()
+        if listener is not None:
+            listener.stop()
 
 
 if __name__ == "__main__":
