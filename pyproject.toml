@@ -15,6 +15,6 @@ dependencies = [
 ]
 
 [tool.setuptools]
-py-modules = ["blip"]
+py-modules = ["blip", "blip_search", "blip_browse"]
 [project.scripts]
 blip = "blip:main"
