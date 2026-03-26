@@ -22,7 +22,7 @@ class Note:
     index: int          # 1-based position in file (stable for append-only)
     timestamp: datetime # parsed from [YYYY-MM-DD HH:MM]
     text: str           # full note text (continuation lines joined with \n)
-    tags: list[str]     # extracted #hashtags (e.g., ["#todo", "#urgent"])
+    tags: list[str]     # extracted hashtags without # prefix (e.g., ["todo", "urgent"])
     is_done: bool       # True if ☑ prefix, False if ☐ or no prefix
     line_number: int    # starting line in blip.md (for mark_done rewriting)
 ```
@@ -31,7 +31,7 @@ class Note:
 
 - A line matching `^- \[\d{4}-\d{2}-\d{2} \d{2}:\d{2}\] ` starts a new note.
 - Subsequent lines indented with 2 spaces are continuation lines, joined to the previous note's `text` with `\n` (leading 2-space indent stripped).
-- Tags extracted via `(?:^|\s)#(\w+)` regex from the full text (same pattern as `blip.py` — excludes URL fragments).
+- Tags extracted via `(?:^|\s)#(\w+)` regex from the full text (same pattern as `blip.py` — excludes URL fragments). Stored **without** the `#` prefix (e.g., `"todo"` not `"#todo"`) to match `SMART_TAGS` dict keys.
 - Smart-tag emoji prefixes (`☐`, `☑`, `🔴`, `⭐`, `💡`) are part of `text` — not stripped.
 - `is_done` is determined by presence of `☐` (False) or `☑` (True) in the text prefix. Notes without either are `is_done=False`.
 
@@ -201,7 +201,7 @@ All display-dependent tests use the existing `@needs_display` skip marker.
 
 | File | Current | After Phase 3 | Notes |
 |------|---------|---------------|-------|
-| `blip.py` | 459 lines | ~475 lines | +15 lines (tray menu + queue handler) |
+| `blip.py` | ~549 lines | ~565 lines | +15 lines (tray menu + queue handler) |
 | `blip_search.py` | — | ~120 lines | New: pure search logic |
 | `blip_browse.py` | — | ~250 lines | New: browse window UI |
 | `test_blip.py` | 188 lines | ~188 lines | Unchanged |
