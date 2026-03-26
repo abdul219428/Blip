@@ -132,12 +132,27 @@ class Blip:
             self.is_visible = False
             self.root.withdraw()
 
+    def flash_border(self, color: str, then_hide: bool = True) -> None:
+        """Briefly flash the window border, then optionally hide."""
+        self.root.configure(bg=color)
+        self.root.after(300, lambda: self._reset_border(then_hide))
+
+    def _reset_border(self, then_hide: bool) -> None:
+        """Reset border color and optionally hide the window."""
+        self.root.configure(bg="#1e1e2e")
+        if then_hide:
+            self.hide_window()
+
     def on_submit(self, event=None):
-        """Save the note and hide the UI."""
+        """Save the note and show visual feedback."""
         text = self.entry.get().strip()
-        if text:
-            self.append_note(text)
-        self.hide_window()
+        if not text:
+            self.hide_window()
+            return
+        if self.append_note(text):
+            self.flash_border("#a6e3a1", then_hide=True)
+        else:
+            self.flash_border("#f38ba8", then_hide=False)
 
     def append_note(self, text: str) -> bool:
         """Append a timestamped note to blip.md. Returns True on success."""
