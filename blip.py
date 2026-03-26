@@ -79,7 +79,7 @@ def load_config(config_path: Path) -> BlipConfig:
     }
 
     if not config_path.exists():
-        logger.info("No config file found — creating %s with defaults", config_path)
+        logger.warning("No config file found — creating %s with defaults", config_path)
         try:
             config_path.parent.mkdir(parents=True, exist_ok=True)
             config_path.write_text(json.dumps(defaults, indent=2), encoding="utf-8")
@@ -299,6 +299,10 @@ class Blip:
         """Check if we should show/update/hide the autocomplete popup, and grow widget."""
         self._grow_text_widget()
 
+        # Skip autocomplete logic for navigation/control keys
+        if event and event.keysym in ("Up", "Down", "Tab", "Escape"):
+            return
+
         # Get text from cursor backwards to find # trigger
         cursor_pos = self.text.index(tk.INSERT)
         line_start = self.text.index(f"{cursor_pos} linestart")
@@ -355,7 +359,6 @@ class Blip:
         self.autocomplete_popup = popup
         self._ac_matches = matches
         self._ac_selected = 0
-        self._ac_hash_idx = hash_idx
 
         # Position near cursor
         try:
@@ -506,9 +509,6 @@ def main():
     config = load_config(Path.home() / ".blip.json")
 
     # Reconfigure logger to use config's log_file
-    global LOG_FILE, OUTPUT_FILE
-    LOG_FILE = config.log_file
-    OUTPUT_FILE = config.output_file
     for h in logger.handlers[:]:
         logger.removeHandler(h)
     _handler = logging.FileHandler(config.log_file, encoding="utf-8")
