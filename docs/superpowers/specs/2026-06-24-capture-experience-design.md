@@ -91,7 +91,7 @@ Always visible, unobtrusive. Uses theme's `muted` color.
 
 ## 5. Theme Presets
 
-4 built-in themes stored as a `THEMES` dict in blip.py:
+5 built-in themes stored as a `THEMES` dict in blip.py:
 
 | Theme | BG | FG | Input BG | Accent | Muted | Error |
 |-------|----|----|----------|--------|-------|-------|
@@ -99,6 +99,7 @@ Always visible, unobtrusive. Uses theme's `muted` color.
 | `light` | `#eff1f5` | `#4c4f69` | `#ccd0da` | `#40a02b` | `#8c8fa1` | `#d20f39` |
 | `dracula` | `#282a36` | `#f8f8f2` | `#44475a` | `#bd93f9` | `#6272a4` | `#ff5555` |
 | `gruvbox` | `#282828` | `#ebdbb2` | `#3c3836` | `#b8bb26` | `#665c54` | `#fb4934` |
+| `mono` | `#0a0a0a` | `#d0d0d0` | `#1a1a1a` | `#d0d0d0` | `#4a4a4a` | `#ff3333` |
 
 Each theme provides: bg, fg, entry_bg, accent (flash border success, autocomplete highlight), muted (footer hints, keybinding hints), error (flash border on save failure).
 
@@ -158,7 +159,7 @@ blip.py
 | `test_load_config_partial` | Partial JSON → merged with defaults |
 | `test_load_config_malformed` | Bad JSON → warning logged, defaults |
 | `test_load_config_unknown_theme` | Unknown theme → falls back to tokyo-night |
-| `test_theme_colors` | All 4 themes have valid bg/fg/entry_bg/accent |
+| `test_theme_colors` | All 5 themes have valid bg/fg/entry_bg/accent/muted/error |
 | `test_window_size_presets` | All 3 sizes have valid width/lines/max_lines |
 | `test_parse_tags_smart` | `#todo #urgent` → ☐ 🔴 prefix |
 | `test_parse_tags_dedup` | `#todo #todo` → single ☐ prefix |
