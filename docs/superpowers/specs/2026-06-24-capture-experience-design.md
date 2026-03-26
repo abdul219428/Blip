@@ -85,6 +85,7 @@ Always visible, unobtrusive. Uses theme's `muted` color.
 - Shows a `tk.Toplevel` popup near the cursor with the 4 options
 - Filters as user continues typing (e.g., `#to` → `#todo`)
 - Arrow keys to navigate, Enter/Tab to insert, Escape to dismiss
+- Escape dismisses popup first; if no popup is open, Escape dismisses the window (innermost-first)
 - Positioned via `tk.Text.bbox()` relative to cursor
 - Popup uses theme colors (entry_bg background, fg text, accent highlight)
 
@@ -174,3 +175,4 @@ All tests use `tmp_path` fixtures, no tkinter dependency.
 - `tk.Entry` → `tk.Text` changes the widget API (`.get()`, `.insert()`, `.delete()`)
 - Existing `on_submit()` and `append_note()` updated for multi-line format
 - Flash border continues to use accent color (success) and error color (failure) from active theme
+- `create_tray_icon()` references global `OUTPUT_FILE` — must thread config output_file path through instead
