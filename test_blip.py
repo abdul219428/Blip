@@ -207,3 +207,51 @@ def test_parse_tags_url_safe():
     assert not result.startswith("🔴")
     assert not result.startswith("⭐")
     assert not result.startswith("💡")
+
+
+def test_multiline_format(tmp_path):
+    """Multi-line text uses indented continuation lines."""
+    import blip as blip_mod
+
+    test_file = tmp_path / "blip.md"
+    original = blip_mod.OUTPUT_FILE
+    blip_mod.OUTPUT_FILE = test_file
+
+    try:
+        root = tk.Tk()
+        root.withdraw()
+        app = blip_mod.Blip(root)
+        result = app.append_note("line one\nline two\nline three")
+        root.destroy()
+
+        assert result is True
+        content = test_file.read_text(encoding="utf-8")
+        lines = content.strip().split("\n")
+        assert len(lines) == 3
+        assert lines[0].startswith("- [")
+        assert lines[0].endswith("] line one")
+        assert lines[1] == "  line two"
+        assert lines[2] == "  line three"
+    finally:
+        blip_mod.OUTPUT_FILE = original
+
+
+def test_empty_submit_ignored(tmp_path):
+    """Whitespace-only text is not saved."""
+    import blip as blip_mod
+
+    test_file = tmp_path / "blip.md"
+    original = blip_mod.OUTPUT_FILE
+    blip_mod.OUTPUT_FILE = test_file
+
+    try:
+        root = tk.Tk()
+        root.withdraw()
+        app = blip_mod.Blip(root)
+        result = app.append_note("   \n  \n  ")
+        root.destroy()
+
+        assert result is False
+        assert not test_file.exists()
+    finally:
+        blip_mod.OUTPUT_FILE = original

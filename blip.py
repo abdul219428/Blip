@@ -312,14 +312,25 @@ class Blip:
             self.flash_border("#f38ba8", then_hide=False)
 
     def append_note(self, text: str) -> bool:
-        """Append a timestamped note to blip.md. Returns True on success."""
+        """Append a timestamped note to output file. Returns True on success."""
+        text = text.strip()
+        if not text:
+            return False
+
+        # Truncate very long notes
+        if len(text) > 10_000:
+            text = text[:10_000]
+
+        text = parse_smart_tags(text)
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-        line = f"- [{timestamp}] {text}\n"
+        lines = text.split("\n")
+        first = f"- [{timestamp}] {lines[0]}\n"
+        rest = "".join(f"  {line}\n" for line in lines[1:])
 
         try:
             OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
             with OUTPUT_FILE.open("a", encoding="utf-8") as f:
-                f.write(line)
+                f.write(first + rest)
             return True
         except OSError:
             logger.error("Failed to write to %s", OUTPUT_FILE, exc_info=True)
