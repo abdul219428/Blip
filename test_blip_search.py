@@ -1,0 +1,84 @@
+"""Tests for blip_search.py — note parsing and search logic."""
+
+from pathlib import Path
+from datetime import datetime
+
+
+def test_parse_notes_basic(tmp_path):
+    """Single note parsed correctly: timestamp, text, tags, line_number."""
+    f = tmp_path / "blip.md"
+    f.write_text("- [2026-03-26 14:30] ☐ buy milk #todo\n", encoding="utf-8")
+
+    from blip_search import parse_notes
+    notes = parse_notes(f)
+
+    assert len(notes) == 1
+    n = notes[0]
+    assert n.index == 1
+    assert n.timestamp == datetime(2026, 3, 26, 14, 30)
+    assert n.text == "☐ buy milk #todo"
+    assert n.tags == ["todo"]
+    assert n.is_done is False
+    assert n.line_number == 0
+
+
+def test_parse_notes_multiline(tmp_path):
+    """Continuation lines joined to parent note."""
+    f = tmp_path / "blip.md"
+    f.write_text(
+        "- [2026-03-26 14:30] first line\n"
+        "  second line\n"
+        "  third line\n",
+        encoding="utf-8",
+    )
+
+    from blip_search import parse_notes
+    notes = parse_notes(f)
+
+    assert len(notes) == 1
+    assert notes[0].text == "first line\nsecond line\nthird line"
+
+
+def test_parse_notes_empty_file(tmp_path):
+    """Empty file returns empty list."""
+    f = tmp_path / "blip.md"
+    f.write_text("", encoding="utf-8")
+
+    from blip_search import parse_notes
+    notes = parse_notes(f)
+    assert notes == []
+
+
+def test_parse_notes_missing_file(tmp_path):
+    """Missing file returns empty list."""
+    from blip_search import parse_notes
+    notes = parse_notes(tmp_path / "nonexistent.md")
+    assert notes == []
+
+
+def test_parse_notes_done_status(tmp_path):
+    """☐ → is_done=False, ☑ → is_done=True."""
+    f = tmp_path / "blip.md"
+    f.write_text(
+        "- [2026-03-26 14:30] ☐ open item #todo\n"
+        "- [2026-03-26 15:00] ☑ done item #todo\n",
+        encoding="utf-8",
+    )
+
+    from blip_search import parse_notes
+    notes = parse_notes(f)
+
+    assert notes[0].is_done is False
+    assert notes[1].is_done is True
+
+
+def test_parse_notes_no_prefix(tmp_path):
+    """Note without smart-tag emoji → is_done=False."""
+    f = tmp_path / "blip.md"
+    f.write_text("- [2026-03-26 14:30] plain note\n", encoding="utf-8")
+
+    from blip_search import parse_notes
+    notes = parse_notes(f)
+
+    assert notes[0].is_done is False
+    assert notes[0].tags == []
