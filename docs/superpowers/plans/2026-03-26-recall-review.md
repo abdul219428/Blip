@@ -18,7 +18,7 @@
 |------|--------|---------------|--------|
 | `blip_search.py` | Create | Note dataclass, parse_notes, search_notes, filter_by_tag, mark_done, TAG_COLORS dict | ~120 lines |
 | `blip_browse.py` | Create | BrowseWindow class — tkinter Toplevel with search, tag filters, scrollable cards | ~250 lines |
-| `test_blip_search.py` | Create | 11 tests for all search/parse/filter/mark_done logic | ~130 lines |
+| `test_blip_search.py` | Create | 12 tests for all search/parse/filter/mark_done logic | ~130 lines |
 | `test_blip_browse.py` | Create | 3 display-dependent tests for browse window UI | ~50 lines |
 | `blip.py` | Modify | Add "Browse Notes" to tray menu, handle `"browse"` in poll_queue | ~15 lines added |
 | `pyproject.toml` | Modify | Add new modules to setuptools config | ~2 lines |
@@ -638,9 +638,12 @@ class BrowseWindow:
         scrollbar.pack(side="right", fill="y")
         self.canvas.pack(side="left", fill="both", expand=True)
 
-        # Mousewheel scrolling (bound to canvas only, not globally)
-        self.canvas.bind("<MouseWheel>", lambda e: self.canvas.yview_scroll(-1 * (e.delta // 120), "units"))
-        self.cards_frame.bind("<MouseWheel>", lambda e: self.canvas.yview_scroll(-1 * (e.delta // 120), "units"))
+        # Mousewheel scrolling (bound to canvas and cards_frame, not globally)
+        def _on_mousewheel(e):
+            self.canvas.yview_scroll(-1 * (e.delta // 120), "units")
+        self.canvas.bind("<MouseWheel>", _on_mousewheel)
+        self.cards_frame.bind("<MouseWheel>", _on_mousewheel)
+        self._on_mousewheel = _on_mousewheel  # stored for binding on card children
 
         # Footer
         self.footer = tk.Label(
@@ -791,6 +794,10 @@ class BrowseWindow:
                     tags_frame, text=f"#{tag}", bg=t["bg"], fg=color,
                     font=(fnt, 9), padx=4, pady=1,
                 ).pack(side="left", padx=(0, 4))
+
+        # Bind mousewheel on card and all children for smooth scrolling
+        for widget in (outer, card, top_row, text_label):
+            widget.bind("<MouseWheel>", self._on_mousewheel)
 
         self._card_frames.append(outer)
 
