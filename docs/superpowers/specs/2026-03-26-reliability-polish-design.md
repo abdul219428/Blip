@@ -16,7 +16,7 @@ Blip is a functional prototype but lacks reliability and polish for daily use:
 
 ## Approach
 
-Harden the foundation with five targeted improvements, keeping everything in the single-file architecture (`blip.py` + new `test_blip.py`). One new dependency: `pystray` (with `Pillow`).
+Harden the foundation with five targeted improvements plus tests, keeping everything in the single-file architecture (`blip.py` + new `test_blip.py`). One new dependency: `pystray` (with `Pillow`).
 
 ## Design
 
@@ -82,7 +82,7 @@ A `platform_font()` function returns the OS-native font family:
 | `sys.platform` | Font Family | Rationale |
 |-----------------|-------------|-----------|
 | `win32` | Segoe UI | Ships with every Windows since Vista |
-| `darwin` | SF Pro | Default macOS system font |
+| `darwin` | Helvetica Neue | Ships with macOS; SF Pro doesn't resolve by name in tkinter |
 | `linux` | sans-serif | Resolved by fontconfig (Noto Sans, DejaVu, etc.) |
 | Other | TkDefaultFont | Safe tkinter fallback |
 
