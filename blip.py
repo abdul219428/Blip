@@ -26,6 +26,16 @@ logger.addHandler(_handler)
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+def platform_font() -> str:
+    """Return the native font family for the current OS."""
+    fonts = {
+        "win32": "Segoe UI",
+        "darwin": "Helvetica Neue",
+        "linux": "sans-serif",
+    }
+    return fonts.get(sys.platform, "TkDefaultFont")
+
+
 class Blip:
     def __init__(self, root: tk.Tk):
         self.root = root
@@ -52,7 +62,7 @@ class Blip:
             text="⚡  Blip",
             bg="#1e1e2e",
             fg="#cdd6f4",
-            font=("Segoe UI", 9),
+            font=(platform_font(), 9),
             anchor="w",
         ).pack(fill="x", pady=(0, 6))
 
@@ -63,7 +73,7 @@ class Blip:
             fg="#cdd6f4",
             insertbackground="#cdd6f4",
             relief="flat",
-            font=("Segoe UI", 12),
+            font=(platform_font(), 12),
         )
         self.entry.pack(ipady=6)
 
@@ -72,7 +82,7 @@ class Blip:
             text="Enter to save · Esc to cancel",
             bg="#1e1e2e",
             fg="#585b70",
-            font=("Segoe UI", 8),
+            font=(platform_font(), 8),
             anchor="w",
         ).pack(fill="x", pady=(4, 0))
 
