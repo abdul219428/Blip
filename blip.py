@@ -36,6 +36,16 @@ def platform_font() -> str:
     return fonts.get(sys.platform, "TkDefaultFont")
 
 
+def configure_dpi() -> None:
+    """Enable DPI awareness on Windows so the UI renders crisply on HiDPI displays."""
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            ctypes.windll.shcore.SetProcessDpiAwareness(1)
+        except (AttributeError, OSError):
+            pass
+
+
 class Blip:
     def __init__(self, root: tk.Tk):
         self.root = root
@@ -140,6 +150,7 @@ class Blip:
 
 
 def main():
+    configure_dpi()
     print(f"Blip is running. ({HOTKEY} to capture · Ctrl+C to quit)")
     print(f"Notes → {OUTPUT_FILE}")
 
