@@ -103,3 +103,16 @@ def search_notes(notes: list[Note], query: str) -> list[Note]:
 def filter_by_tag(notes: list[Note], tag: str) -> list[Note]:
     """Return only notes containing the given tag (without # prefix)."""
     return [n for n in notes if tag in n.tags]
+
+
+def mark_done(path: Path, note: Note) -> bool:
+    """Rewrite note's line in the file: ☐ → ☑. Returns True on success."""
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+        if note.line_number >= len(lines):
+            return False
+        lines[note.line_number] = lines[note.line_number].replace("☐", "☑", 1)
+        path.write_text("".join(lines), encoding="utf-8")
+        return True
+    except OSError:
+        return False

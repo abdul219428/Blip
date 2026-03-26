@@ -130,3 +130,32 @@ def test_filter_by_tag(tmp_path):
     results = filter_by_tag(notes, "todo")
     assert len(results) == 2
     assert all("todo" in n.tags for n in results)
+
+
+def test_mark_done(tmp_path):
+    """☐ flipped to ☑ in file, returns True."""
+    f = tmp_path / "blip.md"
+    f.write_text("- [2026-03-26 14:30] ☐ buy milk #todo\n", encoding="utf-8")
+
+    from blip_search import parse_notes, mark_done
+    notes = parse_notes(f)
+    result = mark_done(f, notes[0])
+
+    assert result is True
+    content = f.read_text(encoding="utf-8")
+    assert "☑" in content
+    assert "☐" not in content
+
+
+def test_mark_done_already_done(tmp_path):
+    """Already ☑ → no change, returns True."""
+    f = tmp_path / "blip.md"
+    f.write_text("- [2026-03-26 14:30] ☑ already done #todo\n", encoding="utf-8")
+
+    from blip_search import parse_notes, mark_done
+    notes = parse_notes(f)
+    result = mark_done(f, notes[0])
+
+    assert result is True
+    content = f.read_text(encoding="utf-8")
+    assert content.count("☑") == 1
