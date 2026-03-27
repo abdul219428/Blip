@@ -6,7 +6,11 @@ All data operations delegate to cogstash_search.py.
 
 from __future__ import annotations
 
-from cogstash_search import Note
+import sys
+import argparse
+from pathlib import Path
+
+from cogstash_search import Note, parse_notes, search_notes
 
 # ANSI escape codes — approximations of TAG_COLORS hex values
 ANSI_RESET = "\033[0m"
@@ -41,3 +45,49 @@ def format_note(note: Note, use_color: bool = True) -> str:
             colored = colored.replace(f"#{tag}", f"{color}#{tag}{ANSI_RESET}")
 
     return f"{ANSI_DIM}{ts}{ANSI_RESET} {colored}"
+
+
+def cmd_recent(args, config):
+    """Show the most recent N notes."""
+    notes = parse_notes(config.output_file)
+    if not notes:
+        print("No notes found.")
+        return
+
+    use_color = sys.stdout.isatty()
+    newest_first = list(reversed(notes))
+    limited = newest_first[:args.limit] if args.limit > 0 else newest_first
+
+    for note in limited:
+        print(format_note(note, use_color))
+
+
+def build_parser() -> argparse.ArgumentParser:
+    """Build the CLI argument parser with subcommands."""
+    parser = argparse.ArgumentParser(
+        prog="cogstash",
+        description="CogStash — query your brain dump from the terminal.",
+    )
+    sub = parser.add_subparsers(dest="command")
+
+    # recent
+    p_recent = sub.add_parser("recent", help="Show latest notes")
+    p_recent.add_argument("--limit", type=int, default=20, help="Max notes to show (default: 20)")
+    p_recent.set_defaults(func=cmd_recent)
+
+    return parser
+
+
+def cli_main(argv: list[str]) -> None:
+    """Entry point for CLI subcommands."""
+    from cogstash import load_config
+
+    parser = build_parser()
+    args = parser.parse_args(argv)
+
+    if not hasattr(args, "func"):
+        parser.print_help()
+        return
+
+    config = load_config(Path.home() / ".cogstash.json")
+    args.func(args, config)

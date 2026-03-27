@@ -66,3 +66,47 @@ def test_format_done_note():
     result = format_note(note, use_color=True)
     assert "\033[9" in result
     assert "fix login bug" in result
+
+
+def test_cmd_recent_default(tmp_path, capsys):
+    """Shows notes newest-first, up to 20 by default."""
+    f = _make_notes_file(tmp_path)
+    from cogstash_cli import cmd_recent
+    from cogstash import CogStashConfig
+    from types import SimpleNamespace
+
+    cmd_recent(SimpleNamespace(limit=20), CogStashConfig(output_file=f))
+    output = capsys.readouterr().out
+    lines = [l for l in output.strip().split("\n") if l.strip()]
+
+    assert len(lines) == 5
+    assert "redesign dashboard" in lines[0]  # newest first
+    assert "old note" in lines[4]  # oldest last
+
+
+def test_cmd_recent_limit(tmp_path, capsys):
+    """--limit restricts number of notes shown."""
+    f = _make_notes_file(tmp_path)
+    from cogstash_cli import cmd_recent
+    from cogstash import CogStashConfig
+    from types import SimpleNamespace
+
+    cmd_recent(SimpleNamespace(limit=2), CogStashConfig(output_file=f))
+    output = capsys.readouterr().out
+    lines = [l for l in output.strip().split("\n") if l.strip()]
+
+    assert len(lines) == 2
+    assert "redesign dashboard" in lines[0]
+    assert "fix login bug" in lines[1]
+
+
+def test_cmd_recent_empty(tmp_path, capsys):
+    """Empty/missing file shows 'No notes found.' message."""
+    f = tmp_path / "cogstash.md"  # does not exist
+    from cogstash_cli import cmd_recent
+    from cogstash import CogStashConfig
+    from types import SimpleNamespace
+
+    cmd_recent(SimpleNamespace(limit=20), CogStashConfig(output_file=f))
+    output = capsys.readouterr().out
+    assert "No notes found." in output
