@@ -1,4 +1,4 @@
-"""Tests for blip_browse.py — Browse Window UI."""
+"""Tests for cogstash_browse.py — Browse Window UI."""
 
 import tkinter as tk
 import pytest
@@ -17,15 +17,15 @@ needs_display = pytest.mark.skipif(not _has_display, reason="No display or Tcl u
 @needs_display
 def test_browse_window_creates(tmp_path):
     """BrowseWindow opens without error."""
-    f = tmp_path / "blip.md"
+    f = tmp_path / "cogstash.md"
     f.write_text("- [2026-03-26 14:30] ☐ test note #todo\n", encoding="utf-8")
 
-    from blip_browse import BrowseWindow
-    from blip import BlipConfig
+    from cogstash_browse import BrowseWindow
+    from cogstash import CogStashConfig
 
     root = tk.Tk()
     root.withdraw()
-    config = BlipConfig(output_file=f)
+    config = CogStashConfig(output_file=f)
     win = BrowseWindow(root, config)
     assert win.window.winfo_exists()
     win.window.destroy()
@@ -35,19 +35,19 @@ def test_browse_window_creates(tmp_path):
 @needs_display
 def test_browse_search_filters(tmp_path):
     """Typing in search box reduces visible cards."""
-    f = tmp_path / "blip.md"
+    f = tmp_path / "cogstash.md"
     f.write_text(
         "- [2026-03-26 14:30] ☐ buy milk #todo\n"
         "- [2026-03-26 11:20] meeting notes\n",
         encoding="utf-8",
     )
 
-    from blip_browse import BrowseWindow
-    from blip import BlipConfig
+    from cogstash_browse import BrowseWindow
+    from cogstash import CogStashConfig
 
     root = tk.Tk()
     root.withdraw()
-    config = BlipConfig(output_file=f)
+    config = CogStashConfig(output_file=f)
     win = BrowseWindow(root, config)
     total_before = len(win._visible_cards)
 
@@ -64,19 +64,19 @@ def test_browse_search_filters(tmp_path):
 @needs_display
 def test_browse_tag_filter(tmp_path):
     """Tag pill click filters cards."""
-    f = tmp_path / "blip.md"
+    f = tmp_path / "cogstash.md"
     f.write_text(
         "- [2026-03-26 14:30] ☐ buy milk #todo\n"
         "- [2026-03-26 11:20] ⭐ lunch #important\n",
         encoding="utf-8",
     )
 
-    from blip_browse import BrowseWindow
-    from blip import BlipConfig
+    from cogstash_browse import BrowseWindow
+    from cogstash import CogStashConfig
 
     root = tk.Tk()
     root.withdraw()
-    config = BlipConfig(output_file=f)
+    config = CogStashConfig(output_file=f)
     win = BrowseWindow(root, config)
 
     win._on_tag_filter("todo")
