@@ -1,7 +1,7 @@
 """
-blip.py — A global hotkey brain dump — press, type, gone.
+cogstash.py — A global hotkey brain dump — press, type, gone.
 Hotkey: Ctrl + Shift + Space
-Enter  → appends timestamped note to blip.md
+Enter  → appends timestamped note to cogstash.md
 Escape → hides window
 """
 
@@ -43,10 +43,10 @@ SMART_TAGS = {
 
 # ── Config ────────────────────────────────────────────────────────────────────
 HOTKEY      = "<ctrl>+<shift>+<space>"
-OUTPUT_FILE = Path.home() / "blip.md"
-LOG_FILE    = Path.home() / "blip.log"
+OUTPUT_FILE = Path.home() / "cogstash.md"
+LOG_FILE    = Path.home() / "cogstash.log"
 
-logger = logging.getLogger("blip")
+logger = logging.getLogger("cogstash")
 logger.setLevel(logging.WARNING)
 _handler = logging.FileHandler(LOG_FILE, encoding="utf-8")
 _handler.setFormatter(logging.Formatter("[%(asctime)s] %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M"))
@@ -54,7 +54,7 @@ logger.addHandler(_handler)
 
 
 @dataclass
-class BlipConfig:
+class CogStashConfig:
     hotkey: str = "<ctrl>+<shift>+<space>"
     output_file: Path = None
     log_file: Path = None
@@ -63,17 +63,17 @@ class BlipConfig:
 
     def __post_init__(self):
         if self.output_file is None:
-            self.output_file = Path.home() / "blip.md"
+            self.output_file = Path.home() / "cogstash.md"
         if self.log_file is None:
-            self.log_file = Path.home() / "blip.log"
+            self.log_file = Path.home() / "cogstash.log"
 
 
-def load_config(config_path: Path) -> BlipConfig:
+def load_config(config_path: Path) -> CogStashConfig:
     """Load config from JSON file, merging with defaults."""
     defaults = {
         "hotkey": "<ctrl>+<shift>+<space>",
-        "output_file": str(Path.home() / "blip.md"),
-        "log_file": str(Path.home() / "blip.log"),
+        "output_file": str(Path.home() / "cogstash.md"),
+        "log_file": str(Path.home() / "cogstash.log"),
         "theme": "tokyo-night",
         "window_size": "default",
     }
@@ -85,13 +85,13 @@ def load_config(config_path: Path) -> BlipConfig:
             config_path.write_text(json.dumps(defaults, indent=2), encoding="utf-8")
         except OSError:
             logger.warning("Could not create config file %s", config_path, exc_info=True)
-        return BlipConfig()
+        return CogStashConfig()
 
     try:
         data = json.loads(config_path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError) as e:
         logger.warning("Bad config file %s: %s — using defaults", config_path, e)
-        return BlipConfig()
+        return CogStashConfig()
 
     merged = {**defaults, **data}
 
@@ -109,7 +109,7 @@ def load_config(config_path: Path) -> BlipConfig:
     output_file = Path(merged["output_file"]).expanduser()
     log_file = Path(merged["log_file"]).expanduser()
 
-    return BlipConfig(
+    return CogStashConfig(
         hotkey=merged["hotkey"],
         output_file=output_file,
         log_file=log_file,
@@ -155,7 +155,7 @@ def configure_dpi() -> None:
             pass
 
 
-def create_tray_icon(app_queue: queue.Queue, config: BlipConfig) -> None:
+def create_tray_icon(app_queue: queue.Queue, config: CogStashConfig) -> None:
     """Create and run a system tray icon on a daemon thread."""
     try:
         import pystray
@@ -198,20 +198,20 @@ def create_tray_icon(app_queue: queue.Queue, config: BlipConfig) -> None:
         app_queue.put("BROWSE")
 
     menu = pystray.Menu(
-        pystray.MenuItem("Blip ⚡", None, enabled=False),
+        pystray.MenuItem("CogStash ⚡", None, enabled=False),
         pystray.Menu.SEPARATOR,
         pystray.MenuItem(f"Open {config.output_file.name}", lambda: open_notes()),
         pystray.MenuItem("Browse Notes", lambda: browse_notes()),
         pystray.MenuItem("Quit", quit_app),
     )
 
-    icon = pystray.Icon("blip", img, "Blip", menu)
+    icon = pystray.Icon("cogstash", img, "CogStash", menu)
     thread = threading.Thread(target=icon.run, daemon=True)
     thread.start()
 
 
-class Blip:
-    def __init__(self, root: tk.Tk, config: BlipConfig):
+class CogStash:
+    def __init__(self, root: tk.Tk, config: CogStashConfig):
         self.root = root
         self.config = config
         self.queue = queue.Queue()
@@ -235,7 +235,7 @@ class Blip:
         frame.pack()
 
         tk.Label(
-            frame, text="⚡  Blip", bg=t["bg"], fg=t["fg"],
+            frame, text="⚡  CogStash", bg=t["bg"], fg=t["fg"],
             font=(platform_font(), 9), anchor="w",
         ).pack(fill="x", pady=(0, 6))
 
@@ -447,7 +447,7 @@ class Blip:
 
     def _open_browse(self):
         """Open the Browse Notes window."""
-        from blip_browse import BrowseWindow
+        from cogstash_browse import BrowseWindow
         BrowseWindow(self.root, self.config)
 
     def show_window(self):
@@ -517,7 +517,7 @@ class Blip:
 
 
 def main():
-    config = load_config(Path.home() / ".blip.json")
+    config = load_config(Path.home() / ".cogstash.json")
 
     # Reconfigure logger to use config's log_file
     for h in logger.handlers[:]:
@@ -527,11 +527,11 @@ def main():
     logger.addHandler(_handler)
 
     configure_dpi()
-    print(f"Blip is running. ({config.hotkey} to capture · Ctrl+C to quit)")
+    print(f"CogStash is running. ({config.hotkey} to capture · Ctrl+C to quit)")
     print(f"Notes → {config.output_file}")
 
     root = tk.Tk()
-    app = Blip(root, config)
+    app = CogStash(root, config)
 
     create_tray_icon(app.queue, config)
 
@@ -549,7 +549,7 @@ def main():
     try:
         root.mainloop()
     except KeyboardInterrupt:
-        print("\nBlip stopped.")
+        print("\nCogStash stopped.")
     finally:
         if listener is not None:
             listener.stop()
