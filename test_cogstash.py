@@ -273,3 +273,59 @@ def test_load_config_invalid_tag_skipped(tmp_path):
     assert "bad_no_emoji" not in config.tags
     assert "bad_no_color" not in config.tags
     assert "bad_hex" not in config.tags
+
+
+def test_parse_smart_tags_custom():
+    """parse_smart_tags uses custom tags when provided."""
+    from cogstash import parse_smart_tags
+    custom = {"work": "💼", "todo": "☐"}
+    result = parse_smart_tags("meeting notes #work", smart_tags=custom)
+    assert result.startswith("💼")
+    assert "#work" in result
+
+
+def test_parse_smart_tags_default():
+    """parse_smart_tags still works with defaults when no param given."""
+    from cogstash import parse_smart_tags
+    result = parse_smart_tags("buy milk #todo")
+    assert result.startswith("☐")
+
+
+def test_append_note_to_file(tmp_path):
+    """append_note_to_file writes a timestamped note."""
+    from cogstash import append_note_to_file
+    out = tmp_path / "notes.md"
+    result = append_note_to_file("hello world", out)
+    assert result is True
+    content = out.read_text(encoding="utf-8")
+    assert "hello world" in content
+    assert content.startswith("- [")
+
+
+def test_append_note_to_file_smart_tags(tmp_path):
+    """append_note_to_file applies smart tag emojis."""
+    from cogstash import append_note_to_file
+    out = tmp_path / "notes.md"
+    custom = {"work": "💼"}
+    append_note_to_file("meeting #work", out, smart_tags=custom)
+    content = out.read_text(encoding="utf-8")
+    assert "💼" in content
+
+
+def test_append_note_to_file_multiline(tmp_path):
+    """Multi-line notes get 2-space indented continuation."""
+    from cogstash import append_note_to_file
+    out = tmp_path / "notes.md"
+    append_note_to_file("line one\nline two\nline three", out)
+    content = out.read_text(encoding="utf-8")
+    assert "  line two\n" in content
+    assert "  line three\n" in content
+
+
+def test_append_note_to_file_empty(tmp_path):
+    """Empty text returns False and writes nothing."""
+    from cogstash import append_note_to_file
+    out = tmp_path / "notes.md"
+    result = append_note_to_file("  ", out)
+    assert result is False
+    assert not out.exists()
