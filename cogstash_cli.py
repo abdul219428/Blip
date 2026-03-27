@@ -10,7 +10,7 @@ import sys
 import argparse
 from pathlib import Path
 
-from cogstash_search import Note, parse_notes, search_notes
+from cogstash_search import Note, parse_notes, search_notes, edit_note, delete_note
 
 # ANSI escape codes — approximations of TAG_COLORS hex values
 ANSI_RESET = "\033[0m"
@@ -153,6 +153,81 @@ def cmd_add(args, config, ansi_tag=None):
         sys.exit(1)
 
 
+def _find_note(config, number: int | None = None, search: str | None = None,
+               ansi_tag: dict[str, str] | None = None) -> Note | None:
+    """Find a note by number or search. Prints errors and returns None on failure."""
+    notes = parse_notes(config.output_file)
+    if number is not None:
+        for n in notes:
+            if n.index == number:
+                return n
+        print(f"Error: note #{number} not found.", file=sys.stderr)
+        return None
+    if search is not None:
+        results = search_notes(notes, search)
+        if len(results) == 1:
+            return results[0]
+        if len(results) == 0:
+            print(f"Error: no notes match '{search}'.", file=sys.stderr)
+            return None
+        use_color = sys.stdout.isatty()
+        print(f"Multiple matches ({len(results)}). Use a note number instead:", file=sys.stderr)
+        for n in results:
+            print(f"  {n.index}: {format_note(n, use_color, ansi_tag)}", file=sys.stderr)
+        return None
+    print("Error: provide a note number or --search.", file=sys.stderr)
+    return None
+
+
+def cmd_edit(args, config, ansi_tag=None):
+    """Edit a note's text."""
+    number = None
+    text_parts = list(args.args) if args.args else []
+
+    if args.search:
+        pass
+    elif text_parts and text_parts[0].isdigit():
+        number = int(text_parts.pop(0))
+    else:
+        print("Error: provide a note number or --search.", file=sys.stderr)
+        sys.exit(1)
+
+    if not text_parts:
+        print("Error: no replacement text provided.", file=sys.stderr)
+        sys.exit(1)
+
+    note = _find_note(config, number=number, search=args.search, ansi_tag=ansi_tag)
+    if note is None:
+        sys.exit(1)
+
+    new_text = " ".join(text_parts)
+    if not edit_note(config.output_file, note, new_text):
+        print("Error: failed to update note.", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"Note {note.index} updated.")
+
+
+def cmd_delete(args, config, ansi_tag=None):
+    """Delete a note."""
+    note = _find_note(config, number=args.number, search=args.search, ansi_tag=ansi_tag)
+    if note is None:
+        sys.exit(1)
+
+    if not args.yes:
+        preview = note.text[:60] + ("..." if len(note.text) > 60 else "")
+        answer = input(f"Delete note {note.index}: \"{preview}\"? [y/N] ")
+        if answer.lower() != "y":
+            print("Cancelled.")
+            return
+
+    if not delete_note(config.output_file, note):
+        print("Error: failed to delete note.", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"Note {note.index} deleted.")
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI argument parser with subcommands."""
     parser = argparse.ArgumentParser(
@@ -180,6 +255,20 @@ def build_parser() -> argparse.ArgumentParser:
     p_add = sub.add_parser("add", help="Add a note from the CLI")
     p_add.add_argument("text", nargs="*", help="Note text (or pipe via stdin)")
     p_add.set_defaults(func=cmd_add)
+
+    # edit — uses a single "args" positional to avoid int/str ambiguity
+    # Usage: cogstash edit 3 new text  OR  cogstash edit --search "milk" new text
+    p_edit = sub.add_parser("edit", help="Edit a note's text")
+    p_edit.add_argument("args", nargs="*", help="Note number followed by new text")
+    p_edit.add_argument("--search", "-s", help="Find note by keyword instead of number")
+    p_edit.set_defaults(func=cmd_edit)
+
+    # delete
+    p_delete = sub.add_parser("delete", help="Delete a note")
+    p_delete.add_argument("number", type=int, nargs="?", default=None, help="Note number")
+    p_delete.add_argument("--search", "-s", help="Find note by keyword")
+    p_delete.add_argument("--yes", "-y", action="store_true", help="Skip confirmation")
+    p_delete.set_defaults(func=cmd_delete)
 
     return parser
 

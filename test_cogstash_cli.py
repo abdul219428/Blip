@@ -268,3 +268,135 @@ def test_cmd_add_empty(tmp_path, monkeypatch):
     with pytest.raises(SystemExit):
         cmd_add(SimpleNamespace(text=[]), CogStashConfig(output_file=f))
 
+
+def test_cmd_edit_by_number(tmp_path, capsys):
+    """Edit by note number replaces text, preserves timestamp."""
+    f = _make_notes_file(tmp_path)
+    from cogstash_cli import cmd_edit
+    from cogstash import CogStashConfig
+    from types import SimpleNamespace
+
+    cmd_edit(SimpleNamespace(args=["3", "updated", "note"], search=None), CogStashConfig(output_file=f))
+    content = f.read_text(encoding="utf-8")
+    assert "updated note" in content
+    assert "- [2026-03-26 14:30]" in content
+    output = capsys.readouterr().out
+    assert "updated" in output.lower() or "Note 3" in output
+
+
+def test_cmd_edit_by_search(tmp_path, capsys):
+    """Edit by search keyword finds and replaces note."""
+    f = _make_notes_file(tmp_path)
+    from cogstash_cli import cmd_edit
+    from cogstash import CogStashConfig
+    from types import SimpleNamespace
+
+    cmd_edit(SimpleNamespace(args=["get", "oat", "milk"], search="buy milk"), CogStashConfig(output_file=f))
+    content = f.read_text(encoding="utf-8")
+    assert "get oat milk" in content
+    assert "buy milk" not in content
+
+
+def test_cmd_edit_not_found(tmp_path):
+    """Edit with invalid number exits with code 1."""
+    import pytest
+    f = _make_notes_file(tmp_path)
+    from cogstash_cli import cmd_edit
+    from cogstash import CogStashConfig
+    from types import SimpleNamespace
+
+    with pytest.raises(SystemExit):
+        cmd_edit(SimpleNamespace(args=["99", "nope"], search=None), CogStashConfig(output_file=f))
+
+
+def test_cmd_edit_no_text(tmp_path):
+    """Edit with empty text exits with code 1."""
+    import pytest
+    f = _make_notes_file(tmp_path)
+    from cogstash_cli import cmd_edit
+    from cogstash import CogStashConfig
+    from types import SimpleNamespace
+
+    with pytest.raises(SystemExit):
+        cmd_edit(SimpleNamespace(args=["1"], search=None), CogStashConfig(output_file=f))
+
+
+def test_cmd_edit_search_multiple_matches(tmp_path, capsys):
+    """Edit with ambiguous search shows matches and exits with code 1."""
+    import pytest
+    f = _make_notes_file(tmp_path)
+    from cogstash_cli import cmd_edit
+    from cogstash import CogStashConfig
+    from types import SimpleNamespace
+
+    with pytest.raises(SystemExit):
+        cmd_edit(SimpleNamespace(args=["new"], search="note"), CogStashConfig(output_file=f))
+    err = capsys.readouterr().err
+    assert "Multiple matches" in err
+
+
+def test_cmd_delete_with_yes(tmp_path, capsys):
+    """Delete with --yes skips confirmation and removes note."""
+    f = _make_notes_file(tmp_path)
+    from cogstash_cli import cmd_delete
+    from cogstash import CogStashConfig
+    from types import SimpleNamespace
+
+    cmd_delete(SimpleNamespace(number=3, yes=True, search=None), CogStashConfig(output_file=f))
+    content = f.read_text(encoding="utf-8")
+    assert "buy milk" not in content
+    output = capsys.readouterr().out
+    assert "deleted" in output.lower() or "Note 3" in output
+
+
+def test_cmd_delete_by_search(tmp_path, capsys):
+    """Delete by search keyword finds and removes note."""
+    f = _make_notes_file(tmp_path)
+    from cogstash_cli import cmd_delete
+    from cogstash import CogStashConfig
+    from types import SimpleNamespace
+
+    cmd_delete(SimpleNamespace(number=None, yes=True, search="buy milk"), CogStashConfig(output_file=f))
+    content = f.read_text(encoding="utf-8")
+    assert "buy milk" not in content
+    output = capsys.readouterr().out
+    assert "deleted" in output.lower()
+
+
+def test_cmd_delete_confirm_yes(tmp_path, monkeypatch):
+    """Delete with interactive confirmation (user types 'y')."""
+    f = _make_notes_file(tmp_path)
+    from cogstash_cli import cmd_delete
+    from cogstash import CogStashConfig
+    from types import SimpleNamespace
+
+    monkeypatch.setattr("builtins.input", lambda _: "y")
+    cmd_delete(SimpleNamespace(number=3, yes=False, search=None), CogStashConfig(output_file=f))
+    content = f.read_text(encoding="utf-8")
+    assert "buy milk" not in content
+
+
+def test_cmd_delete_confirm_no(tmp_path, monkeypatch):
+    """Delete cancelled when user types 'n'."""
+    f = _make_notes_file(tmp_path)
+    from cogstash_cli import cmd_delete
+    from cogstash import CogStashConfig
+    from types import SimpleNamespace
+
+    monkeypatch.setattr("builtins.input", lambda _: "n")
+    cmd_delete(SimpleNamespace(number=3, yes=False, search=None), CogStashConfig(output_file=f))
+    content = f.read_text(encoding="utf-8")
+    assert "buy milk" in content
+
+
+def test_cmd_delete_not_found(tmp_path):
+    """Delete with invalid number exits with code 1."""
+    import pytest
+    f = _make_notes_file(tmp_path)
+    from cogstash_cli import cmd_delete
+    from cogstash import CogStashConfig
+    from types import SimpleNamespace
+
+    with pytest.raises(SystemExit):
+        cmd_delete(SimpleNamespace(number=99, yes=True, search=None), CogStashConfig(output_file=f))
+
