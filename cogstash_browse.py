@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from cogstash import THEMES, DEFAULT_SMART_TAGS, CogStashConfig, platform_font
-from cogstash_search import parse_notes, search_notes, filter_by_tag, mark_done, DEFAULT_TAG_COLORS, Note
+from cogstash_search import parse_notes, search_notes, filter_by_tag, mark_done, edit_note, delete_note, DEFAULT_TAG_COLORS, Note
 
 
 class BrowseWindow:
@@ -251,20 +251,27 @@ class BrowseWindow:
         )
         text_label.pack(fill="x", pady=(4, 0))
 
+        # Collect all card widgets for event binding
+        card_widgets = [outer, card, top_row, text_label]
+
         # Tag pills
         if note.tags:
             tags_frame = tk.Frame(card, bg=card_bg)
             tags_frame.pack(fill="x", pady=(4, 0), anchor="w")
             for tag in note.tags:
                 color = self.tag_colors.get(tag, t["muted"])
-                tk.Label(
+                pill = tk.Label(
                     tags_frame, text=f"#{tag}", bg=t["bg"], fg=color,
                     font=(fnt, 9), padx=4, pady=1,
-                ).pack(side="left", padx=(0, 4))
+                )
+                pill.pack(side="left", padx=(0, 4))
+                card_widgets.append(pill)
+            card_widgets.append(tags_frame)
 
-        # Bind mousewheel on card and all children for smooth scrolling
-        for widget in (outer, card, top_row, text_label):
+        # Bind mousewheel and right-click context menu on all card widgets
+        for widget in card_widgets:
             widget.bind("<MouseWheel>", self._on_mousewheel)
+            widget.bind("<Button-3>", lambda e, n=note: self._show_context_menu(e, n))
 
         self._card_frames.append(outer)
 
@@ -272,3 +279,94 @@ class BrowseWindow:
         """Mark a todo note as done and refresh the display."""
         if mark_done(self.config.output_file, note):
             self._load_notes()
+
+    def _show_context_menu(self, event, note: Note):
+        """Show right-click context menu for a note card."""
+        menu = tk.Menu(self.window, tearoff=0)
+        menu.add_command(label="✏️ Edit", command=lambda: self._on_edit(note))
+        menu.add_command(label="🗑️ Delete", command=lambda: self._on_delete(note))
+        menu.add_separator()
+        menu.add_command(label="📋 Copy text", command=lambda: self._on_copy(note))
+        menu.tk_popup(event.x_root, event.y_root)
+
+    def _on_edit(self, note: Note):
+        """Open themed edit dialog for a note."""
+        t = self.theme
+        fnt = platform_font()
+
+        dialog = tk.Toplevel(self.window)
+        dialog.title("Edit Note")
+        dialog.configure(bg=t["bg"])
+        dialog.geometry("420x220")
+        dialog.transient(self.window)
+        dialog.grab_set()
+
+        # Header: title + timestamp
+        header = tk.Frame(dialog, bg=t["bg"])
+        header.pack(fill="x", padx=16, pady=(12, 0))
+        tk.Label(
+            header, text="Edit Note", bg=t["bg"], fg=t["fg"],
+            font=(fnt, 12, "bold"),
+        ).pack(side="left")
+        tk.Label(
+            header, text=note.timestamp.strftime("[%Y-%m-%d %H:%M]"),
+            bg=t["bg"], fg=t["muted"], font=(fnt, 10),
+        ).pack(side="right")
+
+        # Text area
+        text_widget = tk.Text(
+            dialog, bg=t["entry_bg"], fg=t["fg"], insertbackground=t["fg"],
+            font=(fnt, 11), relief="flat", bd=0, wrap="word",
+            highlightthickness=1, highlightbackground=t["muted"],
+            highlightcolor=t["accent"],
+        )
+        text_widget.pack(fill="both", expand=True, padx=16, pady=8)
+        text_widget.insert("1.0", note.text)
+        text_widget.focus_set()
+
+        # Buttons
+        btn_frame = tk.Frame(dialog, bg=t["bg"])
+        btn_frame.pack(fill="x", padx=16, pady=(0, 12))
+
+        def save():
+            new_text = text_widget.get("1.0", "end-1c").strip()
+            if not new_text:
+                return
+            if edit_note(self.config.output_file, note, new_text):
+                dialog.destroy()
+                self._load_notes()
+            else:
+                from tkinter import messagebox
+                messagebox.showerror("Error", "Failed to save changes.", parent=dialog)
+
+        tk.Button(
+            btn_frame, text="Cancel", command=dialog.destroy,
+            bg=t["entry_bg"], fg=t["fg"], font=(fnt, 10),
+            relief="flat", padx=12, pady=4, cursor="hand2",
+        ).pack(side="right", padx=(4, 0))
+        tk.Button(
+            btn_frame, text="Save", command=save,
+            bg=t["accent"], fg=t["bg"], font=(fnt, 10, "bold"),
+            relief="flat", padx=12, pady=4, cursor="hand2",
+        ).pack(side="right")
+
+        dialog.bind("<Escape>", lambda e: dialog.destroy())
+
+    def _on_delete(self, note: Note):
+        """Delete a note with confirmation dialog."""
+        from tkinter import messagebox
+        preview = note.text[:50] + ("..." if len(note.text) > 50 else "")
+        if messagebox.askyesno(
+            "Delete Note",
+            f"Delete this note?\n\n\"{preview}\"",
+            parent=self.window,
+        ):
+            if delete_note(self.config.output_file, note):
+                self._load_notes()
+            else:
+                messagebox.showerror("Error", "Failed to delete note.", parent=self.window)
+
+    def _on_copy(self, note: Note):
+        """Copy note text to clipboard."""
+        self.window.clipboard_clear()
+        self.window.clipboard_append(note.text)

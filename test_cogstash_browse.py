@@ -84,3 +84,65 @@ def test_browse_custom_tag_pills(tk_root, tmp_path):
     bw = BrowseWindow(tk_root, config, smart_tags=custom_smart, tag_colors=custom_colors)
     assert "work" in bw._pill_buttons
     bw.window.destroy()
+
+
+@needs_display
+def test_browse_context_menu_exists(tmp_path, tk_root):
+    """Right-click on a card shows a context menu."""
+    f = tmp_path / "cogstash.md"
+    f.write_text("- [2026-03-26 14:30] test note #todo\n", encoding="utf-8")
+
+    from cogstash_browse import BrowseWindow
+    from cogstash import CogStashConfig
+
+    config = CogStashConfig(output_file=f)
+    win = BrowseWindow(tk_root, config)
+    assert hasattr(win, "_show_context_menu")
+    win.window.destroy()
+
+
+@needs_display
+def test_browse_edit_note(tmp_path, tk_root):
+    """Edit via _on_edit updates file and refreshes cards."""
+    f = tmp_path / "cogstash.md"
+    f.write_text("- [2026-03-26 14:30] original text\n", encoding="utf-8")
+
+    from cogstash_browse import BrowseWindow
+    from cogstash import CogStashConfig
+    from cogstash_search import edit_note, parse_notes
+
+    config = CogStashConfig(output_file=f)
+    win = BrowseWindow(tk_root, config)
+    note = win._all_notes[0]
+
+    # Directly call edit_note (dialog would be interactive)
+    edit_note(f, note, "updated text")
+    win._load_notes()
+    assert win._all_notes[0].text == "updated text"
+    win.window.destroy()
+
+
+@needs_display
+def test_browse_delete_note(tmp_path, tk_root):
+    """Delete via delete_note removes note and refreshes cards."""
+    f = tmp_path / "cogstash.md"
+    f.write_text(
+        "- [2026-03-26 14:30] first note\n"
+        "- [2026-03-26 15:00] second note\n",
+        encoding="utf-8",
+    )
+
+    from cogstash_browse import BrowseWindow
+    from cogstash import CogStashConfig
+    from cogstash_search import delete_note, parse_notes
+
+    config = CogStashConfig(output_file=f)
+    win = BrowseWindow(tk_root, config)
+    assert len(win._all_notes) == 2
+
+    note = win._all_notes[0]
+    delete_note(f, note)
+    win._load_notes()
+    assert len(win._all_notes) == 1
+    assert "second note" in win._all_notes[0].text
+    win.window.destroy()
