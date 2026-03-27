@@ -79,6 +79,34 @@ def cmd_search(args, config):
         print(format_note(note, use_color))
 
 
+def cmd_tags(args, config):
+    """List all tags with note counts."""
+    notes = parse_notes(config.output_file)
+
+    tag_counts: dict[str, int] = {}
+    for note in notes:
+        for tag in note.tags:
+            tag_counts[tag] = tag_counts.get(tag, 0) + 1
+
+    if not tag_counts:
+        print("No tags found.")
+        return
+
+    use_color = sys.stdout.isatty()
+    sorted_tags = sorted(tag_counts.items(), key=lambda x: (-x[1], x[0]))
+    max_len = max(len(f"#{tag}") for tag, _ in sorted_tags)
+
+    for tag, count in sorted_tags:
+        label = f"#{tag}"
+        noun = "note" if count == 1 else "notes"
+        if use_color:
+            color = ANSI_TAG.get(tag, "")
+            reset = ANSI_RESET if color else ""
+            print(f"  {color}{label:<{max_len}}{reset}  {ANSI_BOLD}{count}{ANSI_RESET} {noun}")
+        else:
+            print(f"  {label:<{max_len}}  {count} {noun}")
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI argument parser with subcommands."""
     parser = argparse.ArgumentParser(
@@ -97,6 +125,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_search.add_argument("query", help="Search term")
     p_search.add_argument("--limit", type=int, default=20, help="Max results (default: 20)")
     p_search.set_defaults(func=cmd_search)
+
+    # tags
+    p_tags = sub.add_parser("tags", help="List all tags with counts")
+    p_tags.set_defaults(func=cmd_tags)
 
     return parser
 

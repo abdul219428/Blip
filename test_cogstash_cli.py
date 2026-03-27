@@ -137,3 +137,36 @@ def test_cmd_search_no_match(tmp_path, capsys):
     cmd_search(SimpleNamespace(query="nonexistent xyz", limit=20), CogStashConfig(output_file=f))
     output = capsys.readouterr().out
     assert "No matching notes." in output
+
+
+def test_cmd_tags_counts(tmp_path, capsys):
+    """Tags listed with correct counts, sorted by count descending."""
+    f = _make_notes_file(tmp_path)
+    from cogstash_cli import cmd_tags
+    from cogstash import CogStashConfig
+    from types import SimpleNamespace
+
+    cmd_tags(SimpleNamespace(), CogStashConfig(output_file=f))
+    output = capsys.readouterr().out
+    lines = [l for l in output.strip().split("\n") if l.strip()]
+
+    # 3 tags in fixture: #todo (1), #urgent (1), #important (1)
+    assert len(lines) == 3
+    # All have count 1, sorted alphabetically as tiebreaker
+    assert "#important" in lines[0]
+    assert "#todo" in lines[1]
+    assert "#urgent" in lines[2]
+    assert "1 note" in lines[0]
+
+
+def test_cmd_tags_empty(tmp_path, capsys):
+    """Empty file shows 'No tags found.' message."""
+    f = tmp_path / "cogstash.md"
+    f.write_text("", encoding="utf-8")
+    from cogstash_cli import cmd_tags
+    from cogstash import CogStashConfig
+    from types import SimpleNamespace
+
+    cmd_tags(SimpleNamespace(), CogStashConfig(output_file=f))
+    output = capsys.readouterr().out
+    assert "No tags found." in output
