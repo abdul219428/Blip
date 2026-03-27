@@ -133,6 +133,26 @@ def cmd_tags(args, config, ansi_tag=None):
             print(f"  {label:<{max_len}}  {count} {noun}")
 
 
+def cmd_add(args, config, ansi_tag=None):
+    """Add a note from the command line."""
+    from cogstash import append_note_to_file, merge_tags
+
+    # Argument takes priority over stdin
+    if args.text:
+        text = " ".join(args.text)
+    else:
+        if sys.stdin.isatty():
+            print("Error: provide note text as argument or pipe via stdin.", file=sys.stderr)
+            sys.exit(1)
+        text = sys.stdin.read()
+
+    smart_tags, _ = merge_tags(config)
+    ok = append_note_to_file(text, config.output_file, smart_tags)
+    if not ok:
+        print("Error: failed to save note.", file=sys.stderr)
+        sys.exit(1)
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI argument parser with subcommands."""
     parser = argparse.ArgumentParser(
@@ -155,6 +175,11 @@ def build_parser() -> argparse.ArgumentParser:
     # tags
     p_tags = sub.add_parser("tags", help="List all tags with counts")
     p_tags.set_defaults(func=cmd_tags)
+
+    # add
+    p_add = sub.add_parser("add", help="Add a note from the CLI")
+    p_add.add_argument("text", nargs="*", help="Note text (or pipe via stdin)")
+    p_add.set_defaults(func=cmd_add)
 
     return parser
 

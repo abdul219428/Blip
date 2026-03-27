@@ -198,3 +198,73 @@ def test_format_note_custom_tag(tmp_path):
     result = format_note(note, use_color=True, ansi_tag=ansi_map)
     assert "\033[34m" in result  # blue for #work
     assert "#work" in result
+
+
+def test_cmd_add_argument(tmp_path):
+    """cogstash add 'text' saves note via argument."""
+    from cogstash_cli import cmd_add
+    from cogstash import CogStashConfig
+    from types import SimpleNamespace
+
+    f = tmp_path / "cogstash.md"
+    cmd_add(SimpleNamespace(text=["hello", "world"]), CogStashConfig(output_file=f))
+    content = f.read_text(encoding="utf-8")
+    assert "hello world" in content
+    assert content.startswith("- [")
+
+
+def test_cmd_add_stdin(tmp_path, monkeypatch):
+    """cogstash add reads from stdin when no argument given."""
+    import io
+    from cogstash_cli import cmd_add
+    from cogstash import CogStashConfig
+    from types import SimpleNamespace
+
+    monkeypatch.setattr("sys.stdin", io.StringIO("from stdin"))
+    f = tmp_path / "cogstash.md"
+    cmd_add(SimpleNamespace(text=[]), CogStashConfig(output_file=f))
+    content = f.read_text(encoding="utf-8")
+    assert "from stdin" in content
+
+
+def test_cmd_add_smart_tags(tmp_path):
+    """cogstash add applies smart tag emoji prefixes."""
+    from cogstash_cli import cmd_add
+    from cogstash import CogStashConfig
+    from types import SimpleNamespace
+
+    f = tmp_path / "cogstash.md"
+    cmd_add(SimpleNamespace(text=["buy", "milk", "#todo"]), CogStashConfig(output_file=f))
+    content = f.read_text(encoding="utf-8")
+    assert "☐" in content
+    assert "#todo" in content
+
+
+def test_cmd_add_multiline_stdin(tmp_path, monkeypatch):
+    """Multi-line stdin produces continuation-indented output."""
+    import io
+    from cogstash_cli import cmd_add
+    from cogstash import CogStashConfig
+    from types import SimpleNamespace
+
+    monkeypatch.setattr("sys.stdin", io.StringIO("line one\nline two"))
+    f = tmp_path / "cogstash.md"
+    cmd_add(SimpleNamespace(text=[]), CogStashConfig(output_file=f))
+    content = f.read_text(encoding="utf-8")
+    assert "line one" in content
+    assert "  line two" in content  # continuation indent
+
+
+def test_cmd_add_empty(tmp_path, monkeypatch):
+    """Empty input causes sys.exit(1)."""
+    import io
+    import pytest
+    from cogstash_cli import cmd_add
+    from cogstash import CogStashConfig
+    from types import SimpleNamespace
+
+    monkeypatch.setattr("sys.stdin", io.StringIO(""))
+    f = tmp_path / "cogstash.md"
+    with pytest.raises(SystemExit):
+        cmd_add(SimpleNamespace(text=[]), CogStashConfig(output_file=f))
+
