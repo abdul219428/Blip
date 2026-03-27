@@ -1,7 +1,7 @@
-"""blip_browse.py — Browse Window for viewing and filtering past notes.
+"""cogstash_browse.py — Browse Window for viewing and filtering past notes.
 
 Card-view UI with search, tag filtering, and mark-done for #todo items.
-Opened from the system tray icon. Uses blip_search for all data operations.
+Opened from the system tray icon. Uses cogstash_search for all data operations.
 """
 
 from __future__ import annotations
@@ -11,14 +11,14 @@ from tkinter import font as tkfont
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from blip import THEMES, SMART_TAGS, BlipConfig, platform_font
-from blip_search import parse_notes, search_notes, filter_by_tag, mark_done, TAG_COLORS, Note
+from cogstash import THEMES, SMART_TAGS, CogStashConfig, platform_font
+from cogstash_search import parse_notes, search_notes, filter_by_tag, mark_done, TAG_COLORS, Note
 
 
 class BrowseWindow:
     """Toplevel window for browsing and filtering notes."""
 
-    def __init__(self, root: tk.Tk, config: BlipConfig):
+    def __init__(self, root: tk.Tk, config: CogStashConfig):
         self.root = root
         self.config = config
         self.theme = THEMES[config.theme]
@@ -28,7 +28,7 @@ class BrowseWindow:
         self._card_frames: list[tk.Frame] = []
 
         self.window = tk.Toplevel(root)
-        self.window.title("Blip — Browse Notes")
+        self.window.title("CogStash — Browse Notes")
         self.window.configure(bg=self.theme["bg"])
         self.window.geometry("480x520")
         self.window.minsize(360, 300)

@@ -1,6 +1,6 @@
-"""blip_search.py — Note parsing, search, and filtering logic.
+"""cogstash_search.py — Note parsing, search, and filtering logic.
 
-Pure functions with no tkinter dependency. Used by blip_browse.py
+Pure functions with no tkinter dependency. Used by cogstash_browse.py
 for the Browse Window and potentially CLI tools in the future.
 """
 
@@ -33,7 +33,7 @@ class Note:
 
 
 def parse_notes(path: Path) -> list[Note]:
-    """Parse blip.md into a list of Note objects."""
+    """Parse cogstash.md into a list of Note objects."""
     if not path.exists():
         return []
 
