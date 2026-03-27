@@ -1,4 +1,4 @@
-"""Tests for blip.py."""
+"""Tests for cogstash.py."""
 
 import sys
 from unittest.mock import patch
@@ -21,28 +21,28 @@ needs_display = pytest.mark.skipif(not _has_display, reason="No display or Tcl u
 
 def test_platform_font_windows():
     with patch.object(sys, "platform", "win32"):
-        from blip import platform_font
+        from cogstash import platform_font
         result = platform_font()
         assert result == "Segoe UI"
 
 
 def test_platform_font_macos():
     with patch.object(sys, "platform", "darwin"):
-        from blip import platform_font
+        from cogstash import platform_font
         result = platform_font()
         assert result == "Helvetica Neue"
 
 
 def test_platform_font_linux():
     with patch.object(sys, "platform", "linux"):
-        from blip import platform_font
+        from cogstash import platform_font
         result = platform_font()
         assert result == "sans-serif"
 
 
 def test_platform_font_unknown():
     with patch.object(sys, "platform", "freebsd"):
-        from blip import platform_font
+        from cogstash import platform_font
         result = platform_font()
         assert result == "TkDefaultFont"
 
@@ -50,12 +50,12 @@ def test_platform_font_unknown():
 @needs_display
 def test_append_note_creates_file(tmp_path):
     """append_note creates the file and writes the correct format."""
-    import blip as blip_mod
+    import cogstash as cogstash_mod
 
-    test_file = tmp_path / "blip.md"
+    test_file = tmp_path / "cogstash.md"
     root = tk.Tk()
     root.withdraw()
-    app = blip_mod.Blip(root, blip_mod.BlipConfig(output_file=test_file))
+    app = cogstash_mod.CogStash(root, cogstash_mod.CogStashConfig(output_file=test_file))
     result = app.append_note("test note")
     root.destroy()
 
@@ -68,12 +68,12 @@ def test_append_note_creates_file(tmp_path):
 @needs_display
 def test_append_note_appends(tmp_path):
     """Multiple notes are appended, not overwritten."""
-    import blip as blip_mod
+    import cogstash as cogstash_mod
 
-    test_file = tmp_path / "blip.md"
+    test_file = tmp_path / "cogstash.md"
     root = tk.Tk()
     root.withdraw()
-    app = blip_mod.Blip(root, blip_mod.BlipConfig(output_file=test_file))
+    app = cogstash_mod.CogStash(root, cogstash_mod.CogStashConfig(output_file=test_file))
     app.append_note("first")
     app.append_note("second")
     root.destroy()
@@ -87,11 +87,11 @@ def test_append_note_appends(tmp_path):
 @needs_display
 def test_append_note_error_handling(tmp_path):
     """append_note returns False and logs on write failure."""
-    import blip as blip_mod
+    import cogstash as cogstash_mod
 
     root = tk.Tk()
     root.withdraw()
-    app = blip_mod.Blip(root, blip_mod.BlipConfig(output_file=Path("\\\\nonexistent_server_xyz\\share\\blip.md")))
+    app = cogstash_mod.CogStash(root, cogstash_mod.CogStashConfig(output_file=Path("\\\\nonexistent_server_xyz\\share\\cogstash.md")))
     result = app.append_note("should fail")
     root.destroy()
 
@@ -101,11 +101,11 @@ def test_append_note_error_handling(tmp_path):
 @needs_display
 def test_show_hide_state():
     """show_window and hide_window toggle is_visible correctly."""
-    import blip as blip_mod
+    import cogstash as cogstash_mod
 
     root = tk.Tk()
     root.withdraw()
-    app = blip_mod.Blip(root, blip_mod.BlipConfig())
+    app = cogstash_mod.CogStash(root, cogstash_mod.CogStashConfig())
 
     assert app.is_visible is False
 
@@ -120,7 +120,7 @@ def test_show_hide_state():
 
 def test_theme_colors():
     """Every theme has all 6 required color keys."""
-    from blip import THEMES
+    from cogstash import THEMES
     required = {"bg", "fg", "entry_bg", "accent", "muted", "error"}
     assert len(THEMES) == 5
     for name, colors in THEMES.items():
@@ -131,7 +131,7 @@ def test_theme_colors():
 
 def test_window_size_presets():
     """Every window size has width, lines, and max_lines."""
-    from blip import WINDOW_SIZES
+    from cogstash import WINDOW_SIZES
     required = {"width", "lines", "max_lines"}
     assert len(WINDOW_SIZES) == 3
     for name, size in WINDOW_SIZES.items():
@@ -141,9 +141,9 @@ def test_window_size_presets():
 
 def test_load_config_defaults(tmp_path):
     """No config file → returns default BlipConfig."""
-    from blip import load_config, BlipConfig
+    from cogstash import load_config, CogStashConfig
     config = load_config(tmp_path / "nonexistent.json")
-    assert isinstance(config, BlipConfig)
+    assert isinstance(config, CogStashConfig)
     assert config.hotkey == "<ctrl>+<shift>+<space>"
     assert config.theme == "tokyo-night"
     assert config.window_size == "default"
@@ -153,8 +153,8 @@ def test_load_config_defaults(tmp_path):
 
 def test_load_config_partial(tmp_path):
     """Partial JSON → missing keys filled from defaults."""
-    from blip import load_config
-    cfg_file = tmp_path / "blip.json"
+    from cogstash import load_config
+    cfg_file = tmp_path / "cogstash.json"
     cfg_file.write_text(json.dumps({"theme": "dracula"}), encoding="utf-8")
     config = load_config(cfg_file)
     assert config.theme == "dracula"
@@ -163,8 +163,8 @@ def test_load_config_partial(tmp_path):
 
 def test_load_config_malformed(tmp_path):
     """Bad JSON → warning logged, defaults returned."""
-    from blip import load_config
-    cfg_file = tmp_path / "blip.json"
+    from cogstash import load_config
+    cfg_file = tmp_path / "cogstash.json"
     cfg_file.write_text("{bad json!!!", encoding="utf-8")
     config = load_config(cfg_file)
     assert config.theme == "tokyo-night"  # all defaults
@@ -172,8 +172,8 @@ def test_load_config_malformed(tmp_path):
 
 def test_load_config_unknown_theme(tmp_path):
     """Unknown theme → falls back to tokyo-night."""
-    from blip import load_config
-    cfg_file = tmp_path / "blip.json"
+    from cogstash import load_config
+    cfg_file = tmp_path / "cogstash.json"
     cfg_file.write_text(json.dumps({"theme": "nonexistent"}), encoding="utf-8")
     config = load_config(cfg_file)
     assert config.theme == "tokyo-night"
@@ -181,7 +181,7 @@ def test_load_config_unknown_theme(tmp_path):
 
 def test_parse_tags_smart():
     """Smart tags get emoji prefixes prepended to text."""
-    from blip import parse_smart_tags
+    from cogstash import parse_smart_tags
     result = parse_smart_tags("Review PR #42 #todo #urgent")
     assert result.startswith("☐ 🔴 ")
     assert "Review PR #42 #todo #urgent" in result
@@ -189,7 +189,7 @@ def test_parse_tags_smart():
 
 def test_parse_tags_dedup():
     """Duplicate smart tags produce only one emoji prefix."""
-    from blip import parse_smart_tags
+    from cogstash import parse_smart_tags
     result = parse_smart_tags("do thing #todo and also #todo")
     # Should have exactly one ☐, not two
     assert result.count("☐") == 1
@@ -197,7 +197,7 @@ def test_parse_tags_dedup():
 
 def test_parse_tags_url_safe():
     """URL fragments are not matched as tags."""
-    from blip import parse_smart_tags
+    from cogstash import parse_smart_tags
     result = parse_smart_tags("see http://example.com#section for details")
     # No emoji should be prepended — #section is not a standalone tag
     assert not result.startswith("☐")
@@ -209,12 +209,12 @@ def test_parse_tags_url_safe():
 @needs_display
 def test_multiline_format(tmp_path):
     """Multi-line text uses indented continuation lines."""
-    import blip as blip_mod
+    import cogstash as cogstash_mod
 
-    test_file = tmp_path / "blip.md"
+    test_file = tmp_path / "cogstash.md"
     root = tk.Tk()
     root.withdraw()
-    app = blip_mod.Blip(root, blip_mod.BlipConfig(output_file=test_file))
+    app = cogstash_mod.CogStash(root, cogstash_mod.CogStashConfig(output_file=test_file))
     result = app.append_note("line one\nline two\nline three")
     root.destroy()
 
@@ -231,12 +231,12 @@ def test_multiline_format(tmp_path):
 @needs_display
 def test_empty_submit_ignored(tmp_path):
     """Whitespace-only text is not saved."""
-    import blip as blip_mod
+    import cogstash as cogstash_mod
 
-    test_file = tmp_path / "blip.md"
+    test_file = tmp_path / "cogstash.md"
     root = tk.Tk()
     root.withdraw()
-    app = blip_mod.Blip(root, blip_mod.BlipConfig(output_file=test_file))
+    app = cogstash_mod.CogStash(root, cogstash_mod.CogStashConfig(output_file=test_file))
     result = app.append_note("   \n  \n  ")
     root.destroy()
 
