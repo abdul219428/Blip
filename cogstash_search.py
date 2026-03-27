@@ -14,7 +14,7 @@ from pathlib import Path
 _NOTE_RE = re.compile(r"^- \[(\d{4}-\d{2}-\d{2} \d{2}:\d{2})\] (.+)")
 _TAG_RE = re.compile(r"(?:^|\s)#(\w+)")
 
-TAG_COLORS = {
+DEFAULT_TAG_COLORS = {
     "urgent": "#f7768e",
     "important": "#e0af68",
     "idea": "#9ece6a",

@@ -11,8 +11,8 @@ from tkinter import font as tkfont
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from cogstash import THEMES, SMART_TAGS, CogStashConfig, platform_font
-from cogstash_search import parse_notes, search_notes, filter_by_tag, mark_done, TAG_COLORS, Note
+from cogstash import THEMES, DEFAULT_SMART_TAGS, CogStashConfig, platform_font
+from cogstash_search import parse_notes, search_notes, filter_by_tag, mark_done, DEFAULT_TAG_COLORS, Note
 
 
 class BrowseWindow:
@@ -72,8 +72,8 @@ class BrowseWindow:
         all_pill.bind("<Button-1>", lambda e: self._on_tag_filter(None))
         self._pill_buttons[None] = all_pill
 
-        for tag, emoji in SMART_TAGS.items():
-            color = TAG_COLORS.get(tag, t["muted"])
+        for tag, emoji in DEFAULT_SMART_TAGS.items():
+            color = DEFAULT_TAG_COLORS.get(tag, t["muted"])
             pill = tk.Label(
                 pills_frame, text=f"{emoji} {tag}", bg=t["bg"], fg=t["fg"],
                 font=(fnt, 9), padx=6, pady=2, cursor="hand2",
@@ -201,8 +201,8 @@ class BrowseWindow:
         # Determine left border color
         border_color = t["muted"]
         for tag in note.tags:
-            if tag in TAG_COLORS:
-                border_color = TAG_COLORS[tag]
+            if tag in DEFAULT_TAG_COLORS:
+                border_color = DEFAULT_TAG_COLORS[tag]
                 break
 
         opacity_fg = t["muted"] if note.is_done else t["fg"]
@@ -252,7 +252,7 @@ class BrowseWindow:
             tags_frame = tk.Frame(card, bg=card_bg)
             tags_frame.pack(fill="x", pady=(4, 0), anchor="w")
             for tag in note.tags:
-                color = TAG_COLORS.get(tag, t["muted"])
+                color = DEFAULT_TAG_COLORS.get(tag, t["muted"])
                 tk.Label(
                     tags_frame, text=f"#{tag}", bg=t["bg"], fg=color,
                     font=(fnt, 9), padx=4, pady=1,

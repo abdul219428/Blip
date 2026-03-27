@@ -5,6 +5,8 @@ Enter  → appends timestamped note to cogstash.md
 Escape → hides window
 """
 
+from __future__ import annotations
+
 import tkinter as tk
 from datetime import datetime
 from pathlib import Path
@@ -34,12 +36,15 @@ WINDOW_SIZES = {
     "wide":    {"width": 520, "lines": 4, "max_lines": 10},
 }
 
-SMART_TAGS = {
+DEFAULT_SMART_TAGS = {
     "todo":      "☐",
     "urgent":    "🔴",
     "important": "⭐",
     "idea":      "💡",
 }
+
+# ── Validation ────────────────────────────────────────────────────────────────
+_HEX_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 
 # ── Config ────────────────────────────────────────────────────────────────────
 HOTKEY      = "<ctrl>+<shift>+<space>"
@@ -60,6 +65,7 @@ class CogStashConfig:
     log_file: Path = None
     theme: str = "tokyo-night"
     window_size: str = "default"
+    tags: dict[str, dict[str, str]] | None = None
 
     def __post_init__(self):
         if self.output_file is None:
@@ -109,13 +115,45 @@ def load_config(config_path: Path) -> CogStashConfig:
     output_file = Path(merged["output_file"]).expanduser()
     log_file = Path(merged["log_file"]).expanduser()
 
+    # Parse and validate custom tags
+    raw_tags = data.get("tags", {})
+    valid_tags = {}
+    if isinstance(raw_tags, dict):
+        for name, props in raw_tags.items():
+            if not isinstance(props, dict):
+                logger.warning("Tag '%s': expected object, skipping", name)
+                continue
+            emoji = props.get("emoji")
+            color = props.get("color")
+            if not emoji:
+                logger.warning("Tag '%s': missing emoji, skipping", name)
+                continue
+            if not color or not _HEX_RE.match(color):
+                logger.warning("Tag '%s': missing or invalid color, skipping", name)
+                continue
+            valid_tags[name] = {"emoji": emoji, "color": color}
+    tags = valid_tags if valid_tags else None
+
     return CogStashConfig(
         hotkey=merged["hotkey"],
         output_file=output_file,
         log_file=log_file,
         theme=merged["theme"],
         window_size=merged["window_size"],
+        tags=tags,
     )
+
+
+def merge_tags(config: CogStashConfig) -> tuple[dict[str, str], dict[str, str]]:
+    """Merge built-in tags with user-defined tags. Returns (smart_tags, tag_colors)."""
+    from cogstash_search import DEFAULT_TAG_COLORS
+    smart_tags = dict(DEFAULT_SMART_TAGS)
+    tag_colors = dict(DEFAULT_TAG_COLORS)
+    if config.tags:
+        for name, props in config.tags.items():
+            smart_tags[name] = props["emoji"]
+            tag_colors[name] = props["color"]
+    return smart_tags, tag_colors
 
 
 _TAG_RE = re.compile(r"(?:^|\s)#(\w+)")
@@ -127,11 +165,11 @@ def parse_smart_tags(text: str) -> str:
     seen = []
     for tag in matches:
         tag_lower = tag.lower()
-        if tag_lower in SMART_TAGS and tag_lower not in seen:
+        if tag_lower in DEFAULT_SMART_TAGS and tag_lower not in seen:
             seen.append(tag_lower)
     if not seen:
         return text
-    prefix = " ".join(SMART_TAGS[t] for t in seen)
+    prefix = " ".join(DEFAULT_SMART_TAGS[t] for t in seen)
     return f"{prefix} {text}"
 
 
@@ -257,7 +295,7 @@ class CogStash:
         self.hint_label.pack(fill="x", pady=(4, 0))
 
         # Tag hints footer
-        tag_hints = "  ".join(f"{emoji} #{name}" for name, emoji in SMART_TAGS.items())
+        tag_hints = "  ".join(f"{emoji} #{name}" for name, emoji in DEFAULT_SMART_TAGS.items())
         tk.Label(
             frame, text=tag_hints, bg=t["bg"], fg=t["muted"],
             font=(platform_font(), 8), anchor="w",
@@ -323,7 +361,7 @@ class CogStash:
 
         # Filter matching smart tags
         matches = [
-            (name, emoji) for name, emoji in SMART_TAGS.items()
+            (name, emoji) for name, emoji in DEFAULT_SMART_TAGS.items()
             if name.startswith(fragment)
         ]
 

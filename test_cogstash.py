@@ -214,3 +214,62 @@ def test_empty_submit_ignored(tmp_path, tk_root):
 
     assert result is False
     assert not test_file.exists()
+
+
+def test_merge_tags_builtin_defaults():
+    """merge_tags with no custom tags returns built-in defaults."""
+    from cogstash import merge_tags, DEFAULT_SMART_TAGS, CogStashConfig
+    from cogstash_search import DEFAULT_TAG_COLORS
+    config = CogStashConfig()
+    smart, colors = merge_tags(config)
+    assert smart == DEFAULT_SMART_TAGS
+    assert colors == DEFAULT_TAG_COLORS
+
+
+def test_merge_tags_add_new():
+    """Custom tag merges alongside built-ins."""
+    from cogstash import merge_tags, CogStashConfig
+    config = CogStashConfig(tags={"work": {"emoji": "💼", "color": "#4A90D9"}})
+    smart, colors = merge_tags(config)
+    assert smart["work"] == "💼"
+    assert colors["work"] == "#4A90D9"
+    assert "todo" in smart  # built-in still present
+
+
+def test_merge_tags_override_builtin():
+    """User can override a built-in tag's emoji and color."""
+    from cogstash import merge_tags, CogStashConfig
+    config = CogStashConfig(tags={"todo": {"emoji": "✅", "color": "#00FF00"}})
+    smart, colors = merge_tags(config)
+    assert smart["todo"] == "✅"
+    assert colors["todo"] == "#00FF00"
+
+
+def test_load_config_custom_tags(tmp_path):
+    """Config with tags key loads custom tags into CogStashConfig."""
+    from cogstash import load_config
+    cfg_path = tmp_path / "cogstash.json"
+    cfg_path.write_text(json.dumps({
+        "tags": {"work": {"emoji": "💼", "color": "#4A90D9"}}
+    }), encoding="utf-8")
+    config = load_config(cfg_path)
+    assert config.tags == {"work": {"emoji": "💼", "color": "#4A90D9"}}
+
+
+def test_load_config_invalid_tag_skipped(tmp_path):
+    """Tags missing emoji or color are skipped."""
+    from cogstash import load_config
+    cfg_path = tmp_path / "cogstash.json"
+    cfg_path.write_text(json.dumps({
+        "tags": {
+            "good": {"emoji": "✅", "color": "#00FF00"},
+            "bad_no_emoji": {"color": "#FF0000"},
+            "bad_no_color": {"emoji": "❌"},
+            "bad_hex": {"emoji": "❌", "color": "not-hex"},
+        }
+    }), encoding="utf-8")
+    config = load_config(cfg_path)
+    assert "good" in config.tags
+    assert "bad_no_emoji" not in config.tags
+    assert "bad_no_color" not in config.tags
+    assert "bad_hex" not in config.tags
