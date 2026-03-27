@@ -62,6 +62,23 @@ def cmd_recent(args, config):
         print(format_note(note, use_color))
 
 
+def cmd_search(args, config):
+    """Search notes by keyword."""
+    notes = parse_notes(config.output_file)
+    results = search_notes(notes, args.query)
+
+    if not results:
+        print("No matching notes.")
+        return
+
+    use_color = sys.stdout.isatty()
+    newest_first = list(reversed(results))
+    limited = newest_first[:args.limit] if args.limit > 0 else newest_first
+
+    for note in limited:
+        print(format_note(note, use_color))
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI argument parser with subcommands."""
     parser = argparse.ArgumentParser(
@@ -74,6 +91,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_recent = sub.add_parser("recent", help="Show latest notes")
     p_recent.add_argument("--limit", type=int, default=20, help="Max notes to show (default: 20)")
     p_recent.set_defaults(func=cmd_recent)
+
+    # search
+    p_search = sub.add_parser("search", help="Search notes by keyword")
+    p_search.add_argument("query", help="Search term")
+    p_search.add_argument("--limit", type=int, default=20, help="Max results (default: 20)")
+    p_search.set_defaults(func=cmd_search)
 
     return parser
 

@@ -110,3 +110,30 @@ def test_cmd_recent_empty(tmp_path, capsys):
     cmd_recent(SimpleNamespace(limit=20), CogStashConfig(output_file=f))
     output = capsys.readouterr().out
     assert "No notes found." in output
+
+
+def test_cmd_search_match(tmp_path, capsys):
+    """Finds notes matching the query, newest first."""
+    f = _make_notes_file(tmp_path)
+    from cogstash_cli import cmd_search
+    from cogstash import CogStashConfig
+    from types import SimpleNamespace
+
+    cmd_search(SimpleNamespace(query="milk", limit=20), CogStashConfig(output_file=f))
+    output = capsys.readouterr().out
+    lines = [l for l in output.strip().split("\n") if l.strip()]
+
+    assert len(lines) == 1
+    assert "buy milk" in lines[0]
+
+
+def test_cmd_search_no_match(tmp_path, capsys):
+    """No matches shows 'No matching notes.' message."""
+    f = _make_notes_file(tmp_path)
+    from cogstash_cli import cmd_search
+    from cogstash import CogStashConfig
+    from types import SimpleNamespace
+
+    cmd_search(SimpleNamespace(query="nonexistent xyz", limit=20), CogStashConfig(output_file=f))
+    output = capsys.readouterr().out
+    assert "No matching notes." in output
