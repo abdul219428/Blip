@@ -18,10 +18,14 @@ from cogstash_search import parse_notes, search_notes, filter_by_tag, mark_done,
 class BrowseWindow:
     """Toplevel window for browsing and filtering notes."""
 
-    def __init__(self, root: tk.Tk, config: CogStashConfig):
+    def __init__(self, root: tk.Tk, config: CogStashConfig,
+                 smart_tags: dict[str, str] | None = None,
+                 tag_colors: dict[str, str] | None = None):
         self.root = root
         self.config = config
         self.theme = THEMES[config.theme]
+        self.smart_tags = smart_tags or dict(DEFAULT_SMART_TAGS)
+        self.tag_colors = tag_colors or dict(DEFAULT_TAG_COLORS)
         self._all_notes: list[Note] = []
         self._visible_cards: list[Note] = []
         self._active_tag: str | None = None
@@ -72,8 +76,8 @@ class BrowseWindow:
         all_pill.bind("<Button-1>", lambda e: self._on_tag_filter(None))
         self._pill_buttons[None] = all_pill
 
-        for tag, emoji in DEFAULT_SMART_TAGS.items():
-            color = DEFAULT_TAG_COLORS.get(tag, t["muted"])
+        for tag, emoji in self.smart_tags.items():
+            color = self.tag_colors.get(tag, t["muted"])
             pill = tk.Label(
                 pills_frame, text=f"{emoji} {tag}", bg=t["bg"], fg=t["fg"],
                 font=(fnt, 9), padx=6, pady=2, cursor="hand2",
@@ -201,8 +205,8 @@ class BrowseWindow:
         # Determine left border color
         border_color = t["muted"]
         for tag in note.tags:
-            if tag in DEFAULT_TAG_COLORS:
-                border_color = DEFAULT_TAG_COLORS[tag]
+            if tag in self.tag_colors:
+                border_color = self.tag_colors[tag]
                 break
 
         opacity_fg = t["muted"] if note.is_done else t["fg"]
@@ -252,7 +256,7 @@ class BrowseWindow:
             tags_frame = tk.Frame(card, bg=card_bg)
             tags_frame.pack(fill="x", pady=(4, 0), anchor="w")
             for tag in note.tags:
-                color = DEFAULT_TAG_COLORS.get(tag, t["muted"])
+                color = self.tag_colors.get(tag, t["muted"])
                 tk.Label(
                     tags_frame, text=f"#{tag}", bg=t["bg"], fg=color,
                     font=(fnt, 9), padx=4, pady=1,

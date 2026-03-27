@@ -389,8 +389,9 @@ class CogStash:
         fragment = line_text[hash_idx + 1:].lower()
 
         # Filter matching smart tags
+        smart_tags, _ = merge_tags(self.config)
         matches = [
-            (name, emoji) for name, emoji in DEFAULT_SMART_TAGS.items()
+            (name, emoji) for name, emoji in smart_tags.items()
             if name.startswith(fragment)
         ]
 
@@ -515,7 +516,8 @@ class CogStash:
     def _open_browse(self):
         """Open the Browse Notes window."""
         from cogstash_browse import BrowseWindow
-        BrowseWindow(self.root, self.config)
+        smart_tags, tag_colors = merge_tags(self.config)
+        BrowseWindow(self.root, self.config, smart_tags, tag_colors)
 
     def show_window(self):
         """Reveal the window, clear past text, and steal focus."""

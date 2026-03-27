@@ -69,3 +69,18 @@ def test_browse_tag_filter(tmp_path, tk_root):
     win._on_tag_filter(None)  # "All" — clear filter
     assert len(win._visible_cards) == 2
     win.window.destroy()
+
+
+@needs_display
+def test_browse_custom_tag_pills(tk_root, tmp_path):
+    """Custom tags appear as filter pills in the browse window."""
+    from cogstash import CogStashConfig
+    from cogstash_browse import BrowseWindow
+    notes_file = tmp_path / "cogstash.md"
+    notes_file.write_text("- [2026-03-27 10:00] meeting #work\n", encoding="utf-8")
+    config = CogStashConfig(output_file=notes_file)
+    custom_smart = {"todo": "☐", "work": "💼"}
+    custom_colors = {"todo": "#7aa2f7", "work": "#4A90D9"}
+    bw = BrowseWindow(tk_root, config, smart_tags=custom_smart, tag_colors=custom_colors)
+    assert "work" in bw._pill_buttons
+    bw.window.destroy()
