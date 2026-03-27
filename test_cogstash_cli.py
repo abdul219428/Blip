@@ -170,3 +170,31 @@ def test_cmd_tags_empty(tmp_path, capsys):
     cmd_tags(SimpleNamespace(), CogStashConfig(output_file=f))
     output = capsys.readouterr().out
     assert "No tags found." in output
+
+
+def test_hex_to_ansi():
+    """hex_to_ansi maps hex colors to nearest ANSI codes."""
+    from cogstash_cli import hex_to_ansi
+
+    assert hex_to_ansi("#ff0000") == "\033[31m"  # red
+    assert hex_to_ansi("#00ff00") == "\033[32m"  # green
+    assert hex_to_ansi("#0000ff") == "\033[34m"  # blue
+    assert hex_to_ansi("#ffff00") == "\033[33m"  # yellow
+
+
+def test_format_note_custom_tag(tmp_path):
+    """format_note colors custom tags when ansi_tag map provided."""
+    from cogstash_cli import format_note
+    from cogstash_search import Note
+    from datetime import datetime
+
+    note = Note(
+        index=1,
+        timestamp=datetime(2026, 3, 27, 10, 0),
+        text="meeting #work",
+        tags=["work"],
+    )
+    ansi_map = {"work": "\033[34m"}
+    result = format_note(note, use_color=True, ansi_tag=ansi_map)
+    assert "\033[34m" in result  # blue for #work
+    assert "#work" in result

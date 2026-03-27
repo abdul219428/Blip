@@ -18,7 +18,7 @@ ANSI_BOLD = "\033[1m"
 ANSI_DIM = "\033[90m"
 ANSI_STRIKE_DIM = "\033[9;90m"
 
-ANSI_TAG = {
+DEFAULT_ANSI_TAG = {
     "urgent": "\033[31m",
     "important": "\033[33m",
     "idea": "\033[32m",
@@ -26,8 +26,33 @@ ANSI_TAG = {
 }
 
 
-def format_note(note: Note, use_color: bool = True) -> str:
+def hex_to_ansi(hex_color: str) -> str:
+    """Map a hex color to the nearest 8-color ANSI escape code."""
+    r = int(hex_color[1:3], 16)
+    g = int(hex_color[3:5], 16)
+    b = int(hex_color[5:7], 16)
+    ansi_map = [
+        (0, 0, 0, "\033[30m"),
+        (255, 0, 0, "\033[31m"),
+        (0, 255, 0, "\033[32m"),
+        (255, 255, 0, "\033[33m"),
+        (0, 0, 255, "\033[34m"),
+        (255, 0, 255, "\033[35m"),
+        (0, 255, 255, "\033[36m"),
+        (255, 255, 255, "\033[37m"),
+    ]
+    best = min(ansi_map, key=lambda c: (c[0] - r) ** 2 + (c[1] - g) ** 2 + (c[2] - b) ** 2)
+    return best[3]
+
+
+def build_ansi_tag_map(tag_colors: dict[str, str]) -> dict[str, str]:
+    """Build ANSI color map from hex tag colors. All tags converted from hex."""
+    return {tag: hex_to_ansi(color) for tag, color in tag_colors.items()}
+
+
+def format_note(note: Note, use_color: bool = True, ansi_tag: dict[str, str] | None = None) -> str:
     """Format a single note as one line of CLI output."""
+    tag_map = ansi_tag if ansi_tag is not None else DEFAULT_ANSI_TAG
     ts = note.timestamp.strftime("[%Y-%m-%d %H:%M]")
     text = note.text
 
@@ -40,14 +65,14 @@ def format_note(note: Note, use_color: bool = True) -> str:
     # Dim timestamp, color tags in text
     colored = text
     for tag in note.tags:
-        color = ANSI_TAG.get(tag)
+        color = tag_map.get(tag)
         if color:
             colored = colored.replace(f"#{tag}", f"{color}#{tag}{ANSI_RESET}")
 
     return f"{ANSI_DIM}{ts}{ANSI_RESET} {colored}"
 
 
-def cmd_recent(args, config):
+def cmd_recent(args, config, ansi_tag=None):
     """Show the most recent N notes."""
     notes = parse_notes(config.output_file)
     if not notes:
@@ -59,10 +84,10 @@ def cmd_recent(args, config):
     limited = newest_first[:args.limit] if args.limit > 0 else newest_first
 
     for note in limited:
-        print(format_note(note, use_color))
+        print(format_note(note, use_color, ansi_tag))
 
 
-def cmd_search(args, config):
+def cmd_search(args, config, ansi_tag=None):
     """Search notes by keyword."""
     notes = parse_notes(config.output_file)
     results = search_notes(notes, args.query)
@@ -76,11 +101,12 @@ def cmd_search(args, config):
     limited = newest_first[:args.limit] if args.limit > 0 else newest_first
 
     for note in limited:
-        print(format_note(note, use_color))
+        print(format_note(note, use_color, ansi_tag))
 
 
-def cmd_tags(args, config):
+def cmd_tags(args, config, ansi_tag=None):
     """List all tags with note counts."""
+    tag_map = ansi_tag or DEFAULT_ANSI_TAG
     notes = parse_notes(config.output_file)
 
     tag_counts: dict[str, int] = {}
@@ -100,7 +126,7 @@ def cmd_tags(args, config):
         label = f"#{tag}"
         noun = "note" if count == 1 else "notes"
         if use_color:
-            color = ANSI_TAG.get(tag, "")
+            color = tag_map.get(tag, "")
             reset = ANSI_RESET if color else ""
             print(f"  {color}{label:<{max_len}}{reset}  {ANSI_BOLD}{count}{ANSI_RESET} {noun}")
         else:
@@ -135,7 +161,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def cli_main(argv: list[str]) -> None:
     """Entry point for CLI subcommands."""
-    from cogstash import load_config
+    from cogstash import load_config, merge_tags
 
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -145,4 +171,6 @@ def cli_main(argv: list[str]) -> None:
         return
 
     config = load_config(Path.home() / ".cogstash.json")
-    args.func(args, config)
+    _, tag_colors = merge_tags(config)
+    ansi_tag = build_ansi_tag_map(tag_colors)
+    args.func(args, config, ansi_tag)
