@@ -29,8 +29,8 @@ On macOS, you may also need to allow accessibility permissions so the global hot
 
 ```bash
 # Clone the repo
-git clone https://github.com/abdul219428/Blip.git
-cd Blip
+git clone https://github.com/abdul219428/CogStash.git
+cd CogStash
 
 # Install dependencies
 pip install -r requirements.txt
