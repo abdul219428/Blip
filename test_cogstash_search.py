@@ -159,3 +159,104 @@ def test_mark_done_already_done(tmp_path):
     assert result is True
     content = f.read_text(encoding="utf-8")
     assert content.count("☑") == 1
+
+
+def test_note_line_span_single(tmp_path):
+    """Single-line note spans exactly one line."""
+    f = tmp_path / "cogstash.md"
+    f.write_text(
+        "- [2026-03-26 14:30] buy milk #todo\n"
+        "- [2026-03-26 15:00] meeting\n",
+        encoding="utf-8",
+    )
+    from cogstash_search import parse_notes, _note_line_span
+    notes = parse_notes(f)
+    lines = f.read_text(encoding="utf-8").splitlines(keepends=True)
+    start, end = _note_line_span(lines, notes[0].line_number)
+    assert (start, end) == (0, 1)
+
+
+def test_note_line_span_multiline(tmp_path):
+    """Multi-line note includes all continuation lines."""
+    f = tmp_path / "cogstash.md"
+    f.write_text(
+        "- [2026-03-26 14:30] first line\n"
+        "  second line\n"
+        "  third line\n"
+        "- [2026-03-26 15:00] next note\n",
+        encoding="utf-8",
+    )
+    from cogstash_search import parse_notes, _note_line_span
+    notes = parse_notes(f)
+    lines = f.read_text(encoding="utf-8").splitlines(keepends=True)
+    start, end = _note_line_span(lines, notes[0].line_number)
+    assert (start, end) == (0, 3)
+
+
+def test_edit_note_single_line(tmp_path):
+    """Edit replaces text, preserves timestamp."""
+    f = tmp_path / "cogstash.md"
+    f.write_text(
+        "- [2026-03-26 14:30] buy milk #todo\n"
+        "- [2026-03-26 15:00] meeting\n",
+        encoding="utf-8",
+    )
+    from cogstash_search import parse_notes, edit_note
+    notes = parse_notes(f)
+    result = edit_note(f, notes[0], "buy oat milk #todo")
+    assert result is True
+    content = f.read_text(encoding="utf-8")
+    assert "- [2026-03-26 14:30] buy oat milk #todo\n" in content
+    assert "buy milk" not in content
+    assert "- [2026-03-26 15:00] meeting\n" in content
+
+
+def test_edit_note_multiline(tmp_path):
+    """Edit replaces multi-line note with new multi-line text."""
+    f = tmp_path / "cogstash.md"
+    f.write_text(
+        "- [2026-03-26 14:30] old first\n"
+        "  old second\n"
+        "- [2026-03-26 15:00] keep this\n",
+        encoding="utf-8",
+    )
+    from cogstash_search import parse_notes, edit_note
+    notes = parse_notes(f)
+    result = edit_note(f, notes[0], "new first\nnew second\nnew third")
+    assert result is True
+    content = f.read_text(encoding="utf-8")
+    assert "- [2026-03-26 14:30] new first\n" in content
+    assert "  new second\n" in content
+    assert "  new third\n" in content
+    assert "old" not in content
+    assert "- [2026-03-26 15:00] keep this\n" in content
+
+
+def test_edit_note_empty_rejected(tmp_path):
+    """Empty new text returns False, file unchanged."""
+    f = tmp_path / "cogstash.md"
+    f.write_text("- [2026-03-26 14:30] original\n", encoding="utf-8")
+    from cogstash_search import parse_notes, edit_note
+    notes = parse_notes(f)
+    result = edit_note(f, notes[0], "   ")
+    assert result is False
+    assert "original" in f.read_text(encoding="utf-8")
+
+
+def test_delete_note(tmp_path):
+    """Delete removes note and continuation lines, keeps others."""
+    f = tmp_path / "cogstash.md"
+    f.write_text(
+        "- [2026-03-26 14:30] delete me\n"
+        "  continuation\n"
+        "- [2026-03-26 15:00] keep me\n",
+        encoding="utf-8",
+    )
+    from cogstash_search import parse_notes, delete_note
+    notes = parse_notes(f)
+    result = delete_note(f, notes[0])
+    assert result is True
+    content = f.read_text(encoding="utf-8")
+    assert "delete me" not in content
+    assert "continuation" not in content
+    assert "- [2026-03-26 15:00] keep me\n" in content

@@ -116,3 +116,53 @@ def mark_done(path: Path, note: Note) -> bool:
         return True
     except OSError:
         return False
+
+
+def _note_line_span(lines: list[str], line_number: int) -> tuple[int, int]:
+    """Return (start, end) line range for a note including continuation lines.
+
+    start is inclusive, end is exclusive. Continuation lines start with 2 spaces.
+    """
+    end = line_number + 1
+    while end < len(lines) and lines[end].startswith("  "):
+        end += 1
+    return (line_number, end)
+
+
+def edit_note(path: Path, note: Note, new_text: str) -> bool:
+    """Replace a note's text, preserving its timestamp. Returns True on success."""
+    new_text = new_text.strip()
+    if not new_text:
+        return False
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+        start, end = _note_line_span(lines, note.line_number)
+        if start >= len(lines):
+            return False
+
+        ts = note.timestamp.strftime("%Y-%m-%d %H:%M")
+        text_lines = new_text.split("\n")
+        replacement = [f"- [{ts}] {text_lines[0]}\n"]
+        replacement.extend(f"  {line}\n" for line in text_lines[1:])
+
+        lines[start:end] = replacement
+        path.write_text("".join(lines), encoding="utf-8")
+        return True
+    except OSError:
+        return False
+
+
+def delete_note(path: Path, note: Note) -> bool:
+    """Remove a note and its continuation lines from the file. Returns True on success."""
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+        start, end = _note_line_span(lines, note.line_number)
+        if start >= len(lines):
+            return False
+
+        del lines[start:end]
+        path.write_text("".join(lines), encoding="utf-8")
+        return True
+    except OSError:
+        return False
+
