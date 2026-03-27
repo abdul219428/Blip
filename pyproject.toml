@@ -15,6 +15,6 @@ dependencies = [
 ]
 
 [tool.setuptools]
-py-modules = ["cogstash", "cogstash_search", "cogstash_browse"]
+py-modules = ["cogstash", "cogstash_search", "cogstash_browse", "cogstash_cli"]
 [project.scripts]
 cogstash = "cogstash:main"

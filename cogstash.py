@@ -517,6 +517,12 @@ class CogStash:
 
 
 def main():
+    # CLI subcommands — delegate before loading GUI
+    if len(sys.argv) > 1 and sys.argv[1] in ("recent", "search", "tags"):
+        from cogstash_cli import cli_main
+        cli_main(sys.argv[1:])
+        return
+
     config = load_config(Path.home() / ".cogstash.json")
 
     # Reconfigure logger to use config's log_file
