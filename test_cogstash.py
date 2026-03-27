@@ -3,20 +3,11 @@
 import sys
 from unittest.mock import patch
 from pathlib import Path
-import tkinter as tk
 import re
 import json
 import pytest
 
-# Skip tkinter-dependent tests when display/Tcl is unavailable
-try:
-    _test_root = tk.Tk()
-    _test_root.destroy()
-    _has_display = True
-except tk.TclError:
-    _has_display = False
-
-needs_display = pytest.mark.skipif(not _has_display, reason="No display or Tcl unavailable")
+from conftest import needs_display
 
 
 def test_platform_font_windows():
@@ -48,16 +39,13 @@ def test_platform_font_unknown():
 
 
 @needs_display
-def test_append_note_creates_file(tmp_path):
+def test_append_note_creates_file(tmp_path, tk_root):
     """append_note creates the file and writes the correct format."""
     import cogstash as cogstash_mod
 
     test_file = tmp_path / "cogstash.md"
-    root = tk.Tk()
-    root.withdraw()
-    app = cogstash_mod.CogStash(root, cogstash_mod.CogStashConfig(output_file=test_file))
+    app = cogstash_mod.CogStash(tk_root, cogstash_mod.CogStashConfig(output_file=test_file))
     result = app.append_note("test note")
-    root.destroy()
 
     assert result is True
     content = test_file.read_text(encoding="utf-8")
@@ -66,17 +54,14 @@ def test_append_note_creates_file(tmp_path):
 
 
 @needs_display
-def test_append_note_appends(tmp_path):
+def test_append_note_appends(tmp_path, tk_root):
     """Multiple notes are appended, not overwritten."""
     import cogstash as cogstash_mod
 
     test_file = tmp_path / "cogstash.md"
-    root = tk.Tk()
-    root.withdraw()
-    app = cogstash_mod.CogStash(root, cogstash_mod.CogStashConfig(output_file=test_file))
+    app = cogstash_mod.CogStash(tk_root, cogstash_mod.CogStashConfig(output_file=test_file))
     app.append_note("first")
     app.append_note("second")
-    root.destroy()
 
     lines = test_file.read_text(encoding="utf-8").strip().split("\n")
     assert len(lines) == 2
@@ -85,27 +70,22 @@ def test_append_note_appends(tmp_path):
 
 
 @needs_display
-def test_append_note_error_handling(tmp_path):
+def test_append_note_error_handling(tmp_path, tk_root):
     """append_note returns False and logs on write failure."""
     import cogstash as cogstash_mod
 
-    root = tk.Tk()
-    root.withdraw()
-    app = cogstash_mod.CogStash(root, cogstash_mod.CogStashConfig(output_file=Path("\\\\nonexistent_server_xyz\\share\\cogstash.md")))
+    app = cogstash_mod.CogStash(tk_root, cogstash_mod.CogStashConfig(output_file=Path("\\\\nonexistent_server_xyz\\share\\cogstash.md")))
     result = app.append_note("should fail")
-    root.destroy()
 
     assert result is False
 
 
 @needs_display
-def test_show_hide_state():
+def test_show_hide_state(tk_root):
     """show_window and hide_window toggle is_visible correctly."""
     import cogstash as cogstash_mod
 
-    root = tk.Tk()
-    root.withdraw()
-    app = cogstash_mod.CogStash(root, cogstash_mod.CogStashConfig())
+    app = cogstash_mod.CogStash(tk_root, cogstash_mod.CogStashConfig())
 
     assert app.is_visible is False
 
@@ -114,8 +94,6 @@ def test_show_hide_state():
 
     app.hide_window()
     assert app.is_visible is False
-
-    root.destroy()
 
 
 def test_theme_colors():
@@ -140,7 +118,7 @@ def test_window_size_presets():
 
 
 def test_load_config_defaults(tmp_path):
-    """No config file → returns default BlipConfig."""
+    """No config file → returns default CogStashConfig."""
     from cogstash import load_config, CogStashConfig
     config = load_config(tmp_path / "nonexistent.json")
     assert isinstance(config, CogStashConfig)
@@ -207,16 +185,13 @@ def test_parse_tags_url_safe():
 
 
 @needs_display
-def test_multiline_format(tmp_path):
+def test_multiline_format(tmp_path, tk_root):
     """Multi-line text uses indented continuation lines."""
     import cogstash as cogstash_mod
 
     test_file = tmp_path / "cogstash.md"
-    root = tk.Tk()
-    root.withdraw()
-    app = cogstash_mod.CogStash(root, cogstash_mod.CogStashConfig(output_file=test_file))
+    app = cogstash_mod.CogStash(tk_root, cogstash_mod.CogStashConfig(output_file=test_file))
     result = app.append_note("line one\nline two\nline three")
-    root.destroy()
 
     assert result is True
     content = test_file.read_text(encoding="utf-8")
@@ -229,16 +204,13 @@ def test_multiline_format(tmp_path):
 
 
 @needs_display
-def test_empty_submit_ignored(tmp_path):
+def test_empty_submit_ignored(tmp_path, tk_root):
     """Whitespace-only text is not saved."""
     import cogstash as cogstash_mod
 
     test_file = tmp_path / "cogstash.md"
-    root = tk.Tk()
-    root.withdraw()
-    app = cogstash_mod.CogStash(root, cogstash_mod.CogStashConfig(output_file=test_file))
+    app = cogstash_mod.CogStash(tk_root, cogstash_mod.CogStashConfig(output_file=test_file))
     result = app.append_note("   \n  \n  ")
-    root.destroy()
 
     assert result is False
     assert not test_file.exists()

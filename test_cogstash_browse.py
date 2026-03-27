@@ -1,21 +1,12 @@
 """Tests for cogstash_browse.py — Browse Window UI."""
 
-import tkinter as tk
 import pytest
-from pathlib import Path
 
-try:
-    _test_root = tk.Tk()
-    _test_root.destroy()
-    _has_display = True
-except tk.TclError:
-    _has_display = False
-
-needs_display = pytest.mark.skipif(not _has_display, reason="No display or Tcl unavailable")
+from conftest import needs_display
 
 
 @needs_display
-def test_browse_window_creates(tmp_path):
+def test_browse_window_creates(tmp_path, tk_root):
     """BrowseWindow opens without error."""
     f = tmp_path / "cogstash.md"
     f.write_text("- [2026-03-26 14:30] ☐ test note #todo\n", encoding="utf-8")
@@ -23,17 +14,14 @@ def test_browse_window_creates(tmp_path):
     from cogstash_browse import BrowseWindow
     from cogstash import CogStashConfig
 
-    root = tk.Tk()
-    root.withdraw()
     config = CogStashConfig(output_file=f)
-    win = BrowseWindow(root, config)
+    win = BrowseWindow(tk_root, config)
     assert win.window.winfo_exists()
     win.window.destroy()
-    root.destroy()
 
 
 @needs_display
-def test_browse_search_filters(tmp_path):
+def test_browse_search_filters(tmp_path, tk_root):
     """Typing in search box reduces visible cards."""
     f = tmp_path / "cogstash.md"
     f.write_text(
@@ -45,10 +33,8 @@ def test_browse_search_filters(tmp_path):
     from cogstash_browse import BrowseWindow
     from cogstash import CogStashConfig
 
-    root = tk.Tk()
-    root.withdraw()
     config = CogStashConfig(output_file=f)
-    win = BrowseWindow(root, config)
+    win = BrowseWindow(tk_root, config)
     total_before = len(win._visible_cards)
 
     win.search_var.set("milk")
@@ -58,11 +44,10 @@ def test_browse_search_filters(tmp_path):
     assert total_before == 2
     assert total_after == 1
     win.window.destroy()
-    root.destroy()
 
 
 @needs_display
-def test_browse_tag_filter(tmp_path):
+def test_browse_tag_filter(tmp_path, tk_root):
     """Tag pill click filters cards."""
     f = tmp_path / "cogstash.md"
     f.write_text(
@@ -74,10 +59,8 @@ def test_browse_tag_filter(tmp_path):
     from cogstash_browse import BrowseWindow
     from cogstash import CogStashConfig
 
-    root = tk.Tk()
-    root.withdraw()
     config = CogStashConfig(output_file=f)
-    win = BrowseWindow(root, config)
+    win = BrowseWindow(tk_root, config)
 
     win._on_tag_filter("todo")
     assert len(win._visible_cards) == 1
@@ -86,4 +69,3 @@ def test_browse_tag_filter(tmp_path):
     win._on_tag_filter(None)  # "All" — clear filter
     assert len(win._visible_cards) == 2
     win.window.destroy()
-    root.destroy()
