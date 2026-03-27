@@ -1,10 +1,10 @@
-# Blip ⚡
+# CogStash ⚡
 
 A tiny Python utility for quickly capturing thoughts with a global hotkey.
 
 **Press `Ctrl + Shift + Space` → type your thought → hit `Enter`. Done.**
 
-Notes are appended (with a timestamp) to `~/blip.md`.
+Notes are appended (with a timestamp) to `~/cogstash.md`.
 
 ---
 
@@ -17,11 +17,11 @@ Notes are appended (with a timestamp) to `~/blip.md`.
 
 ## Cross-platform behavior
 
-Blip runs on any PC that has Python 3.9+ with `tkinter` available:
+CogStash runs on any PC that has Python 3.9+ with `tkinter` available:
 
-- **Windows**: notes are written to your user home folder, for example `C:\Users\alice\blip.md`
-- **macOS**: notes are written to your user home folder, for example `/Users/alice/blip.md`
-- **Linux**: notes are written to your user home folder, for example `/home/alice/blip.md`
+- **Windows**: notes are written to your user home folder, for example `C:\Users\alice\cogstash.md`
+- **macOS**: notes are written to your user home folder, for example `/Users/alice/cogstash.md`
+- **Linux**: notes are written to your user home folder, for example `/home/alice/cogstash.md`
 
 On macOS, you may also need to allow accessibility permissions so the global hotkey can be captured.
 
@@ -45,9 +45,9 @@ pip install .
 ## Usage
 
 ```bash
-python blip.py
+python cogstash.py
 # or, if installed via pip:
-blip
+cogstash
 ```
 
 | Key | Action |
@@ -56,7 +56,7 @@ blip
 | `Enter` | Save note and close window |
 | `Escape` | Dismiss window without saving |
 
-Notes are written to `~/blip.md` in the format:
+Notes are written to `~/cogstash.md` in the format:
 
 ```
 - [2024-01-15 09:30] Remember to buy milk
@@ -64,9 +64,9 @@ Notes are written to `~/blip.md` in the format:
 
 ## Configuration
 
-Edit the constants at the top of `blip.py`:
+Edit the constants at the top of `cogstash.py`:
 
 | Constant | Default | Description |
 |----------|---------|-------------|
 | `HOTKEY` | `<ctrl>+<shift>+<space>` | Global hotkey combination |
-| `OUTPUT_FILE` | `~/blip.md` | Path to the notes file |
+| `OUTPUT_FILE` | `~/cogstash.md` | Path to the notes file |
