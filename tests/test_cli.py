@@ -2,6 +2,8 @@
 
 from datetime import datetime
 
+from conftest import CaptureStream, StrictEncodedStream
+
 
 def _make_notes_file(tmp_path):
     """Create a test cogstash.md with 5 notes spanning various states."""
@@ -15,31 +17,6 @@ def _make_notes_file(tmp_path):
         encoding="utf-8",
     )
     return f
-
-
-class _CaptureStream:
-    def __init__(self):
-        self.parts = []
-
-    def write(self, text):
-        self.parts.append(text)
-        return len(text)
-
-    def flush(self):
-        pass
-
-    def getvalue(self):
-        return "".join(self.parts)
-
-
-class _StrictEncodedStream(_CaptureStream):
-    def __init__(self, encoding: str):
-        super().__init__()
-        self.encoding = encoding
-
-    def write(self, text):
-        text.encode(self.encoding)
-        return super().write(text)
 
 
 def test_format_note_color():
@@ -685,7 +662,7 @@ def test_cmd_stats_handles_none_stdout(monkeypatch, tmp_path):
     from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_stats
 
-    capture = _CaptureStream()
+    capture = CaptureStream()
     f = _make_notes_file(tmp_path)
     import sys
 
@@ -706,7 +683,7 @@ def test_cmd_search_plain_output_without_isatty(monkeypatch, tmp_path):
     from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_search
 
-    capture = _CaptureStream()
+    capture = CaptureStream()
     f = _make_notes_file(tmp_path)
     import sys
 
@@ -726,7 +703,7 @@ def test_cmd_stats_replaces_unencodable_chars(monkeypatch, tmp_path):
     from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_stats
 
-    capture = _StrictEncodedStream("cp1252")
+    capture = StrictEncodedStream("cp1252")
     f = _make_notes_file(tmp_path)
     import sys
 
@@ -747,7 +724,7 @@ def test_cmd_search_replaces_unencodable_note_chars(monkeypatch, tmp_path):
     from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_search
 
-    capture = _StrictEncodedStream("cp1252")
+    capture = StrictEncodedStream("cp1252")
     f = tmp_path / "cogstash.md"
     f.write_text("- [2026-03-28 09:00] smile 😀 note\n", encoding="utf-8")
     import sys
@@ -882,7 +859,7 @@ def test_version_flag_without_isatty(monkeypatch):
 
     from cogstash.cli import build_parser
 
-    capture = _CaptureStream()
+    capture = CaptureStream()
     import sys
 
     monkeypatch.setattr(sys, "stdout", capture)

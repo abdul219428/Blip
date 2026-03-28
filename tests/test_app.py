@@ -5,32 +5,7 @@ import re
 import sys
 from unittest.mock import patch
 
-from conftest import needs_display
-
-
-class _CaptureStream:
-    def __init__(self):
-        self.parts = []
-
-    def write(self, text):
-        self.parts.append(text)
-        return len(text)
-
-    def flush(self):
-        pass
-
-    def getvalue(self):
-        return "".join(self.parts)
-
-
-class _StrictEncodedStream(_CaptureStream):
-    def __init__(self, encoding: str):
-        super().__init__()
-        self.encoding = encoding
-
-    def write(self, text):
-        text.encode(self.encoding)
-        return super().write(text)
+from conftest import StrictEncodedStream, needs_display
 
 
 def test_platform_font_windows():
@@ -370,7 +345,7 @@ def test_main_dispatches_version_with_cp1252_stdout(monkeypatch):
     """--version should not crash when packaged stdout cannot encode Unicode."""
     import cogstash
 
-    capture = _StrictEncodedStream("cp1252")
+    capture = StrictEncodedStream("cp1252")
     monkeypatch.setattr("sys.argv", ["cogstash", "--version"])
     monkeypatch.setattr("sys.stdout", capture)
     monkeypatch.setattr(cogstash, "__version__", "0.0.0 → dev")
@@ -412,7 +387,7 @@ def test_app_main_startup_output_is_cp1252_safe(monkeypatch, tmp_path):
         log_file=tmp_path / "cogstash.log",
         last_seen_version=cogstash.__version__,
     )
-    capture = _StrictEncodedStream("cp1252")
+    capture = StrictEncodedStream("cp1252")
 
     monkeypatch.setattr(app_mod, "load_config", lambda _path: config)
     monkeypatch.setattr(app_mod, "configure_dpi", lambda: None)
@@ -422,7 +397,19 @@ def test_app_main_startup_output_is_cp1252_safe(monkeypatch, tmp_path):
     monkeypatch.setattr(app_mod.keyboard, "GlobalHotKeys", FakeListener)
     monkeypatch.setattr("sys.stdout", capture)
 
-    app_mod.main()
+    original_handlers = app_mod.logger.handlers[:]
+    try:
+        app_mod.main()
+    finally:
+        for handler in [h for h in app_mod.logger.handlers[:] if h not in original_handlers]:
+            app_mod.logger.removeHandler(handler)
+            try:
+                handler.close()
+            except Exception:
+                pass
+        for handler in original_handlers:
+            if handler not in app_mod.logger.handlers:
+                app_mod.logger.addHandler(handler)
 
     output = capture.getvalue()
     assert "CogStash is running." in output
