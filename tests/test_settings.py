@@ -57,3 +57,27 @@ def test_settings_appearance_tab(tk_root, tmp_path):
     assert sw.selected_size.get() == "default"
     sw.win.destroy()
 
+
+@needs_display
+def test_settings_tags_tab(tk_root, tmp_path):
+    """Tags tab shows built-in tags."""
+    from cogstash.app import CogStashConfig
+    from cogstash.settings import SettingsWindow
+    config = CogStashConfig()
+    sw = SettingsWindow(tk_root, config, tmp_path / "test.json")
+    sw._show_tab(2)  # Tags tab
+    assert hasattr(sw, "tag_list_frame")
+    sw.win.destroy()
+
+
+@needs_display
+def test_settings_about_tab(tk_root, tmp_path):
+    """About tab shows version info."""
+    from cogstash.app import CogStashConfig
+    from cogstash.settings import SettingsWindow
+    config = CogStashConfig()
+    sw = SettingsWindow(tk_root, config, tmp_path / "test.json")
+    sw._show_tab(3)  # About tab
+    assert hasattr(sw, "version_label")
+    sw.win.destroy()
+

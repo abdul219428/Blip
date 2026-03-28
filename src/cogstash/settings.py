@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import sys
 import tkinter as tk
 from pathlib import Path
 
 from cogstash.app import (
+    DEFAULT_SMART_TAGS,
     THEMES,
     WINDOW_SIZES,
     CogStashConfig,
+    merge_tags,
     platform_font,
     save_config,
 )
@@ -219,14 +222,163 @@ class SettingsWindow:
                   cursor="hand2").pack(anchor="e", pady=(12, 0))
 
     def _build_tags_tab(self):
-        """Placeholder — implemented in Task 5."""
-        frame = tk.Frame(self.content_frame, bg=self.theme["bg"])
+        """Build the Tags management tab."""
+        t = self.theme
+        frame = tk.Frame(self.content_frame, bg=t["bg"])
         self.tab_frames.append(frame)
 
+        tk.Label(frame, text="Tags", bg=t["bg"], fg=t["fg"],
+                 font=(platform_font(), 11, "bold")).pack(anchor="w", pady=(8, 8))
+
+        # Scrollable tag list
+        self.tag_list_frame = tk.Frame(frame, bg=t["bg"])
+        self.tag_list_frame.pack(fill="both", expand=True, padx=(8, 0))
+
+        self._render_tags()
+
+        # Add tag button
+        add_frame = tk.Frame(frame, bg=t["bg"])
+        add_frame.pack(fill="x", pady=(8, 0))
+        tk.Button(add_frame, text="+ Add Custom Tag", command=self._show_add_tag_form,
+                  bg=t["entry_bg"], fg=t["fg"], relief="flat",
+                  font=(platform_font(), 9), cursor="hand2").pack(anchor="w")
+
+        # Add tag form (hidden initially)
+        self._add_tag_frame = tk.Frame(frame, bg=t["entry_bg"])
+        self._tag_name_var = tk.StringVar()
+        self._tag_emoji_var = tk.StringVar()
+        self._tag_color_var = tk.StringVar(value="#ffffff")
+
+        tk.Label(self._add_tag_frame, text="Name:", bg=t["entry_bg"], fg=t["fg"],
+                 font=(platform_font(), 9)).grid(row=0, column=0, padx=4, pady=2, sticky="w")
+        tk.Entry(self._add_tag_frame, textvariable=self._tag_name_var, bg=t["bg"], fg=t["fg"],
+                 insertbackground=t["fg"], relief="flat", font=(platform_font(), 9),
+                 width=12).grid(row=0, column=1, padx=4, pady=2)
+        tk.Label(self._add_tag_frame, text="Emoji:", bg=t["entry_bg"], fg=t["fg"],
+                 font=(platform_font(), 9)).grid(row=0, column=2, padx=4, pady=2, sticky="w")
+        tk.Entry(self._add_tag_frame, textvariable=self._tag_emoji_var, bg=t["bg"], fg=t["fg"],
+                 insertbackground=t["fg"], relief="flat", font=(platform_font(), 9),
+                 width=4).grid(row=0, column=3, padx=4, pady=2)
+        tk.Label(self._add_tag_frame, text="Color:", bg=t["entry_bg"], fg=t["fg"],
+                 font=(platform_font(), 9)).grid(row=0, column=4, padx=4, pady=2, sticky="w")
+        tk.Entry(self._add_tag_frame, textvariable=self._tag_color_var, bg=t["bg"], fg=t["fg"],
+                 insertbackground=t["fg"], relief="flat", font=(platform_font(), 9),
+                 width=8).grid(row=0, column=5, padx=4, pady=2)
+        tk.Button(self._add_tag_frame, text="Add", command=self._add_tag,
+                  bg=t["accent"], fg=t["bg"], relief="flat",
+                  font=(platform_font(), 9)).grid(row=0, column=6, padx=8, pady=2)
+
+        # Save button
+        tk.Button(frame, text="Save", command=self._save_tags,
+                  bg=t["accent"], fg=t["bg"], relief="flat",
+                  font=(platform_font(), 10, "bold"), padx=24, pady=6,
+                  cursor="hand2").pack(anchor="e", pady=(8, 0))
+
     def _build_about_tab(self):
-        """Placeholder — implemented in Task 6."""
-        frame = tk.Frame(self.content_frame, bg=self.theme["bg"])
+        """Build the About tab with version and links."""
+        t = self.theme
+        frame = tk.Frame(self.content_frame, bg=t["bg"])
         self.tab_frames.append(frame)
+
+        # Version
+        from cogstash import __version__
+        self.version_label = tk.Label(frame, text=f"CogStash v{__version__}", bg=t["bg"], fg=t["fg"],
+                                      font=(platform_font(), 14, "bold"))
+        self.version_label.pack(pady=(24, 4))
+        tk.Label(frame, text="A global hotkey brain dump — press, type, gone.",
+                 bg=t["bg"], fg=t["muted"], font=(platform_font(), 10)).pack(pady=(0, 24))
+
+        # Links
+        links = [
+            ("GitHub Repository", "https://github.com/abdul219428/CogStash"),
+            ("Open Notes File", str(self.config.output_file)),
+            ("Open Config File", str(self.config_path)),
+        ]
+        for text, target in links:
+            lbl = tk.Label(frame, text=text, bg=t["bg"], fg=t["accent"],
+                           font=(platform_font(), 10), cursor="hand2")
+            lbl.pack(pady=2)
+            lbl.bind("<Button-1>", lambda e, t=target: self._open_link(t))
+
+        # Credits
+        tk.Label(frame, text="Built with Python, tkinter, pynput, pystray, Pillow",
+                 bg=t["bg"], fg=t["muted"], font=(platform_font(), 9)).pack(pady=(24, 0))
+
+    def _open_link(self, target: str):
+        """Open a URL or file path."""
+        import os
+        import subprocess
+        if target.startswith("http"):
+            import webbrowser
+            webbrowser.open(target)
+        elif sys.platform == "win32":
+            os.startfile(target)
+        elif sys.platform == "darwin":
+            subprocess.run(["open", target], check=False)
+        else:
+            subprocess.run(["xdg-open", target], check=False)
+
+    def _render_tags(self):
+        """Render the tag list in the tags tab."""
+        for child in self.tag_list_frame.winfo_children():
+            child.destroy()
+        t = self.theme
+        smart_tags, tag_colors = merge_tags(self.config)
+
+        for name, emoji in DEFAULT_SMART_TAGS.items():
+            row = tk.Frame(self.tag_list_frame, bg=t["bg"])
+            row.pack(fill="x", pady=2)
+            tk.Label(row, text=f"  {emoji}  #{name}", bg=t["bg"], fg=t["fg"],
+                     font=(platform_font(), 10), anchor="w").pack(side="left")
+            tk.Label(row, text="Built-in", bg=t["entry_bg"], fg=t["muted"],
+                     font=(platform_font(), 8), padx=6, pady=1).pack(side="right")
+
+        if self.config.tags:
+            for name, props in self.config.tags.items():
+                row = tk.Frame(self.tag_list_frame, bg=t["bg"])
+                row.pack(fill="x", pady=2)
+                tk.Label(row, text=f"  {props['emoji']}  #{name}", bg=t["bg"], fg=t["fg"],
+                         font=(platform_font(), 10), anchor="w").pack(side="left")
+                color_swatch = tk.Frame(row, bg=props["color"], width=14, height=14)
+                color_swatch.pack(side="right", padx=(0, 4))
+                color_swatch.pack_propagate(False)
+                tk.Button(row, text="✕", command=lambda n=name: self._remove_tag(n),
+                          bg=t["bg"], fg=t["error"], relief="flat",
+                          font=(platform_font(), 9), cursor="hand2").pack(side="right")
+
+    def _show_add_tag_form(self):
+        """Show the add-tag form."""
+        self._add_tag_frame.pack(fill="x", padx=(8, 0), pady=(4, 0))
+
+    def _add_tag(self):
+        """Add a new custom tag from the form fields."""
+        import re
+        name = self._tag_name_var.get().strip().lower()
+        emoji = self._tag_emoji_var.get().strip()
+        color = self._tag_color_var.get().strip()
+        if not name or not emoji or not re.match(r"^#[0-9a-fA-F]{6}$", color):
+            return
+        if self.config.tags is None:
+            self.config.tags = {}
+        self.config.tags[name] = {"emoji": emoji, "color": color}
+        self._tag_name_var.set("")
+        self._tag_emoji_var.set("")
+        self._tag_color_var.set("#ffffff")
+        self._add_tag_frame.pack_forget()
+        self._render_tags()
+
+    def _remove_tag(self, name: str):
+        """Remove a custom tag."""
+        if self.config.tags and name in self.config.tags:
+            del self.config.tags[name]
+            if not self.config.tags:
+                self.config.tags = None
+            self._render_tags()
+
+    def _save_tags(self):
+        """Save Tags tab settings."""
+        save_config(self.config, self.config_path)
+        self._flash_saved()
 
 
 class WizardWindow:
