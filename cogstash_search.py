@@ -166,3 +166,98 @@ def delete_note(path: Path, note: Note) -> bool:
     except OSError:
         return False
 
+
+def compute_stats(notes: list[Note]) -> dict:
+    """Compute extended statistics from a list of notes.
+
+    Returns a dict with keys: total, done, pending, first_date, last_date,
+    tag_counts, avg_length, longest, notes_this_week, notes_last_week,
+    busiest_day, avg_per_week, current_streak, longest_streak.
+    """
+    if not notes:
+        return {
+            "total": 0, "done": 0, "pending": 0,
+            "first_date": None, "last_date": None,
+            "tag_counts": {}, "avg_length": 0, "longest": 0,
+            "notes_this_week": 0, "notes_last_week": 0,
+            "busiest_day": None, "avg_per_week": 0.0,
+            "current_streak": 0, "longest_streak": 0,
+        }
+
+    from collections import Counter
+    from datetime import timedelta, date
+
+    total = len(notes)
+    done = sum(1 for n in notes if n.is_done)
+    pending = total - done
+
+    timestamps = sorted(n.timestamp for n in notes)
+    first_date = timestamps[0]
+    last_date = timestamps[-1]
+
+    # Tag counts
+    tag_counter: Counter[str] = Counter()
+    for n in notes:
+        for tag in n.tags:
+            tag_counter[tag] += 1
+    tag_counts = dict(tag_counter.most_common())
+
+    # Note lengths
+    lengths = [len(n.text) for n in notes]
+    avg_length = sum(lengths) // total
+    longest = max(lengths)
+
+    # Weekly activity
+    today = date.today()
+    week_start = today - timedelta(days=today.weekday())  # Monday
+    last_week_start = week_start - timedelta(days=7)
+    notes_this_week = sum(1 for n in notes if n.timestamp.date() >= week_start)
+    notes_last_week = sum(
+        1 for n in notes
+        if last_week_start <= n.timestamp.date() < week_start
+    )
+
+    # Busiest day of week (0=Monday, 6=Sunday)
+    day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    day_counts = Counter(n.timestamp.weekday() for n in notes)
+    busiest_idx = day_counts.most_common(1)[0][0]
+    busiest_day = day_names[busiest_idx]
+
+    # Average per week
+    span_days = (last_date.date() - first_date.date()).days + 1
+    span_weeks = max(span_days / 7, 1)
+    avg_per_week = round(total / span_weeks, 1)
+
+    # Streaks — consecutive days with at least one note
+    note_dates = sorted(set(n.timestamp.date() for n in notes))
+    current_streak = 0
+    longest_streak = 0
+    streak = 1
+
+    for i in range(1, len(note_dates)):
+        if (note_dates[i] - note_dates[i - 1]).days == 1:
+            streak += 1
+        else:
+            longest_streak = max(longest_streak, streak)
+            streak = 1
+    longest_streak = max(longest_streak, streak)
+
+    # Current streak: count backwards from today
+    if today in note_dates:
+        current_streak = 1
+        check = today - timedelta(days=1)
+        while check in set(note_dates):
+            current_streak += 1
+            check -= timedelta(days=1)
+    else:
+        current_streak = 0
+
+    return {
+        "total": total, "done": done, "pending": pending,
+        "first_date": first_date, "last_date": last_date,
+        "tag_counts": tag_counts, "avg_length": avg_length, "longest": longest,
+        "notes_this_week": notes_this_week, "notes_last_week": notes_last_week,
+        "busiest_day": busiest_day, "avg_per_week": avg_per_week,
+        "current_streak": current_streak, "longest_streak": longest_streak,
+    }
+

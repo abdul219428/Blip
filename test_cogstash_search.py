@@ -260,3 +260,64 @@ def test_delete_note(tmp_path):
     assert "delete me" not in content
     assert "continuation" not in content
     assert "- [2026-03-26 15:00] keep me\n" in content
+
+
+def test_compute_stats_basic(tmp_path):
+    """Stats returns correct totals, done/pending, date range."""
+    f = tmp_path / "cogstash.md"
+    f.write_text(
+        "- [2026-01-15 09:00] first note #todo\n"
+        "- [2026-02-10 14:30] ☑ done item #todo\n"
+        "- [2026-03-27 16:00] latest note #idea\n",
+        encoding="utf-8",
+    )
+    from cogstash_search import parse_notes, compute_stats
+    notes = parse_notes(f)
+    stats = compute_stats(notes)
+
+    assert stats["total"] == 3
+    assert stats["done"] == 1
+    assert stats["pending"] == 2
+    assert stats["first_date"].year == 2026
+    assert stats["first_date"].month == 1
+    assert stats["last_date"].month == 3
+    assert "todo" in stats["tag_counts"]
+    assert stats["tag_counts"]["todo"] == 2
+    assert stats["avg_length"] > 0
+    assert stats["longest"] >= stats["avg_length"]
+
+
+def test_compute_stats_empty():
+    """Empty note list returns zeroed stats."""
+    from cogstash_search import compute_stats
+    stats = compute_stats([])
+
+    assert stats["total"] == 0
+    assert stats["done"] == 0
+    assert stats["pending"] == 0
+    assert stats["first_date"] is None
+    assert stats["last_date"] is None
+    assert stats["tag_counts"] == {}
+    assert stats["avg_length"] == 0
+
+
+def test_compute_stats_streaks(tmp_path):
+    """Streak calculation finds consecutive days with notes."""
+    from datetime import timedelta, date
+    from cogstash_search import parse_notes, compute_stats
+
+    today = date.today()
+    dates = [today - timedelta(days=i) for i in range(3, -1, -1)]  # 4 consecutive days ending today
+    lines = []
+    for i, d in enumerate(dates):
+        ts = d.strftime("%Y-%m-%d") + " 09:00"
+        lines.append(f"- [{ts}] day {i + 1}\n")
+
+    f = tmp_path / "cogstash.md"
+    f.write_text("".join(lines), encoding="utf-8")
+    notes = parse_notes(f)
+    stats = compute_stats(notes)
+
+    assert stats["current_streak"] == 4
+    assert stats["longest_streak"] == 4
+    assert stats["notes_this_week"] >= 1
