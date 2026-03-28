@@ -623,6 +623,8 @@ class CogStash:
 
 
 def main():
+    from cogstash.cli import safe_print
+
     config_path = Path.home() / ".cogstash.json"
     config = load_config(config_path)
 
@@ -651,8 +653,8 @@ def main():
             config.last_seen_version = __version__
             save_config(config, config_path)
 
-    print(f"CogStash is running. ({config.hotkey} to capture · Ctrl+C to quit)")
-    print(f"Notes → {config.output_file}")
+    safe_print(f"CogStash is running. ({config.hotkey} to capture · Ctrl+C to quit)")
+    safe_print(f"Notes → {config.output_file}")
 
     app = CogStash(root, config)
 
@@ -666,13 +668,13 @@ def main():
         listener.start()
     except Exception:
         logger.error("Failed to register global hotkey %s", config.hotkey, exc_info=True)
-        print(f"ERROR: Could not register hotkey {config.hotkey}. See {config.log_file} for details.")
+        safe_print(f"ERROR: Could not register hotkey {config.hotkey}. See {config.log_file} for details.")
         listener = None
 
     try:
         root.mainloop()
     except KeyboardInterrupt:
-        print("\nCogStash stopped.")
+        safe_print("\nCogStash stopped.")
     finally:
         if listener is not None:
             listener.stop()
