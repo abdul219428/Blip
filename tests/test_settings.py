@@ -36,6 +36,18 @@ def test_settings_window_has_tabs(tk_root, tmp_path):
 
 
 @needs_display
+def test_settings_window_not_transient_to_withdrawn_root(tk_root, tmp_path):
+    """Settings window should not be transient to the hidden app root."""
+    from cogstash.app import CogStashConfig
+    from cogstash.settings import SettingsWindow
+
+    config = CogStashConfig()
+    sw = SettingsWindow(tk_root, config, tmp_path / "test.json")
+    assert sw.win.transient() == ""
+    sw.win.destroy()
+
+
+@needs_display
 def test_settings_general_tab_widgets(tk_root, tmp_path):
     """General tab has hotkey label, notes file entry, and launch checkbox."""
     from cogstash.app import CogStashConfig

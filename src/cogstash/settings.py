@@ -65,7 +65,9 @@ class SettingsWindow:
         self.win.resizable(False, False)
         self.theme = THEMES[config.theme]
         self.win.configure(bg=self.theme["bg"])
-        self.win.transient(parent)
+        if parent.state() != "withdrawn":
+            self.win.transient(parent)
+        self.win.lift()
         self.win.focus_force()
 
         self._build_tab_bar()
