@@ -62,6 +62,7 @@ Filename: "{app}\CogStash.exe"; Description: "Launch CogStash"; Flags: nowait po
 
 [UninstallDelete]
 Type: files; Name: "{userstartup}\CogStash.bat"
+Type: files; Name: "{app}\.path-owned"
 
 [Code]
 const

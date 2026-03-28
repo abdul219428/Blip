@@ -110,6 +110,16 @@ def test_inno_setup_script_persists_path_ownership_for_uninstall():
     assert "RemovePathOwnershipMarker" in content
 
 
+def test_inno_setup_script_removes_path_marker_on_uninstall():
+    """Uninstall should remove the PATH ownership marker so the install dir can be deleted."""
+    repo_root = Path(__file__).resolve().parents[1]
+    iss_path = repo_root / "installer" / "windows" / "CogStash.iss"
+
+    content = iss_path.read_text(encoding="utf-8")
+
+    assert 'Type: files; Name: "{app}\\.path-owned"' in content
+
+
 def test_stage_windows_payload_copies_bundle_and_renames_exe(tmp_path):
     """Stage helper should normalize the app dir and executable name."""
     module = _load_build_installer_module()
