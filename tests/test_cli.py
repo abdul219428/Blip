@@ -699,26 +699,6 @@ def test_cmd_stats_handles_none_stdout(monkeypatch, tmp_path):
     assert "5" in output
 
 
-def test_cmd_search_handles_none_stdout(monkeypatch, tmp_path):
-    """Search prints through sys.__stdout__ when sys.stdout is None."""
-    from types import SimpleNamespace
-
-    from cogstash.app import CogStashConfig
-    from cogstash.cli import cmd_search
-
-    capture = _CaptureStream()
-    f = _make_notes_file(tmp_path)
-    import sys
-
-    monkeypatch.setattr(sys, "stdout", None)
-    monkeypatch.setattr(sys, "__stdout__", capture)
-
-    cmd_search(SimpleNamespace(query="milk", limit=20), CogStashConfig(output_file=f))
-
-    output = capture.getvalue()
-    assert "buy milk" in output
-
-
 def test_cmd_search_plain_output_without_isatty(monkeypatch, tmp_path):
     """Search falls back to plain text when stdout lacks isatty()."""
     from types import SimpleNamespace
@@ -880,62 +860,6 @@ def test_cmd_config_get_invalid_key(tmp_path, capsys):
         )
 
 
-def test_cmd_config_get_invalid_key_handles_none_stderr(monkeypatch, tmp_path):
-    """Config errors print through sys.__stderr__ when sys.stderr is None."""
-    from types import SimpleNamespace
-
-    import pytest
-
-    from cogstash.app import CogStashConfig
-    from cogstash.cli import cmd_config
-
-    config_path = tmp_path / ".cogstash.json"
-    config_path.write_text("{}", encoding="utf-8")
-    capture = _CaptureStream()
-    import sys
-
-    monkeypatch.setattr(sys, "stderr", None)
-    monkeypatch.setattr(sys, "__stderr__", capture)
-
-    with pytest.raises(SystemExit):
-        cmd_config(
-            SimpleNamespace(action="get", key="nonexistent", value=None),
-            CogStashConfig(),
-            config_path=config_path,
-        )
-
-    output = capture.getvalue()
-    assert "unknown key" in output.lower()
-
-
-def test_cmd_config_get_invalid_key_does_not_leak_to_stdout_without_stderr(monkeypatch, tmp_path):
-    """Config errors stay off stdout when both stderr handles are unavailable."""
-    from types import SimpleNamespace
-
-    import pytest
-
-    from cogstash.app import CogStashConfig
-    from cogstash.cli import cmd_config
-
-    config_path = tmp_path / ".cogstash.json"
-    config_path.write_text("{}", encoding="utf-8")
-    stdout_capture = _CaptureStream()
-    import sys
-
-    monkeypatch.setattr(sys, "stdout", stdout_capture)
-    monkeypatch.setattr(sys, "stderr", None)
-    monkeypatch.setattr(sys, "__stderr__", None)
-
-    with pytest.raises(SystemExit):
-        cmd_config(
-            SimpleNamespace(action="get", key="nonexistent", value=None),
-            CogStashConfig(),
-            config_path=config_path,
-        )
-
-    assert stdout_capture.getvalue() == ""
-
-
 def test_version_flag(capsys):
     """cogstash --version prints the version string."""
     from cogstash.cli import build_parser
@@ -972,23 +896,6 @@ def test_version_flag_without_isatty(monkeypatch):
     assert "cogstash" in output.lower()
 
 
-def test_package_entry_version_handles_none_stdout(monkeypatch):
-    """Top-level cogstash --version prints through sys.__stdout__ when needed."""
-    import sys
-
-    import cogstash
-
-    capture = _CaptureStream()
-    monkeypatch.setattr(sys, "argv", ["cogstash", "--version"])
-    monkeypatch.setattr(sys, "stdout", None)
-    monkeypatch.setattr(sys, "__stdout__", capture)
-
-    cogstash.main()
-
-    output = capture.getvalue()
-    assert "cogstash" in output.lower()
-
-
 def test_invalid_command_exits_as_cli_error(capsys):
     """Unknown subcommands raise argparse CLI errors."""
     import pytest
@@ -1002,66 +909,6 @@ def test_invalid_command_exits_as_cli_error(capsys):
     assert exc.value.code == 2
     err = capsys.readouterr().err.lower()
     assert "invalid choice" in err
-
-
-def test_invalid_command_uses___stderr__(monkeypatch):
-    """Argparse errors print through sys.__stderr__ when sys.stderr is None."""
-    import sys
-
-    import pytest
-
-    from cogstash.cli import cli_main
-
-    capture = _CaptureStream()
-    monkeypatch.setattr(sys, "stderr", None)
-    monkeypatch.setattr(sys, "__stderr__", capture)
-
-    with pytest.raises(SystemExit) as exc:
-        cli_main(["bogus"])
-
-    assert exc.value.code == 2
-    output = capture.getvalue().lower()
-    assert "invalid choice" in output
-
-
-def test_invalid_command_does_not_leak_to_stdout_without_stderr(monkeypatch):
-    """Argparse errors stay off stdout when no stderr streams are available."""
-    import sys
-
-    import pytest
-
-    from cogstash.cli import cli_main
-
-    stdout_capture = _CaptureStream()
-    monkeypatch.setattr(sys, "stdout", stdout_capture)
-    monkeypatch.setattr(sys, "stderr", None)
-    monkeypatch.setattr(sys, "__stderr__", None)
-
-    with pytest.raises(SystemExit) as exc:
-        cli_main(["bogus"])
-
-    assert exc.value.code == 2
-    assert stdout_capture.getvalue() == ""
-
-
-def test_parser_exit_uses___stderr__(monkeypatch):
-    """ArgumentParser.exit() preserves stderr routing when stderr is missing."""
-    import sys
-
-    import pytest
-
-    from cogstash.cli import build_parser
-
-    capture = _CaptureStream()
-    monkeypatch.setattr(sys, "stderr", None)
-    monkeypatch.setattr(sys, "__stderr__", capture)
-
-    parser = build_parser()
-    with pytest.raises(SystemExit) as exc:
-        parser.exit(2, "boom\n")
-
-    assert exc.value.code == 2
-    assert capture.getvalue() == "boom\n"
 
 
 def test_invalid_flag_exits_as_cli_error(capsys):

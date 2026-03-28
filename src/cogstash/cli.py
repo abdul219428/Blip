@@ -47,7 +47,7 @@ def stream_is_interactive(stream: object | None) -> bool:
 
 def safe_print(*args: object, sep: str = " ", end: str = "\n", file: object | None = None) -> None:
     """Print text while degrading unencodable characters instead of crashing."""
-    stream = (sys.stdout if sys.stdout is not None else sys.__stdout__) if file is None else file
+    stream = sys.stdout if file is None else file
     if stream is None:
         return
 
@@ -69,31 +69,6 @@ def safe_print(*args: object, sep: str = " ", end: str = "\n", file: object | No
     flush = getattr(stream, "flush", None)
     if callable(flush):
         flush()
-
-
-def safe_error_print(*args: object, sep: str = " ", end: str = "\n") -> None:
-    """Print text to stderr while degrading unencodable characters instead of crashing."""
-    stream = sys.stderr if sys.stderr is not None else sys.__stderr__
-    if stream is None:
-        return
-    safe_print(*args, sep=sep, end=end, file=stream)
-
-
-class SafeArgumentParser(argparse.ArgumentParser):
-    """ArgumentParser that keeps output on the intended stream in degraded runtimes."""
-
-    def _print_message(self, message: str | None, file: object | None = None) -> None:
-        if not message:
-            return
-        if file is None:
-            safe_error_print(message, end="" if message.endswith("\n") else "\n")
-            return
-        safe_print(message, end="" if message.endswith("\n") else "\n", file=file)
-
-    def error(self, message: str) -> None:
-        safe_error_print(self.format_usage(), end="")
-        safe_error_print(f"{self.prog}: error: {message}")
-        raise SystemExit(2)
 
 
 def hex_to_ansi(hex_color: str) -> str:
@@ -213,14 +188,14 @@ def cmd_add(args, config, ansi_tag=None):
     else:
         stdin = sys.stdin
         if stdin is None or stream_is_interactive(stdin):
-            safe_error_print("Error: provide note text as argument or pipe via stdin.")
+            safe_print("Error: provide note text as argument or pipe via stdin.", file=sys.stderr)
             sys.exit(1)
         text = stdin.read()
 
     smart_tags, _ = merge_tags(config)
     ok = append_note_to_file(text, config.output_file, smart_tags)
     if not ok:
-        safe_error_print("Error: failed to save note.")
+        safe_print("Error: failed to save note.", file=sys.stderr)
         sys.exit(1)
 
 
@@ -232,21 +207,21 @@ def _find_note(config, number: int | None = None, search: str | None = None,
         for n in notes:
             if n.index == number:
                 return n
-        safe_error_print(f"Error: note #{number} not found.")
+        safe_print(f"Error: note #{number} not found.", file=sys.stderr)
         return None
     if search is not None:
         results = search_notes(notes, search)
         if len(results) == 1:
             return results[0]
         if len(results) == 0:
-            safe_error_print(f"Error: no notes match '{search}'.")
+            safe_print(f"Error: no notes match '{search}'.", file=sys.stderr)
             return None
         use_color = stream_supports_color(sys.stdout)
-        safe_error_print(f"Multiple matches ({len(results)}). Use a note number instead:")
+        safe_print(f"Multiple matches ({len(results)}). Use a note number instead:", file=sys.stderr)
         for n in results:
-            safe_error_print(f"  {n.index}: {format_note(n, use_color, ansi_tag)}")
+            safe_print(f"  {n.index}: {format_note(n, use_color, ansi_tag)}", file=sys.stderr)
         return None
-    safe_error_print("Error: provide a note number or --search.")
+    safe_print("Error: provide a note number or --search.", file=sys.stderr)
     return None
 
 
@@ -260,11 +235,11 @@ def cmd_edit(args, config, ansi_tag=None):
     elif text_parts and text_parts[0].isdigit():
         number = int(text_parts.pop(0))
     else:
-        safe_error_print("Error: provide a note number or --search.")
+        safe_print("Error: provide a note number or --search.", file=sys.stderr)
         sys.exit(1)
 
     if not text_parts:
-        safe_error_print("Error: no replacement text provided.")
+        safe_print("Error: no replacement text provided.", file=sys.stderr)
         sys.exit(1)
 
     note = _find_note(config, number=number, search=args.search, ansi_tag=ansi_tag)
@@ -273,7 +248,7 @@ def cmd_edit(args, config, ansi_tag=None):
 
     new_text = " ".join(text_parts)
     if not edit_note(config.output_file, note, new_text):
-        safe_error_print("Error: failed to update note.")
+        safe_print("Error: failed to update note.", file=sys.stderr)
         sys.exit(1)
 
     safe_print(f"Note {note.index} updated.")
@@ -293,7 +268,7 @@ def cmd_delete(args, config, ansi_tag=None):
             return
 
     if not delete_note(config.output_file, note):
-        safe_error_print("Error: failed to delete note.")
+        safe_print("Error: failed to delete note.", file=sys.stderr)
         sys.exit(1)
 
     safe_print(f"Note {note.index} deleted.")
@@ -554,7 +529,7 @@ def cmd_config(args, config, ansi_tag=None, config_path: Path | None = None):
 
     if args.action == "get":
         if args.key not in VALID_CONFIG_KEYS:
-            safe_error_print(f"Error: unknown key '{args.key}'. Valid: {', '.join(sorted(VALID_CONFIG_KEYS))}")
+            safe_print(f"Error: unknown key '{args.key}'. Valid: {', '.join(sorted(VALID_CONFIG_KEYS))}", file=sys.stderr)
             sys.exit(1)
         value = config_map[args.key]
         if isinstance(value, dict):
@@ -565,20 +540,20 @@ def cmd_config(args, config, ansi_tag=None, config_path: Path | None = None):
 
     if args.action == "set":
         if args.key not in VALID_CONFIG_KEYS:
-            safe_error_print(f"Error: unknown key '{args.key}'. Valid: {', '.join(sorted(VALID_CONFIG_KEYS))}")
+            safe_print(f"Error: unknown key '{args.key}'. Valid: {', '.join(sorted(VALID_CONFIG_KEYS))}", file=sys.stderr)
             sys.exit(1)
         if args.key == "tags":
-            safe_error_print("Error: use the wizard to manage tags, or edit ~/.cogstash.json directly.")
+            safe_print("Error: use the wizard to manage tags, or edit ~/.cogstash.json directly.", file=sys.stderr)
             sys.exit(1)
 
         # Validate value
         valid_themes = _get_valid_themes()
         valid_sizes = _get_valid_window_sizes()
         if args.key == "theme" and args.value not in valid_themes:
-            safe_error_print(f"Error: invalid theme '{args.value}'. Valid: {', '.join(valid_themes)}")
+            safe_print(f"Error: invalid theme '{args.value}'. Valid: {', '.join(valid_themes)}", file=sys.stderr)
             sys.exit(1)
         if args.key == "window_size" and args.value not in valid_sizes:
-            safe_error_print(f"Error: invalid window_size '{args.value}'. Valid: {', '.join(valid_sizes)}")
+            safe_print(f"Error: invalid window_size '{args.value}'. Valid: {', '.join(valid_sizes)}", file=sys.stderr)
             sys.exit(1)
 
         # Read, update, write
@@ -599,7 +574,7 @@ def build_parser() -> argparse.ArgumentParser:
     """Build the CLI argument parser with subcommands."""
     from cogstash import __version__
 
-    parser = SafeArgumentParser(
+    parser = argparse.ArgumentParser(
         prog="cogstash",
         description="CogStash — query your brain dump from the terminal.",
     )

@@ -15,9 +15,7 @@ def main() -> None:
     import sys
 
     if len(sys.argv) > 1 and sys.argv[1] in ("--version", "-V"):
-        from cogstash.cli import safe_print
-
-        safe_print(f"cogstash {__version__}")
+        print(f"cogstash {__version__}")
         return
 
     from cogstash.__main__ import main as entry_main

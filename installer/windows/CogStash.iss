@@ -291,6 +291,5 @@ begin
   if (CurUninstallStep = usUninstall) and PathOwnershipMarkerExists() then
   begin
     EnvRemovePath(ExpandConstant('{app}'));
-    RemovePathOwnershipMarker();
   end;
 end;
