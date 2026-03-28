@@ -570,6 +570,12 @@ class CogStash:
 
 
 def main():
+    # --version flag — handle before GUI
+    if len(sys.argv) > 1 and sys.argv[1] in ("--version", "-V"):
+        from cogstash.cli import build_parser
+        build_parser().parse_args(sys.argv[1:])
+        return
+
     # CLI subcommands — delegate before loading GUI
     if len(sys.argv) > 1 and sys.argv[1] in ("recent", "search", "tags", "add", "edit", "delete", "export", "stats", "config"):
         from cogstash.cli import cli_main

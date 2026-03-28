@@ -669,3 +669,16 @@ def test_cmd_config_get_invalid_key(tmp_path, capsys):
             CogStashConfig(),
             config_path=config_path,
         )
+
+
+def test_version_flag(capsys):
+    """cogstash --version prints the version string."""
+    from cogstash.cli import build_parser
+
+    parser = build_parser()
+    try:
+        parser.parse_args(["--version"])
+    except SystemExit:
+        pass
+    captured = capsys.readouterr()
+    assert "cogstash" in captured.out.lower() or "0." in captured.out

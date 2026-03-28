@@ -520,10 +520,13 @@ def cmd_config(args, config, ansi_tag=None, config_path: Path | None = None):
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI argument parser with subcommands."""
+    from cogstash import __version__
+
     parser = argparse.ArgumentParser(
         prog="cogstash",
         description="CogStash — query your brain dump from the terminal.",
     )
+    parser.add_argument("--version", "-V", action="version", version=f"cogstash {__version__}")
     sub = parser.add_subparsers(dest="command")
 
     # recent

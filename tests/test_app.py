@@ -329,3 +329,16 @@ def test_append_note_to_file_empty(tmp_path):
     result = append_note_to_file("  ", out)
     assert result is False
     assert not out.exists()
+
+
+def test_main_dispatches_version(monkeypatch, capsys):
+    """main() handles --version before GUI launch."""
+    import cogstash.app as cogstash_mod
+
+    monkeypatch.setattr("sys.argv", ["cogstash", "--version"])
+    try:
+        cogstash_mod.main()
+    except SystemExit:
+        pass
+    captured = capsys.readouterr()
+    assert "0." in captured.out or "cogstash" in captured.out.lower()
