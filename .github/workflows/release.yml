@@ -110,9 +110,20 @@ jobs:
           merge-multiple: true
       - name: List artifacts
         run: find artifacts -type f | sort
+      - name: Extract tag annotation
+        id: tag_body
+        run: |
+          TAG_BODY=$(git tag -l --format='%(contents:body)' ${{ github.ref_name }})
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+          echo "$TAG_BODY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: CogStash ${{ github.ref_name }}
-          generate_release_notes: true
+          body: ${{ steps.tag_body.outputs.body }}
+          generate_release_notes: false
           files: artifacts/*
