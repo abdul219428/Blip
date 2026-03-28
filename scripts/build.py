@@ -79,7 +79,7 @@ def run_pyinstaller(*, onefile: bool, debug: bool, icon_path: str | None, versio
         "--clean",
     ]
 
-    if not debug:
+    if not debug and sys.platform != "win32":
         cmd.append("--noconsole")
 
     if icon_path:

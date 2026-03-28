@@ -818,6 +818,9 @@ def test_version_flag(capsys):
     assert "cogstash" in captured.out.lower() or "0." in captured.out
 
 
+# Packaged Windows builds have previously lost CLI output when the runtime assumed
+# a normal console/TTY. Keep these flag-path tests close to the parser behavior
+# they protect so packaged --help/--version regressions stay visible.
 def test_version_flag_without_isatty(monkeypatch):
     """--version prints even when stdout has no isatty()."""
     import pytest

@@ -67,7 +67,20 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: |
           $binary = Get-ChildItem dist/CogStash-*${{ matrix.exe_ext }} -File | Where-Object { $_.Name -notmatch 'onedir|setup' } | Select-Object -First 1
-          & $binary.FullName --version
+          $help = (& $binary.FullName --help 2>&1 | Out-String).Trim()
+          if ($LASTEXITCODE -ne 0) {
+            throw "--help exited with code $LASTEXITCODE for $($binary.FullName)"
+          }
+          if ($help -notmatch 'usage:') {
+            throw "Expected readable --help output from $($binary.FullName), got: [$help]"
+          }
+          $version = (& $binary.FullName --version 2>&1 | Out-String).Trim()
+          if ($LASTEXITCODE -ne 0) {
+            throw "--version exited with code $LASTEXITCODE for $($binary.FullName)"
+          }
+          if ($version -notmatch 'CogStash|cogstash|\d+\.\d+') {
+            throw "Expected readable --version output from $($binary.FullName), got: [$version]"
+          }
         shell: pwsh
       - name: Smoke test onefile (Unix)
         if: matrix.os != 'windows-latest'
