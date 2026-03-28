@@ -7,19 +7,20 @@ Escape → hides window
 
 from __future__ import annotations
 
-import tkinter as tk
-from datetime import datetime
-from pathlib import Path
-import queue
-from pynput import keyboard
+import json
 import logging
 import os
+import queue
+import re
 import subprocess
 import sys
 import threading
-import json
-import re
+import tkinter as tk
 from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
+
+from pynput import keyboard
 
 # ── Data ──────────────────────────────────────────────────────────────────────
 THEMES = {

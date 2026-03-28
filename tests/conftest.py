@@ -6,6 +6,7 @@ multiple Tk() instances corrupts the Tcl interpreter on Windows
 """
 
 import tkinter as tk
+
 import pytest
 
 try:

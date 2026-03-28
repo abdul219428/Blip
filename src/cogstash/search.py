@@ -185,7 +185,7 @@ def compute_stats(notes: list[Note]) -> dict:
         }
 
     from collections import Counter
-    from datetime import timedelta, date
+    from datetime import date, timedelta
 
     total = len(notes)
     done = sum(1 for n in notes if n.is_done)

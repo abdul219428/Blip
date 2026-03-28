@@ -1,11 +1,10 @@
 """Tests for cogstash.py."""
 
-import sys
-from unittest.mock import patch
-from pathlib import Path
-import re
 import json
-import pytest
+import re
+import sys
+from pathlib import Path
+from unittest.mock import patch
 
 from conftest import needs_display
 
@@ -119,7 +118,7 @@ def test_window_size_presets():
 
 def test_load_config_defaults(tmp_path):
     """No config file → returns default CogStashConfig."""
-    from cogstash.app import load_config, CogStashConfig
+    from cogstash.app import CogStashConfig, load_config
     config = load_config(tmp_path / "nonexistent.json")
     assert isinstance(config, CogStashConfig)
     assert config.hotkey == "<ctrl>+<shift>+<space>"
@@ -218,7 +217,7 @@ def test_empty_submit_ignored(tmp_path, tk_root):
 
 def test_merge_tags_builtin_defaults():
     """merge_tags with no custom tags returns built-in defaults."""
-    from cogstash.app import merge_tags, DEFAULT_SMART_TAGS, CogStashConfig
+    from cogstash.app import DEFAULT_SMART_TAGS, CogStashConfig, merge_tags
     from cogstash.search import DEFAULT_TAG_COLORS
     config = CogStashConfig()
     smart, colors = merge_tags(config)
@@ -228,7 +227,7 @@ def test_merge_tags_builtin_defaults():
 
 def test_merge_tags_add_new():
     """Custom tag merges alongside built-ins."""
-    from cogstash.app import merge_tags, CogStashConfig
+    from cogstash.app import CogStashConfig, merge_tags
     config = CogStashConfig(tags={"work": {"emoji": "💼", "color": "#4A90D9"}})
     smart, colors = merge_tags(config)
     assert smart["work"] == "💼"
@@ -238,7 +237,7 @@ def test_merge_tags_add_new():
 
 def test_merge_tags_override_builtin():
     """User can override a built-in tag's emoji and color."""
-    from cogstash.app import merge_tags, CogStashConfig
+    from cogstash.app import CogStashConfig, merge_tags
     config = CogStashConfig(tags={"todo": {"emoji": "✅", "color": "#00FF00"}})
     smart, colors = merge_tags(config)
     assert smart["todo"] == "✅"

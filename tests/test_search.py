@@ -1,6 +1,5 @@
 """Tests for cogstash_search.py — note parsing and search logic."""
 
-from pathlib import Path
 from datetime import datetime
 
 
@@ -125,7 +124,7 @@ def test_search_multi_word(tmp_path):
 
 def test_filter_by_tag(tmp_path):
     """Filters to only notes with given tag."""
-    from cogstash.search import parse_notes, filter_by_tag
+    from cogstash.search import filter_by_tag, parse_notes
     notes = parse_notes(_make_notes_file(tmp_path))
     results = filter_by_tag(notes, "todo")
     assert len(results) == 2
@@ -137,7 +136,7 @@ def test_mark_done(tmp_path):
     f = tmp_path / "cogstash.md"
     f.write_text("- [2026-03-26 14:30] ☐ buy milk #todo\n", encoding="utf-8")
 
-    from cogstash.search import parse_notes, mark_done
+    from cogstash.search import mark_done, parse_notes
     notes = parse_notes(f)
     result = mark_done(f, notes[0])
 
@@ -152,7 +151,7 @@ def test_mark_done_already_done(tmp_path):
     f = tmp_path / "cogstash.md"
     f.write_text("- [2026-03-26 14:30] ☑ already done #todo\n", encoding="utf-8")
 
-    from cogstash.search import parse_notes, mark_done
+    from cogstash.search import mark_done, parse_notes
     notes = parse_notes(f)
     result = mark_done(f, notes[0])
 
@@ -169,7 +168,7 @@ def test_note_line_span_single(tmp_path):
         "- [2026-03-26 15:00] meeting\n",
         encoding="utf-8",
     )
-    from cogstash.search import parse_notes, _note_line_span
+    from cogstash.search import _note_line_span, parse_notes
     notes = parse_notes(f)
     lines = f.read_text(encoding="utf-8").splitlines(keepends=True)
     start, end = _note_line_span(lines, notes[0].line_number)
@@ -186,7 +185,7 @@ def test_note_line_span_multiline(tmp_path):
         "- [2026-03-26 15:00] next note\n",
         encoding="utf-8",
     )
-    from cogstash.search import parse_notes, _note_line_span
+    from cogstash.search import _note_line_span, parse_notes
     notes = parse_notes(f)
     lines = f.read_text(encoding="utf-8").splitlines(keepends=True)
     start, end = _note_line_span(lines, notes[0].line_number)
@@ -201,7 +200,7 @@ def test_edit_note_single_line(tmp_path):
         "- [2026-03-26 15:00] meeting\n",
         encoding="utf-8",
     )
-    from cogstash.search import parse_notes, edit_note
+    from cogstash.search import edit_note, parse_notes
     notes = parse_notes(f)
     result = edit_note(f, notes[0], "buy oat milk #todo")
     assert result is True
@@ -220,7 +219,7 @@ def test_edit_note_multiline(tmp_path):
         "- [2026-03-26 15:00] keep this\n",
         encoding="utf-8",
     )
-    from cogstash.search import parse_notes, edit_note
+    from cogstash.search import edit_note, parse_notes
     notes = parse_notes(f)
     result = edit_note(f, notes[0], "new first\nnew second\nnew third")
     assert result is True
@@ -236,7 +235,7 @@ def test_edit_note_empty_rejected(tmp_path):
     """Empty new text returns False, file unchanged."""
     f = tmp_path / "cogstash.md"
     f.write_text("- [2026-03-26 14:30] original\n", encoding="utf-8")
-    from cogstash.search import parse_notes, edit_note
+    from cogstash.search import edit_note, parse_notes
     notes = parse_notes(f)
     result = edit_note(f, notes[0], "   ")
     assert result is False
@@ -252,7 +251,7 @@ def test_delete_note(tmp_path):
         "- [2026-03-26 15:00] keep me\n",
         encoding="utf-8",
     )
-    from cogstash.search import parse_notes, delete_note
+    from cogstash.search import delete_note, parse_notes
     notes = parse_notes(f)
     result = delete_note(f, notes[0])
     assert result is True
@@ -271,7 +270,7 @@ def test_compute_stats_basic(tmp_path):
         "- [2026-03-27 16:00] latest note #idea\n",
         encoding="utf-8",
     )
-    from cogstash.search import parse_notes, compute_stats
+    from cogstash.search import compute_stats, parse_notes
     notes = parse_notes(f)
     stats = compute_stats(notes)
 
@@ -303,8 +302,9 @@ def test_compute_stats_empty():
 
 def test_compute_stats_streaks(tmp_path):
     """Streak calculation finds consecutive days with notes."""
-    from datetime import timedelta, date
-    from cogstash.search import parse_notes, compute_stats
+    from datetime import date, timedelta
+
+    from cogstash.search import compute_stats, parse_notes
 
     today = date.today()
     dates = [today - timedelta(days=i) for i in range(3, -1, -1)]  # 4 consecutive days ending today

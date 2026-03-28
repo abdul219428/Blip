@@ -1,6 +1,5 @@
 """Tests for cogstash_browse.py — Browse Window UI."""
 
-import pytest
 
 from conftest import needs_display
 
@@ -11,8 +10,8 @@ def test_browse_window_creates(tmp_path, tk_root):
     f = tmp_path / "cogstash.md"
     f.write_text("- [2026-03-26 14:30] ☐ test note #todo\n", encoding="utf-8")
 
-    from cogstash.browse import BrowseWindow
     from cogstash.app import CogStashConfig
+    from cogstash.browse import BrowseWindow
 
     config = CogStashConfig(output_file=f)
     win = BrowseWindow(tk_root, config)
@@ -30,8 +29,8 @@ def test_browse_search_filters(tmp_path, tk_root):
         encoding="utf-8",
     )
 
-    from cogstash.browse import BrowseWindow
     from cogstash.app import CogStashConfig
+    from cogstash.browse import BrowseWindow
 
     config = CogStashConfig(output_file=f)
     win = BrowseWindow(tk_root, config)
@@ -56,8 +55,8 @@ def test_browse_tag_filter(tmp_path, tk_root):
         encoding="utf-8",
     )
 
-    from cogstash.browse import BrowseWindow
     from cogstash.app import CogStashConfig
+    from cogstash.browse import BrowseWindow
 
     config = CogStashConfig(output_file=f)
     win = BrowseWindow(tk_root, config)
@@ -92,8 +91,8 @@ def test_browse_context_menu_exists(tmp_path, tk_root):
     f = tmp_path / "cogstash.md"
     f.write_text("- [2026-03-26 14:30] test note #todo\n", encoding="utf-8")
 
-    from cogstash.browse import BrowseWindow
     from cogstash.app import CogStashConfig
+    from cogstash.browse import BrowseWindow
 
     config = CogStashConfig(output_file=f)
     win = BrowseWindow(tk_root, config)
@@ -107,9 +106,9 @@ def test_browse_edit_note(tmp_path, tk_root):
     f = tmp_path / "cogstash.md"
     f.write_text("- [2026-03-26 14:30] original text\n", encoding="utf-8")
 
-    from cogstash.browse import BrowseWindow
     from cogstash.app import CogStashConfig
-    from cogstash.search import edit_note, parse_notes
+    from cogstash.browse import BrowseWindow
+    from cogstash.search import edit_note
 
     config = CogStashConfig(output_file=f)
     win = BrowseWindow(tk_root, config)
@@ -132,9 +131,9 @@ def test_browse_delete_note(tmp_path, tk_root):
         encoding="utf-8",
     )
 
-    from cogstash.browse import BrowseWindow
     from cogstash.app import CogStashConfig
-    from cogstash.search import delete_note, parse_notes
+    from cogstash.browse import BrowseWindow
+    from cogstash.search import delete_note
 
     config = CogStashConfig(output_file=f)
     win = BrowseWindow(tk_root, config)

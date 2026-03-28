@@ -7,12 +7,19 @@ Opened from the system tray icon. Uses cogstash_search for all data operations.
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import font as tkfont
 from datetime import datetime, timedelta
-from pathlib import Path
 
-from cogstash.app import THEMES, DEFAULT_SMART_TAGS, CogStashConfig, platform_font
-from cogstash.search import parse_notes, search_notes, filter_by_tag, mark_done, edit_note, delete_note, DEFAULT_TAG_COLORS, Note
+from cogstash.app import DEFAULT_SMART_TAGS, THEMES, CogStashConfig, platform_font
+from cogstash.search import (
+    DEFAULT_TAG_COLORS,
+    Note,
+    delete_note,
+    edit_note,
+    filter_by_tag,
+    mark_done,
+    parse_notes,
+    search_notes,
+)
 
 
 class BrowseWindow:
@@ -77,7 +84,6 @@ class BrowseWindow:
         self._pill_buttons[None] = all_pill
 
         for tag, emoji in self.smart_tags.items():
-            color = self.tag_colors.get(tag, t["muted"])
             pill = tk.Label(
                 pills_frame, text=f"{emoji} {tag}", bg=t["bg"], fg=t["fg"],
                 font=(fnt, 9), padx=6, pady=2, cursor="hand2",

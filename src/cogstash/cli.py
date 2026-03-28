@@ -6,12 +6,12 @@ All data operations delegate to cogstash_search.py.
 
 from __future__ import annotations
 
-import sys
 import argparse
+import sys
 from datetime import datetime
 from pathlib import Path
 
-from cogstash.search import Note, parse_notes, search_notes, edit_note, delete_note
+from cogstash.search import Note, delete_note, edit_note, parse_notes, search_notes
 
 # ANSI escape codes — approximations of TAG_COLORS hex values
 ANSI_RESET = "\033[0m"
@@ -231,8 +231,8 @@ def cmd_delete(args, config, ansi_tag=None):
 
 def cmd_export(args, config, ansi_tag=None):
     """Export all notes to JSON, CSV, or Markdown."""
-    import json as json_mod
     import csv
+    import json as json_mod
 
     notes = parse_notes(config.output_file)
     if not notes:
@@ -391,11 +391,11 @@ def _config_wizard(config, config_path: Path) -> None:
         except (json_mod.JSONDecodeError, OSError):
             data = {}
 
-    print(f"⚙️  CogStash Configuration Wizard")
-    print(f"Press Enter to keep current value\n")
+    print("⚙️  CogStash Configuration Wizard")
+    print("Press Enter to keep current value\n")
 
     # ❶ Hotkey
-    print(f"❶ Hotkey")
+    print("❶ Hotkey")
     print(f"  Current: {config.hotkey}")
     val = input("  New hotkey: ").strip()
     if val:
@@ -422,21 +422,21 @@ def _config_wizard(config, config_path: Path) -> None:
             data["window_size"] = val
 
     # ❹ Notes File
-    print(f"\n❹ Notes File")
+    print("\n❹ Notes File")
     print(f"  Current: {config.output_file}")
     val = input("  New path: ").strip()
     if val:
         data["output_file"] = val
 
     # ❺ Log File
-    print(f"\n❺ Log File")
+    print("\n❺ Log File")
     print(f"  Current: {config.log_file}")
     val = input("  New path: ").strip()
     if val:
         data["log_file"] = val
 
     # ❻ Custom Tags
-    print(f"\n❻ Custom Tags")
+    print("\n❻ Custom Tags")
     if config.tags:
         tags_display = " ".join(f"#{name}" for name in config.tags)
         print(f"  Current tags: {tags_display}")
