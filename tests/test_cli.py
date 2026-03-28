@@ -68,6 +68,31 @@ def test_format_done_note():
     assert "fix login bug" in result
 
 
+def test_stream_supports_color_handles_none():
+    from cogstash.cli import stream_supports_color
+
+    assert stream_supports_color(None) is False
+
+
+def test_stream_supports_color_handles_missing_isatty():
+    from cogstash.cli import stream_supports_color
+
+    class StreamWithoutIsatty:
+        pass
+
+    assert stream_supports_color(StreamWithoutIsatty()) is False
+
+
+def test_stream_supports_color_handles_isatty_errors():
+    from cogstash.cli import stream_supports_color
+
+    class BrokenStream:
+        def isatty(self):
+            raise OSError("broken")
+
+    assert stream_supports_color(BrokenStream()) is False
+
+
 def test_cmd_recent_default(tmp_path, capsys):
     """Shows notes newest-first, up to 20 by default."""
     f = _make_notes_file(tmp_path)

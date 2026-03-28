@@ -27,6 +27,24 @@ DEFAULT_ANSI_TAG = {
 }
 
 
+def stream_supports_color(stream: object | None) -> bool:
+    """Return True when a stream safely reports interactive TTY support."""
+    if stream is None:
+        return False
+    isatty = getattr(stream, "isatty", None)
+    if not callable(isatty):
+        return False
+    try:
+        return bool(isatty())
+    except Exception:
+        return False
+
+
+def stream_is_interactive(stream: object | None) -> bool:
+    """Return True when stdin-like streams can be treated as interactive."""
+    return stream_supports_color(stream)
+
+
 def hex_to_ansi(hex_color: str) -> str:
     """Map a hex color to the nearest 8-color ANSI escape code."""
     r = int(hex_color[1:3], 16)
@@ -80,7 +98,7 @@ def cmd_recent(args, config, ansi_tag=None):
         print("No notes found.")
         return
 
-    use_color = sys.stdout.isatty()
+    use_color = stream_supports_color(sys.stdout)
     newest_first = list(reversed(notes))
     limited = newest_first[:args.limit] if args.limit > 0 else newest_first
 
@@ -97,7 +115,7 @@ def cmd_search(args, config, ansi_tag=None):
         print("No matching notes.")
         return
 
-    use_color = sys.stdout.isatty()
+    use_color = stream_supports_color(sys.stdout)
     newest_first = list(reversed(results))
     limited = newest_first[:args.limit] if args.limit > 0 else newest_first
 
@@ -119,7 +137,7 @@ def cmd_tags(args, config, ansi_tag=None):
         print("No tags found.")
         return
 
-    use_color = sys.stdout.isatty()
+    use_color = stream_supports_color(sys.stdout)
     sorted_tags = sorted(tag_counts.items(), key=lambda x: (-x[1], x[0]))
     max_len = max(len(f"#{tag}") for tag, _ in sorted_tags)
 
@@ -142,7 +160,7 @@ def cmd_add(args, config, ansi_tag=None):
     if args.text:
         text = " ".join(args.text)
     else:
-        if sys.stdin.isatty():
+        if stream_is_interactive(sys.stdin):
             print("Error: provide note text as argument or pipe via stdin.", file=sys.stderr)
             sys.exit(1)
         text = sys.stdin.read()
@@ -171,7 +189,7 @@ def _find_note(config, number: int | None = None, search: str | None = None,
         if len(results) == 0:
             print(f"Error: no notes match '{search}'.", file=sys.stderr)
             return None
-        use_color = sys.stdout.isatty()
+        use_color = stream_supports_color(sys.stdout)
         print(f"Multiple matches ({len(results)}). Use a note number instead:", file=sys.stderr)
         for n in results:
             print(f"  {n.index}: {format_note(n, use_color, ansi_tag)}", file=sys.stderr)
@@ -302,7 +320,7 @@ def cmd_stats(args, config, ansi_tag=None):
         return
 
     s = compute_stats(notes)
-    use_color = sys.stdout.isatty()
+    use_color = stream_supports_color(sys.stdout)
 
     def c(code, text):
         return f"{code}{text}{ANSI_RESET}" if use_color else str(text)
