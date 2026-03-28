@@ -67,6 +67,8 @@ class CogStashConfig:
     theme: str = "tokyo-night"
     window_size: str = "default"
     tags: dict[str, dict[str, str]] | None = None
+    launch_at_startup: bool = False
+    last_seen_version: str = ""
 
     def __post_init__(self):
         if self.output_file is None:
@@ -83,6 +85,8 @@ def load_config(config_path: Path) -> CogStashConfig:
         "log_file": str(Path.home() / "cogstash.log"),
         "theme": "tokyo-night",
         "window_size": "default",
+        "launch_at_startup": False,
+        "last_seen_version": "",
     }
 
     if not config_path.exists():
@@ -142,7 +146,29 @@ def load_config(config_path: Path) -> CogStashConfig:
         theme=merged["theme"],
         window_size=merged["window_size"],
         tags=tags,
+        launch_at_startup=bool(merged.get("launch_at_startup", False)),
+        last_seen_version=str(merged.get("last_seen_version", "")),
     )
+
+
+def save_config(config: CogStashConfig, config_path: Path) -> None:
+    """Write config to JSON file."""
+    data: dict[str, object] = {
+        "hotkey": config.hotkey,
+        "output_file": str(config.output_file),
+        "log_file": str(config.log_file),
+        "theme": config.theme,
+        "window_size": config.window_size,
+        "launch_at_startup": config.launch_at_startup,
+        "last_seen_version": config.last_seen_version,
+    }
+    if config.tags:
+        data["tags"] = config.tags
+    try:
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    except OSError:
+        logger.error("Failed to save config to %s", config_path, exc_info=True)
 
 
 def merge_tags(config: CogStashConfig) -> tuple[dict[str, str], dict[str, str]]:

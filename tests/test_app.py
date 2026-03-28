@@ -339,3 +339,40 @@ def test_main_dispatches_version(monkeypatch, capsys):
     cogstash.main()
     captured = capsys.readouterr()
     assert "cogstash" in captured.out.lower() and "0." in captured.out
+
+
+def test_config_new_fields_defaults(tmp_path):
+    """Fresh config has launch_at_startup=False and last_seen_version=''."""
+    from cogstash.app import load_config
+    config = load_config(tmp_path / ".cogstash.json")
+    assert config.launch_at_startup is False
+    assert config.last_seen_version == ""
+
+
+def test_config_new_fields_roundtrip(tmp_path):
+    """New fields survive write-read cycle."""
+    import json
+    config_path = tmp_path / ".cogstash.json"
+    data = {"launch_at_startup": True, "last_seen_version": "0.1.0", "theme": "dracula"}
+    config_path.write_text(json.dumps(data), encoding="utf-8")
+    from cogstash.app import load_config
+    config = load_config(config_path)
+    assert config.launch_at_startup is True
+    assert config.last_seen_version == "0.1.0"
+    assert config.theme == "dracula"
+
+
+def test_save_config(tmp_path):
+    """save_config writes config to JSON file."""
+    import json
+
+    from cogstash.app import CogStashConfig, save_config
+
+    config = CogStashConfig(theme="dracula", window_size="wide", last_seen_version="0.2.0")
+    config_path = tmp_path / ".cogstash.json"
+    save_config(config, config_path)
+    data = json.loads(config_path.read_text(encoding="utf-8"))
+    assert data["theme"] == "dracula"
+    assert data["window_size"] == "wide"
+    assert data["last_seen_version"] == "0.2.0"
+    assert data["launch_at_startup"] is False
