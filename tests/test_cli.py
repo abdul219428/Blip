@@ -873,6 +873,33 @@ def test_version_flag_without_isatty(monkeypatch):
     assert "cogstash" in output.lower()
 
 
+def test_cli_main_version_does_not_import_app(monkeypatch):
+    """cli_main --version should exit cleanly without importing GUI/app dependencies."""
+    import sys
+    import types
+
+    import pytest
+
+    from cogstash.cli import cli_main
+
+    capture = CaptureStream()
+
+    app_stub = types.ModuleType("cogstash.app")
+
+    def _fail(name):
+        raise AssertionError(f"cli_main --version should not access cogstash.app.{name}")
+
+    app_stub.__getattr__ = _fail
+    monkeypatch.setattr(sys, "stdout", capture)
+    monkeypatch.setitem(sys.modules, "cogstash.app", app_stub)
+
+    with pytest.raises(SystemExit) as exc:
+        cli_main(["--version"])
+
+    assert exc.value.code == 0
+    assert "cogstash" in capture.getvalue().lower()
+
+
 def test_invalid_command_exits_as_cli_error(capsys):
     """Unknown subcommands raise argparse CLI errors."""
     import pytest

@@ -597,14 +597,14 @@ def build_parser() -> argparse.ArgumentParser:
 
 def cli_main(argv: list[str]) -> None:
     """Entry point for CLI subcommands."""
-    from cogstash.app import load_config, merge_tags
-
     parser = build_parser()
     args = parser.parse_args(argv)
 
     if not hasattr(args, "func"):
         parser.print_help()
         return
+
+    from cogstash.app import load_config, merge_tags
 
     config_path = Path.home() / ".cogstash.json"
     config = load_config(config_path)
