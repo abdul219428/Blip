@@ -14,7 +14,15 @@ dependencies = [
     "Pillow>=9.0",
 ]
 
-[tool.setuptools]
-py-modules = ["cogstash", "cogstash_search", "cogstash_browse", "cogstash_cli"]
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "ruff>=0.4", "mypy>=1.10"]
+
 [project.scripts]
 cogstash = "cogstash:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["tests"]

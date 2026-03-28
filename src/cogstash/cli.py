@@ -11,7 +11,7 @@ import argparse
 from datetime import datetime
 from pathlib import Path
 
-from cogstash_search import Note, parse_notes, search_notes, edit_note, delete_note
+from cogstash.search import Note, parse_notes, search_notes, edit_note, delete_note
 
 # ANSI escape codes — approximations of TAG_COLORS hex values
 ANSI_RESET = "\033[0m"
@@ -136,7 +136,7 @@ def cmd_tags(args, config, ansi_tag=None):
 
 def cmd_add(args, config, ansi_tag=None):
     """Add a note from the command line."""
-    from cogstash import append_note_to_file, merge_tags
+    from cogstash.app import append_note_to_file, merge_tags
 
     # Argument takes priority over stdin
     if args.text:
@@ -294,7 +294,7 @@ def cmd_export(args, config, ansi_tag=None):
 
 def cmd_stats(args, config, ansi_tag=None):
     """Display extended note statistics."""
-    from cogstash_search import compute_stats
+    from cogstash.search import compute_stats
 
     notes = parse_notes(config.output_file)
     if not notes:
@@ -368,12 +368,12 @@ VALID_CONFIG_KEYS = {"hotkey", "theme", "window_size", "output_file", "log_file"
 
 
 def _get_valid_themes() -> list[str]:
-    from cogstash import THEMES
+    from cogstash.app import THEMES
     return list(THEMES.keys())
 
 
 def _get_valid_window_sizes() -> list[str]:
-    from cogstash import WINDOW_SIZES
+    from cogstash.app import WINDOW_SIZES
     return list(WINDOW_SIZES.keys())
 
 
@@ -586,7 +586,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def cli_main(argv: list[str]) -> None:
     """Entry point for CLI subcommands."""
-    from cogstash import load_config, merge_tags
+    from cogstash.app import load_config, merge_tags
 
     parser = build_parser()
     args = parser.parse_args(argv)

@@ -146,7 +146,7 @@ def load_config(config_path: Path) -> CogStashConfig:
 
 def merge_tags(config: CogStashConfig) -> tuple[dict[str, str], dict[str, str]]:
     """Merge built-in tags with user-defined tags. Returns (smart_tags, tag_colors)."""
-    from cogstash_search import DEFAULT_TAG_COLORS
+    from cogstash.search import DEFAULT_TAG_COLORS
     smart_tags = dict(DEFAULT_SMART_TAGS)
     tag_colors = dict(DEFAULT_TAG_COLORS)
     if config.tags:
@@ -515,7 +515,7 @@ class CogStash:
 
     def _open_browse(self):
         """Open the Browse Notes window."""
-        from cogstash_browse import BrowseWindow
+        from cogstash.browse import BrowseWindow
         smart_tags, tag_colors = merge_tags(self.config)
         BrowseWindow(self.root, self.config, smart_tags, tag_colors)
 
@@ -569,7 +569,7 @@ class CogStash:
 def main():
     # CLI subcommands — delegate before loading GUI
     if len(sys.argv) > 1 and sys.argv[1] in ("recent", "search", "tags", "add", "edit", "delete", "export", "stats", "config"):
-        from cogstash_cli import cli_main
+        from cogstash.cli import cli_main
         cli_main(sys.argv[1:])
         return
 

@@ -9,7 +9,7 @@ def test_parse_notes_basic(tmp_path):
     f = tmp_path / "cogstash.md"
     f.write_text("- [2026-03-26 14:30] ☐ buy milk #todo\n", encoding="utf-8")
 
-    from cogstash_search import parse_notes
+    from cogstash.search import parse_notes
     notes = parse_notes(f)
 
     assert len(notes) == 1
@@ -32,7 +32,7 @@ def test_parse_notes_multiline(tmp_path):
         encoding="utf-8",
     )
 
-    from cogstash_search import parse_notes
+    from cogstash.search import parse_notes
     notes = parse_notes(f)
 
     assert len(notes) == 1
@@ -44,14 +44,14 @@ def test_parse_notes_empty_file(tmp_path):
     f = tmp_path / "cogstash.md"
     f.write_text("", encoding="utf-8")
 
-    from cogstash_search import parse_notes
+    from cogstash.search import parse_notes
     notes = parse_notes(f)
     assert notes == []
 
 
 def test_parse_notes_missing_file(tmp_path):
     """Missing file returns empty list."""
-    from cogstash_search import parse_notes
+    from cogstash.search import parse_notes
     notes = parse_notes(tmp_path / "nonexistent.md")
     assert notes == []
 
@@ -65,7 +65,7 @@ def test_parse_notes_done_status(tmp_path):
         encoding="utf-8",
     )
 
-    from cogstash_search import parse_notes
+    from cogstash.search import parse_notes
     notes = parse_notes(f)
 
     assert notes[0].is_done is False
@@ -77,7 +77,7 @@ def test_parse_notes_no_prefix(tmp_path):
     f = tmp_path / "cogstash.md"
     f.write_text("- [2026-03-26 14:30] plain note\n", encoding="utf-8")
 
-    from cogstash_search import parse_notes
+    from cogstash.search import parse_notes
     notes = parse_notes(f)
 
     assert notes[0].is_done is False
@@ -99,7 +99,7 @@ def _make_notes_file(tmp_path):
 
 def test_search_keyword(tmp_path):
     """Substring match finds correct notes."""
-    from cogstash_search import parse_notes, search_notes
+    from cogstash.search import parse_notes, search_notes
     notes = parse_notes(_make_notes_file(tmp_path))
     results = search_notes(notes, "buy")
     assert len(results) == 2
@@ -107,7 +107,7 @@ def test_search_keyword(tmp_path):
 
 def test_search_case_insensitive(tmp_path):
     """Search is case-insensitive."""
-    from cogstash_search import parse_notes, search_notes
+    from cogstash.search import parse_notes, search_notes
     notes = parse_notes(_make_notes_file(tmp_path))
     results = search_notes(notes, "MILK")
     assert len(results) == 1
@@ -116,7 +116,7 @@ def test_search_case_insensitive(tmp_path):
 
 def test_search_multi_word(tmp_path):
     """Multiple words are AND'd."""
-    from cogstash_search import parse_notes, search_notes
+    from cogstash.search import parse_notes, search_notes
     notes = parse_notes(_make_notes_file(tmp_path))
     results = search_notes(notes, "buy eggs")
     assert len(results) == 1
@@ -125,7 +125,7 @@ def test_search_multi_word(tmp_path):
 
 def test_filter_by_tag(tmp_path):
     """Filters to only notes with given tag."""
-    from cogstash_search import parse_notes, filter_by_tag
+    from cogstash.search import parse_notes, filter_by_tag
     notes = parse_notes(_make_notes_file(tmp_path))
     results = filter_by_tag(notes, "todo")
     assert len(results) == 2
@@ -137,7 +137,7 @@ def test_mark_done(tmp_path):
     f = tmp_path / "cogstash.md"
     f.write_text("- [2026-03-26 14:30] ☐ buy milk #todo\n", encoding="utf-8")
 
-    from cogstash_search import parse_notes, mark_done
+    from cogstash.search import parse_notes, mark_done
     notes = parse_notes(f)
     result = mark_done(f, notes[0])
 
@@ -152,7 +152,7 @@ def test_mark_done_already_done(tmp_path):
     f = tmp_path / "cogstash.md"
     f.write_text("- [2026-03-26 14:30] ☑ already done #todo\n", encoding="utf-8")
 
-    from cogstash_search import parse_notes, mark_done
+    from cogstash.search import parse_notes, mark_done
     notes = parse_notes(f)
     result = mark_done(f, notes[0])
 
@@ -169,7 +169,7 @@ def test_note_line_span_single(tmp_path):
         "- [2026-03-26 15:00] meeting\n",
         encoding="utf-8",
     )
-    from cogstash_search import parse_notes, _note_line_span
+    from cogstash.search import parse_notes, _note_line_span
     notes = parse_notes(f)
     lines = f.read_text(encoding="utf-8").splitlines(keepends=True)
     start, end = _note_line_span(lines, notes[0].line_number)
@@ -186,7 +186,7 @@ def test_note_line_span_multiline(tmp_path):
         "- [2026-03-26 15:00] next note\n",
         encoding="utf-8",
     )
-    from cogstash_search import parse_notes, _note_line_span
+    from cogstash.search import parse_notes, _note_line_span
     notes = parse_notes(f)
     lines = f.read_text(encoding="utf-8").splitlines(keepends=True)
     start, end = _note_line_span(lines, notes[0].line_number)
@@ -201,7 +201,7 @@ def test_edit_note_single_line(tmp_path):
         "- [2026-03-26 15:00] meeting\n",
         encoding="utf-8",
     )
-    from cogstash_search import parse_notes, edit_note
+    from cogstash.search import parse_notes, edit_note
     notes = parse_notes(f)
     result = edit_note(f, notes[0], "buy oat milk #todo")
     assert result is True
@@ -220,7 +220,7 @@ def test_edit_note_multiline(tmp_path):
         "- [2026-03-26 15:00] keep this\n",
         encoding="utf-8",
     )
-    from cogstash_search import parse_notes, edit_note
+    from cogstash.search import parse_notes, edit_note
     notes = parse_notes(f)
     result = edit_note(f, notes[0], "new first\nnew second\nnew third")
     assert result is True
@@ -236,7 +236,7 @@ def test_edit_note_empty_rejected(tmp_path):
     """Empty new text returns False, file unchanged."""
     f = tmp_path / "cogstash.md"
     f.write_text("- [2026-03-26 14:30] original\n", encoding="utf-8")
-    from cogstash_search import parse_notes, edit_note
+    from cogstash.search import parse_notes, edit_note
     notes = parse_notes(f)
     result = edit_note(f, notes[0], "   ")
     assert result is False
@@ -252,7 +252,7 @@ def test_delete_note(tmp_path):
         "- [2026-03-26 15:00] keep me\n",
         encoding="utf-8",
     )
-    from cogstash_search import parse_notes, delete_note
+    from cogstash.search import parse_notes, delete_note
     notes = parse_notes(f)
     result = delete_note(f, notes[0])
     assert result is True
@@ -271,7 +271,7 @@ def test_compute_stats_basic(tmp_path):
         "- [2026-03-27 16:00] latest note #idea\n",
         encoding="utf-8",
     )
-    from cogstash_search import parse_notes, compute_stats
+    from cogstash.search import parse_notes, compute_stats
     notes = parse_notes(f)
     stats = compute_stats(notes)
 
@@ -289,7 +289,7 @@ def test_compute_stats_basic(tmp_path):
 
 def test_compute_stats_empty():
     """Empty note list returns zeroed stats."""
-    from cogstash_search import compute_stats
+    from cogstash.search import compute_stats
     stats = compute_stats([])
 
     assert stats["total"] == 0
@@ -304,7 +304,7 @@ def test_compute_stats_empty():
 def test_compute_stats_streaks(tmp_path):
     """Streak calculation finds consecutive days with notes."""
     from datetime import timedelta, date
-    from cogstash_search import parse_notes, compute_stats
+    from cogstash.search import parse_notes, compute_stats
 
     today = date.today()
     dates = [today - timedelta(days=i) for i in range(3, -1, -1)]  # 4 consecutive days ending today

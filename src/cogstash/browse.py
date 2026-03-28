@@ -11,8 +11,8 @@ from tkinter import font as tkfont
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from cogstash import THEMES, DEFAULT_SMART_TAGS, CogStashConfig, platform_font
-from cogstash_search import parse_notes, search_notes, filter_by_tag, mark_done, edit_note, delete_note, DEFAULT_TAG_COLORS, Note
+from cogstash.app import THEMES, DEFAULT_SMART_TAGS, CogStashConfig, platform_font
+from cogstash.search import parse_notes, search_notes, filter_by_tag, mark_done, edit_note, delete_note, DEFAULT_TAG_COLORS, Note
 
 
 class BrowseWindow:
