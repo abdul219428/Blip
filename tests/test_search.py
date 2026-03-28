@@ -1,5 +1,6 @@
 """Tests for cogstash_search.py — note parsing and search logic."""
 
+import builtins
 from datetime import datetime
 
 
@@ -261,6 +262,100 @@ def test_delete_note(tmp_path):
     assert "- [2026-03-26 15:00] keep me\n" in content
 
 
+def test_mark_done_stale_line_number_rejected(tmp_path):
+    """mark_done rejects stale line numbers after external file changes."""
+    f = tmp_path / "cogstash.md"
+    f.write_text(
+        "- [2026-03-26 14:00] first\n"
+        "- [2026-03-26 15:00] ☐ target #todo\n"
+        "- [2026-03-26 16:00] ☐ last #todo\n",
+        encoding="utf-8",
+    )
+
+    from cogstash.search import mark_done, parse_notes
+
+    note = parse_notes(f)[1]
+    f.write_text(
+        "- [2026-03-26 15:00] ☐ target #todo\n"
+        "- [2026-03-26 16:00] ☐ last #todo\n",
+        encoding="utf-8",
+    )
+
+    assert mark_done(f, note) is False
+    assert f.read_text(encoding="utf-8") == (
+        "- [2026-03-26 15:00] ☐ target #todo\n"
+        "- [2026-03-26 16:00] ☐ last #todo\n"
+    )
+
+
+def test_edit_note_stale_line_number_rejected(tmp_path):
+    """edit_note rejects stale line numbers after external file changes."""
+    f = tmp_path / "cogstash.md"
+    f.write_text(
+        "- [2026-03-26 14:00] first\n"
+        "- [2026-03-26 15:00] target #todo\n"
+        "- [2026-03-26 16:00] last\n",
+        encoding="utf-8",
+    )
+
+    from cogstash.search import edit_note, parse_notes
+
+    note = parse_notes(f)[1]
+    current = (
+        "- [2026-03-26 15:00] target #todo\n"
+        "- [2026-03-26 16:00] last\n"
+    )
+    f.write_text(current, encoding="utf-8")
+
+    assert edit_note(f, note, "updated #todo") is False
+    assert f.read_text(encoding="utf-8") == current
+
+
+def test_delete_note_stale_line_number_rejected(tmp_path):
+    """delete_note rejects stale line numbers after external file changes."""
+    f = tmp_path / "cogstash.md"
+    f.write_text(
+        "- [2026-03-26 14:00] first\n"
+        "- [2026-03-26 15:00] target #todo\n"
+        "- [2026-03-26 16:00] last\n",
+        encoding="utf-8",
+    )
+
+    from cogstash.search import delete_note, parse_notes
+
+    note = parse_notes(f)[1]
+    current = (
+        "- [2026-03-26 15:00] target #todo\n"
+        "- [2026-03-26 16:00] last\n"
+    )
+    f.write_text(current, encoding="utf-8")
+
+    assert delete_note(f, note) is False
+    assert f.read_text(encoding="utf-8") == current
+
+
+def test_atomic_write_cleans_up_temp_file_on_replace_failure(tmp_path, monkeypatch):
+    """_atomic_write removes temp file if replace fails."""
+    import cogstash.search as search
+
+    path = tmp_path / "cogstash.md"
+    path.write_text("original\n", encoding="utf-8")
+    tmp = path.with_suffix(".tmp")
+
+    def boom(src, dst):
+        raise OSError("replace failed")
+
+    monkeypatch.setattr(search.os, "replace", boom)
+
+    try:
+        search._atomic_write(path, "updated\n")
+    except OSError:
+        pass
+
+    assert not tmp.exists()
+    assert path.read_text(encoding="utf-8") == "original\n"
+
+
 def test_compute_stats_basic(tmp_path):
     """Stats returns correct totals, done/pending, date range."""
     f = tmp_path / "cogstash.md"
@@ -321,3 +416,34 @@ def test_compute_stats_streaks(tmp_path):
     assert stats["current_streak"] == 4
     assert stats["longest_streak"] == 4
     assert stats["notes_this_week"] >= 1
+
+
+def test_compute_stats_current_streak_reuses_date_set(tmp_path, monkeypatch):
+    """compute_stats should not rebuild the date set during current streak checks."""
+    from datetime import date, timedelta
+
+    from cogstash.search import compute_stats, parse_notes
+
+    today = date.today()
+    dates = [today - timedelta(days=i) for i in range(3, -1, -1)]
+    f = tmp_path / "cogstash.md"
+    f.write_text(
+        "".join(f"- [{d.strftime('%Y-%m-%d')} 09:00] day {i}\n" for i, d in enumerate(dates, start=1)),
+        encoding="utf-8",
+    )
+    notes = parse_notes(f)
+
+    real_set = builtins.set
+    set_calls = 0
+
+    def counting_set(*args, **kwargs):
+        nonlocal set_calls
+        set_calls += 1
+        return real_set(*args, **kwargs)
+
+    monkeypatch.setattr(builtins, "set", counting_set)
+
+    stats = compute_stats(notes)
+
+    assert stats["current_streak"] == 4
+    assert set_calls == 1

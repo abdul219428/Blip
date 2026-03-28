@@ -109,15 +109,30 @@ def filter_by_tag(notes: list[Note], tag: str) -> list[Note]:
 def _atomic_write(path: Path, content: str) -> None:
     """Write content to a file atomically via a temp file + rename."""
     tmp = path.with_suffix(".tmp")
-    tmp.write_text(content, encoding="utf-8")
-    os.replace(tmp, path)
+    try:
+        tmp.write_text(content, encoding="utf-8")
+        os.replace(tmp, path)
+    except OSError:
+        try:
+            tmp.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise
+
+
+def _line_matches_note(lines: list[str], note: Note) -> bool:
+    """Return True when the stored line still points at the expected note."""
+    if note.line_number >= len(lines):
+        return False
+    ts = note.timestamp.strftime("%Y-%m-%d %H:%M")
+    return lines[note.line_number].startswith(f"- [{ts}] ")
 
 
 def mark_done(path: Path, note: Note) -> bool:
     """Rewrite note's line in the file: ☐ → ☑. Returns True on success."""
     try:
         lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
-        if note.line_number >= len(lines):
+        if not _line_matches_note(lines, note):
             return False
         new_line = lines[note.line_number].replace("☐", "☑", 1)
         if new_line == lines[note.line_number]:
@@ -147,9 +162,9 @@ def edit_note(path: Path, note: Note, new_text: str) -> bool:
         return False
     try:
         lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
-        start, end = _note_line_span(lines, note.line_number)
-        if start >= len(lines):
+        if not _line_matches_note(lines, note):
             return False
+        start, end = _note_line_span(lines, note.line_number)
 
         ts = note.timestamp.strftime("%Y-%m-%d %H:%M")
         text_lines = new_text.split("\n")
@@ -167,9 +182,9 @@ def delete_note(path: Path, note: Note) -> bool:
     """Remove a note and its continuation lines from the file. Returns True on success."""
     try:
         lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
-        start, end = _note_line_span(lines, note.line_number)
-        if start >= len(lines):
+        if not _line_matches_note(lines, note):
             return False
+        start, end = _note_line_span(lines, note.line_number)
 
         del lines[start:end]
         _atomic_write(path, "".join(lines))
@@ -240,7 +255,8 @@ def compute_stats(notes: list[Note]) -> dict:
     avg_per_week = round(total / span_weeks, 1)
 
     # Streaks — consecutive days with at least one note
-    note_dates = sorted(set(n.timestamp.date() for n in notes))
+    note_dates_set = set(n.timestamp.date() for n in notes)
+    note_dates = sorted(note_dates_set)
     current_streak = 0
     longest_streak = 0
     streak = 1
@@ -254,10 +270,10 @@ def compute_stats(notes: list[Note]) -> dict:
     longest_streak = max(longest_streak, streak)
 
     # Current streak: count backwards from today
-    if today in note_dates:
+    if today in note_dates_set:
         current_streak = 1
         check = today - timedelta(days=1)
-        while check in set(note_dates):
+        while check in note_dates_set:
             current_streak += 1
             check -= timedelta(days=1)
     else:
