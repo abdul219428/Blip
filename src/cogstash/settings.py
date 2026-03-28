@@ -7,6 +7,7 @@ from pathlib import Path
 
 from cogstash.app import (
     THEMES,
+    WINDOW_SIZES,
     CogStashConfig,
     platform_font,
     save_config,
@@ -143,10 +144,79 @@ class SettingsWindow:
         lbl.place(relx=0.5, rely=0.95, anchor="center")
         self.win.after(1500, lbl.destroy)
 
+    def _select_theme(self, name: str):
+        """Handle theme swatch click."""
+        self.selected_theme.set(name)
+        for tname, swatch in self._theme_swatches.items():
+            colors = THEMES[tname]
+            hl = colors["accent"] if tname == name else colors["bg"]
+            swatch.configure(highlightbackground=hl)
+
+    def _save_appearance(self):
+        """Save Appearance tab settings."""
+        self.config.theme = self.selected_theme.get()
+        self.config.window_size = self.selected_size.get()
+        save_config(self.config, self.config_path)
+        self._flash_saved()
+
     def _build_appearance_tab(self):
-        """Placeholder — implemented in Task 4."""
-        frame = tk.Frame(self.content_frame, bg=self.theme["bg"])
+        """Build the Appearance settings tab with theme picker and window size."""
+        t = self.theme
+        frame = tk.Frame(self.content_frame, bg=t["bg"])
         self.tab_frames.append(frame)
+
+        # Theme section
+        tk.Label(frame, text="Theme", bg=t["bg"], fg=t["fg"],
+                 font=(platform_font(), 11, "bold")).pack(anchor="w", pady=(8, 8))
+        self.selected_theme = tk.StringVar(value=self.config.theme)
+        theme_grid = tk.Frame(frame, bg=t["bg"])
+        theme_grid.pack(fill="x", padx=(8, 0))
+
+        self._theme_swatches = {}
+        for i, (name, colors) in enumerate(THEMES.items()):
+            swatch = tk.Frame(theme_grid, bg=colors["bg"], highlightthickness=2,
+                              highlightbackground=colors["accent"] if name == self.config.theme else colors["bg"],
+                              cursor="hand2", width=80, height=60)
+            swatch.grid(row=0, column=i, padx=4, pady=4)
+            swatch.grid_propagate(False)
+            tk.Label(swatch, text=name.replace("-", "\n"), bg=colors["bg"], fg=colors["fg"],
+                     font=(platform_font(), 8)).place(relx=0.5, rely=0.35, anchor="center")
+            # Color preview dots
+            dot_frame = tk.Frame(swatch, bg=colors["bg"])
+            dot_frame.place(relx=0.5, rely=0.75, anchor="center")
+            for c in [colors["accent"], colors["fg"], colors["muted"]]:
+                tk.Frame(dot_frame, bg=c, width=8, height=8).pack(side="left", padx=1)
+            swatch.bind("<Button-1>", lambda e, n=name: self._select_theme(n))
+            for child in swatch.winfo_children():
+                child.bind("<Button-1>", lambda e, n=name: self._select_theme(n))
+            for child in dot_frame.winfo_children():
+                child.bind("<Button-1>", lambda e, n=name: self._select_theme(n))
+            self._theme_swatches[name] = swatch
+
+        # Window size section
+        tk.Label(frame, text="Window Size", bg=t["bg"], fg=t["fg"],
+                 font=(platform_font(), 11, "bold")).pack(anchor="w", pady=(20, 8))
+        self.selected_size = tk.StringVar(value=self.config.window_size)
+        size_frame = tk.Frame(frame, bg=t["bg"])
+        size_frame.pack(fill="x", padx=(8, 0))
+        for name, props in WINDOW_SIZES.items():
+            tk.Radiobutton(
+                size_frame, text=f"{name.capitalize()} ({props['width']}px)",
+                variable=self.selected_size, value=name,
+                bg=t["bg"], fg=t["fg"], selectcolor=t["entry_bg"],
+                activebackground=t["bg"], activeforeground=t["fg"],
+                font=(platform_font(), 10),
+            ).pack(anchor="w", pady=2)
+
+        # Info label about restart
+        tk.Label(frame, text="Theme and window size changes take effect after restart.",
+                 bg=t["bg"], fg=t["muted"], font=(platform_font(), 8)).pack(anchor="w", padx=(8, 0), pady=(12, 0))
+
+        # Save button
+        tk.Button(frame, text="Save", command=self._save_appearance,
+                  bg=t["accent"], fg=t["bg"], relief="flat",
+                  font=(platform_font(), 10, "bold"), padx=24, pady=6,
+                  cursor="hand2").pack(anchor="e", pady=(12, 0))
 
     def _build_tags_tab(self):
         """Placeholder — implemented in Task 5."""

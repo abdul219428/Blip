@@ -43,3 +43,17 @@ def test_settings_general_tab_widgets(tk_root, tmp_path):
     assert hasattr(sw, "launch_var")
     sw.win.destroy()
 
+
+@needs_display
+def test_settings_appearance_tab(tk_root, tmp_path):
+    """Appearance tab has theme swatches and window size options."""
+    from cogstash.app import CogStashConfig
+    from cogstash.settings import SettingsWindow
+    config = CogStashConfig()
+    sw = SettingsWindow(tk_root, config, tmp_path / "test.json")
+    assert hasattr(sw, "selected_theme")
+    assert sw.selected_theme.get() == "tokyo-night"
+    assert hasattr(sw, "selected_size")
+    assert sw.selected_size.get() == "default"
+    sw.win.destroy()
+
