@@ -8,6 +8,31 @@ from unittest.mock import patch
 from conftest import needs_display
 
 
+class _CaptureStream:
+    def __init__(self):
+        self.parts = []
+
+    def write(self, text):
+        self.parts.append(text)
+        return len(text)
+
+    def flush(self):
+        pass
+
+    def getvalue(self):
+        return "".join(self.parts)
+
+
+class _StrictEncodedStream(_CaptureStream):
+    def __init__(self, encoding: str):
+        super().__init__()
+        self.encoding = encoding
+
+    def write(self, text):
+        text.encode(self.encoding)
+        return super().write(text)
+
+
 def test_platform_font_windows():
     from cogstash.app import platform_font
     with patch.object(sys, "platform", "win32"):
@@ -339,6 +364,70 @@ def test_main_dispatches_version(monkeypatch, capsys):
     cogstash.main()
     captured = capsys.readouterr()
     assert "cogstash" in captured.out.lower() and "0." in captured.out
+
+
+def test_main_dispatches_version_with_cp1252_stdout(monkeypatch):
+    """--version should not crash when packaged stdout cannot encode Unicode."""
+    import cogstash
+
+    capture = _StrictEncodedStream("cp1252")
+    monkeypatch.setattr("sys.argv", ["cogstash", "--version"])
+    monkeypatch.setattr("sys.stdout", capture)
+    monkeypatch.setattr(cogstash, "__version__", "0.0.0 → dev")
+
+    cogstash.main()
+
+    assert capture.getvalue().startswith("cogstash 0.0.0")
+
+
+def test_app_main_startup_output_is_cp1252_safe(monkeypatch, tmp_path):
+    """Startup status output should not crash on a cp1252-packaged console."""
+    import cogstash
+    import cogstash.app as app_mod
+
+    class FakeRoot:
+        def wait_window(self, _win):
+            raise AssertionError("startup test should not enter wizard flow")
+
+        def mainloop(self):
+            return None
+
+    class FakeListener:
+        def __init__(self, _mapping):
+            self.started = False
+            self.stopped = False
+
+        def start(self):
+            self.started = True
+
+        def stop(self):
+            self.stopped = True
+
+    class FakeApp:
+        def __init__(self, _root, _config):
+            self.queue = object()
+
+    config = app_mod.CogStashConfig(
+        output_file=tmp_path / "notes.md",
+        log_file=tmp_path / "cogstash.log",
+        last_seen_version=cogstash.__version__,
+    )
+    capture = _StrictEncodedStream("cp1252")
+
+    monkeypatch.setattr(app_mod, "load_config", lambda _path: config)
+    monkeypatch.setattr(app_mod, "configure_dpi", lambda: None)
+    monkeypatch.setattr(app_mod.tk, "Tk", lambda: FakeRoot())
+    monkeypatch.setattr(app_mod, "CogStash", FakeApp)
+    monkeypatch.setattr(app_mod, "create_tray_icon", lambda _queue, _config: None)
+    monkeypatch.setattr(app_mod.keyboard, "GlobalHotKeys", FakeListener)
+    monkeypatch.setattr("sys.stdout", capture)
+
+    app_mod.main()
+
+    output = capture.getvalue()
+    assert "CogStash is running." in output
+    assert "Notes" in output
+    assert str(config.output_file) in output
 
 
 def test_config_new_fields_defaults(tmp_path):
