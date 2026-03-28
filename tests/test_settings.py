@@ -81,3 +81,32 @@ def test_settings_about_tab(tk_root, tmp_path):
     assert hasattr(sw, "version_label")
     sw.win.destroy()
 
+
+def test_first_run_detection():
+    """last_seen_version=='' means first run."""
+    from cogstash.app import CogStashConfig
+    config = CogStashConfig()
+    assert config.last_seen_version == ""
+    config2 = CogStashConfig(last_seen_version="0.1.0")
+    assert config2.last_seen_version == "0.1.0"
+
+
+@needs_display
+def test_wizard_saves_config(tk_root, tmp_path):
+    """Wizard writes valid config with all fields when completed."""
+    import json
+
+    from cogstash.app import CogStashConfig
+    from cogstash.settings import WizardWindow
+
+    config = CogStashConfig()
+    config_path = tmp_path / ".cogstash.json"
+    wiz = WizardWindow(tk_root, config, config_path)
+    wiz._finish()
+    assert config_path.exists()
+    data = json.loads(config_path.read_text(encoding="utf-8"))
+    assert "theme" in data
+    assert "last_seen_version" in data
+    assert data["last_seen_version"] != ""
+    wiz.win.destroy()
+

@@ -622,7 +622,8 @@ class CogStash:
 
 
 def main():
-    config = load_config(Path.home() / ".cogstash.json")
+    config_path = Path.home() / ".cogstash.json"
+    config = load_config(config_path)
 
     # Reconfigure logger to use config's log_file
     for h in logger.handlers[:]:
@@ -632,10 +633,26 @@ def main():
     logger.addHandler(_handler)
 
     configure_dpi()
+
+    root = tk.Tk()
+
+    # First-run wizard
+    if config.last_seen_version == "":
+        from cogstash.settings import WizardWindow
+        wiz = WizardWindow(root, config, config_path)
+        root.wait_window(wiz.win)
+        config = load_config(config_path)
+    else:
+        from cogstash import __version__
+        if config.last_seen_version != __version__:
+            from cogstash.settings import WhatsNewDialog
+            WhatsNewDialog(root, config, config_path, __version__)
+            config.last_seen_version = __version__
+            save_config(config, config_path)
+
     print(f"CogStash is running. ({config.hotkey} to capture · Ctrl+C to quit)")
     print(f"Notes → {config.output_file}")
 
-    root = tk.Tk()
     app = CogStash(root, config)
 
     create_tray_icon(app.queue, config)
