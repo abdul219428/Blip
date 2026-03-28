@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import sys
+
+import pytest
 from conftest import needs_display
 
 
@@ -133,4 +136,13 @@ def test_whats_new_dialog_creates(tk_root, tmp_path):
     dialog = WhatsNewDialog(tk_root, config, tmp_path / ".cogstash.json", __version__)
     assert dialog.win.winfo_exists()
     dialog.win.destroy()
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows only")
+def test_startup_shortcut_path():
+    """get_startup_shortcut_path returns valid Windows startup path."""
+    from cogstash.settings import get_startup_shortcut_path
+    path = get_startup_shortcut_path()
+    assert "Startup" in str(path) or "startup" in str(path)
+    assert str(path).endswith(".bat")
 

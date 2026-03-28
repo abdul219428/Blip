@@ -11,10 +11,43 @@ from cogstash.app import (
     THEMES,
     WINDOW_SIZES,
     CogStashConfig,
+    logger,
     merge_tags,
     platform_font,
     save_config,
 )
+
+
+def get_startup_shortcut_path() -> Path:
+    """Get the path where the startup shortcut/script should be placed (Windows)."""
+    import os
+    startup_dir = Path(os.environ.get("APPDATA", "")) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup"
+    return startup_dir / "CogStash.bat"
+
+
+def set_launch_at_startup(enable: bool) -> None:
+    """Enable or disable launch at system startup (Windows only)."""
+    if sys.platform != "win32":
+        return
+    shortcut_path = get_startup_shortcut_path()
+    if enable:
+        exe = sys.executable
+        if getattr(sys, "frozen", False):
+            exe = sys.argv[0]
+            content = f'@echo off\nstart "" "{exe}"\n'
+        else:
+            content = f'@echo off\nstart "" "{exe}" -m cogstash\n'
+        try:
+            shortcut_path.parent.mkdir(parents=True, exist_ok=True)
+            shortcut_path.write_text(content, encoding="utf-8")
+        except OSError:
+            logger.error("Failed to create startup shortcut", exc_info=True)
+    else:
+        try:
+            if shortcut_path.exists():
+                shortcut_path.unlink()
+        except OSError:
+            logger.error("Failed to remove startup shortcut", exc_info=True)
 
 
 class SettingsWindow:
@@ -136,7 +169,10 @@ class SettingsWindow:
     def _save_general(self):
         """Save General tab settings to config."""
         self.config.output_file = Path(self.notes_file_var.get()).expanduser()
-        self.config.launch_at_startup = self.launch_var.get()
+        new_launch = self.launch_var.get()
+        if new_launch != self.config.launch_at_startup:
+            set_launch_at_startup(new_launch)
+        self.config.launch_at_startup = new_launch
         save_config(self.config, self.config_path)
         self._flash_saved()
 
