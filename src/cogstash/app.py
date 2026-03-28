@@ -301,12 +301,17 @@ def create_tray_icon(app_queue: queue.Queue, config: CogStashConfig) -> None:
     def browse_notes():
         app_queue.put("BROWSE")
 
+    def open_settings():
+        app_queue.put("SETTINGS")
+
     assert config.output_file is not None, "output_file should be set by __post_init__"
     menu = pystray.Menu(
         pystray.MenuItem("CogStash ⚡", None, enabled=False),
         pystray.Menu.SEPARATOR,
         pystray.MenuItem(f"Open {config.output_file.name}", lambda: open_notes()),
         pystray.MenuItem("Browse Notes", lambda: browse_notes()),
+        pystray.MenuItem("Settings", lambda: open_settings()),
+        pystray.Menu.SEPARATOR,
         pystray.MenuItem("Quit", quit_app),
     )
 
@@ -544,6 +549,8 @@ class CogStash:
                     self.show_window()
                 elif msg == "BROWSE":
                     self._open_browse()
+                elif msg == "SETTINGS":
+                    self._open_settings()
                 elif msg == "QUIT":
                     self.root.quit()
                     return
@@ -556,6 +563,15 @@ class CogStash:
         from cogstash.browse import BrowseWindow
         smart_tags, tag_colors = merge_tags(self.config)
         BrowseWindow(self.root, self.config, smart_tags, tag_colors)
+
+    def _open_settings(self):
+        """Open the Settings window (singleton — reuse if already open)."""
+        if hasattr(self, "_settings_win") and self._settings_win and self._settings_win.win.winfo_exists():
+            self._settings_win.win.lift()
+            self._settings_win.win.focus_force()
+            return
+        from cogstash.settings import SettingsWindow
+        self._settings_win = SettingsWindow(self.root, self.config, Path.home() / ".cogstash.json")
 
     def show_window(self):
         """Reveal the window, clear past text, and steal focus."""
