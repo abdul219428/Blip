@@ -58,7 +58,7 @@ CogStash is a desktop brain-dump tool: press a global hotkey, type a thought, an
 - `requirements.txt` is runtime-only
 
 ## Commands
-- **Build/install**: `pip install -e ".[dev]"`
+- **Build/install**: `uv pip install -e ".[dev]" --system`
 - **Tests**: `python -m pytest tests/ -v`
 - **Lint**: `python -m ruff check src/ tests/`
 - **Type check**: `python -m mypy src/cogstash/`
