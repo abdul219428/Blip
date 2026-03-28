@@ -292,8 +292,9 @@ def test_cmd_add_stdin(tmp_path, monkeypatch):
 
 
 def test_cmd_add_interactive_stdin_shows_error(monkeypatch, tmp_path, capsys):
-    import pytest
     import argparse
+
+    import pytest
 
     from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_add
@@ -313,8 +314,9 @@ def test_cmd_add_interactive_stdin_shows_error(monkeypatch, tmp_path, capsys):
 
 
 def test_cmd_add_missing_stdin_none_shows_error(monkeypatch, tmp_path, capsys):
-    import pytest
     import argparse
+
+    import pytest
 
     from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_add
