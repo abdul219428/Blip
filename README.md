@@ -53,10 +53,14 @@ Grab the latest release from the [**Releases page**](https://github.com/abdul219
 On Windows you can now choose between:
 
 - `CogStash-vX.Y.Z-setup.exe` — installs CogStash to `%LocalAppData%\Programs\CogStash`, adds an Apps & Features entry, creates a Start Menu shortcut, and can optionally enable launch at sign-in during setup.
+- The Windows installer can optionally add CogStash to your user `PATH` so commands like `cogstash stats` work from new shells without manual PATH edits.
 - `CogStash-vX.Y.Z-windows.exe` — portable onefile executable; download and run without installing.
 
 > **Tip:** The `.zip` / `.tar.gz` files are onedir bundles (a folder with all files).
 > They start slightly faster but aren't a single portable file.
+
+> **PATH note (Windows installer):** newly opened shells may be required before the updated
+> user `PATH` is visible everywhere.
 
 > **Uninstall note (Windows installer):** uninstall removes the installed app, shortcuts,
 > uninstall entry, and installer-managed startup entry, but keeps your personal notes,

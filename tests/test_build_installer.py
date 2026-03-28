@@ -44,6 +44,59 @@ def test_inno_setup_script_supports_optional_startup_task():
     assert 'Type: files; Name: "{userstartup}\\CogStash.bat"' in content
 
 
+def test_inno_setup_script_supports_optional_path_task():
+    """Installer should expose an optional PATH task for CLI access."""
+    repo_root = Path(__file__).resolve().parents[1]
+    iss_path = repo_root / "installer" / "windows" / "CogStash.iss"
+
+    content = iss_path.read_text(encoding="utf-8")
+
+    assert 'Name: "addtopath"; Description: "Add CogStash to PATH' in content
+    assert "RegisterPreviousData" in content
+    assert "GetPreviousData" in content
+    assert "SetPreviousData" in content
+    assert "EnvAddPath" in content
+    assert "EnvRemovePath" in content
+
+
+def test_inno_setup_script_tracks_path_ownership_and_duplicates():
+    """Installer PATH code should normalize duplicates and remove only owned entries."""
+    repo_root = Path(__file__).resolve().parents[1]
+    iss_path = repo_root / "installer" / "windows" / "CogStash.iss"
+
+    content = iss_path.read_text(encoding="utf-8")
+
+    assert "ExpandConstant('{app}')" in content
+    assert "Result := LowerCase(Result);" in content
+    assert "AddPathEntry" in content
+    assert "RemovePathEntry" in content
+    assert "StringChangeEx(Result, '%localappdata%', LowerCase(GetEnv('LOCALAPPDATA')), True);" in content
+    assert "StringChangeEx(Result, '%userprofile%', LowerCase(GetEnv('USERPROFILE')), True);" in content
+    assert "StringChangeEx" in content
+    assert "Result := PreviouslyOwned;" in content
+
+
+def test_inno_setup_script_makes_uninstall_path_cleanup_best_effort():
+    """Optional PATH cleanup should log failures instead of aborting uninstall."""
+    repo_root = Path(__file__).resolve().parents[1]
+    iss_path = repo_root / "installer" / "windows" / "CogStash.iss"
+
+    content = iss_path.read_text(encoding="utf-8")
+
+    assert "Log('Could not remove the installer-managed PATH entry." in content
+    assert "RaiseException('Could not remove the installer-managed PATH entry." not in content
+
+
+def test_inno_setup_script_preserves_expandable_path_writes():
+    """PATH rewrites should preserve expandable registry semantics."""
+    repo_root = Path(__file__).resolve().parents[1]
+    iss_path = repo_root / "installer" / "windows" / "CogStash.iss"
+
+    content = iss_path.read_text(encoding="utf-8")
+
+    assert "RegWriteExpandStringValue(HKEY_CURRENT_USER, UserEnvironmentSubkey, UserPathValueName, NewPath)" in content
+
+
 def test_stage_windows_payload_copies_bundle_and_renames_exe(tmp_path):
     """Stage helper should normalize the app dir and executable name."""
     module = _load_build_installer_module()
@@ -127,5 +180,7 @@ def test_release_workflow_builds_and_uploads_windows_installer():
     assert "uv run python scripts/build_installer.py" in content
     assert "ProgramFiles(x86)" in content
     assert "dist/CogStash-v*-setup.exe" in content
-    assert "Name -notmatch 'onedir|setup'" in content
-    assert 'if "onedir" not in f and "setup" not in f' in content
+    assert "Smoke test onedir (Windows)" in content
+    assert "dist\\CogStash-*-onedir\\CogStash-*-onedir.exe" in content
+    assert "--help output unexpectedly contained Traceback" in content
+    assert "--version output unexpectedly contained Traceback" in content
