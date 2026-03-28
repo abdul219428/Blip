@@ -6,6 +6,7 @@ for the Browse Window and potentially CLI tools in the future.
 
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -105,14 +106,24 @@ def filter_by_tag(notes: list[Note], tag: str) -> list[Note]:
     return [n for n in notes if tag in n.tags]
 
 
+def _atomic_write(path: Path, content: str) -> None:
+    """Write content to a file atomically via a temp file + rename."""
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(content, encoding="utf-8")
+    os.replace(tmp, path)
+
+
 def mark_done(path: Path, note: Note) -> bool:
     """Rewrite note's line in the file: ☐ → ☑. Returns True on success."""
     try:
         lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
         if note.line_number >= len(lines):
             return False
-        lines[note.line_number] = lines[note.line_number].replace("☐", "☑", 1)
-        path.write_text("".join(lines), encoding="utf-8")
+        new_line = lines[note.line_number].replace("☐", "☑", 1)
+        if new_line == lines[note.line_number]:
+            return False
+        lines[note.line_number] = new_line
+        _atomic_write(path, "".join(lines))
         return True
     except OSError:
         return False
@@ -146,7 +157,7 @@ def edit_note(path: Path, note: Note, new_text: str) -> bool:
         replacement.extend(f"  {line}\n" for line in text_lines[1:])
 
         lines[start:end] = replacement
-        path.write_text("".join(lines), encoding="utf-8")
+        _atomic_write(path, "".join(lines))
         return True
     except OSError:
         return False
@@ -161,7 +172,7 @@ def delete_note(path: Path, note: Note) -> bool:
             return False
 
         del lines[start:end]
-        path.write_text("".join(lines), encoding="utf-8")
+        _atomic_write(path, "".join(lines))
         return True
     except OSError:
         return False

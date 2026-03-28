@@ -6,6 +6,7 @@ Opened from the system tray icon. Uses cogstash_search for all data operations.
 
 from __future__ import annotations
 
+import sys
 import tkinter as tk
 from datetime import datetime, timedelta
 
@@ -111,12 +112,29 @@ class BrowseWindow:
         scrollbar.pack(side="right", fill="y")
         self.canvas.pack(side="left", fill="both", expand=True)
 
-        # Mousewheel scrolling (bound to canvas and cards_frame, not globally)
-        def _on_mousewheel(e):
-            self.canvas.yview_scroll(-1 * (e.delta // 120), "units")
-        self.canvas.bind("<MouseWheel>", _on_mousewheel)
-        self.cards_frame.bind("<MouseWheel>", _on_mousewheel)
-        self._on_mousewheel = _on_mousewheel  # stored for binding on card children
+        # Mousewheel scrolling — platform-aware bindings
+        if sys.platform == "linux":
+            def _on_mousewheel_up(e):
+                self.canvas.yview_scroll(-3, "units")
+
+            def _on_mousewheel_down(e):
+                self.canvas.yview_scroll(3, "units")
+            self.canvas.bind("<Button-4>", _on_mousewheel_up)
+            self.canvas.bind("<Button-5>", _on_mousewheel_down)
+            self.cards_frame.bind("<Button-4>", _on_mousewheel_up)
+            self.cards_frame.bind("<Button-5>", _on_mousewheel_down)
+            self._on_mousewheel = None
+            self._on_mousewheel_up = _on_mousewheel_up
+            self._on_mousewheel_down = _on_mousewheel_down
+        else:
+            def _on_mousewheel(e):
+                if sys.platform == "darwin":
+                    self.canvas.yview_scroll(-e.delta, "units")
+                else:
+                    self.canvas.yview_scroll(-1 * (e.delta // 120), "units")
+            self.canvas.bind("<MouseWheel>", _on_mousewheel)
+            self.cards_frame.bind("<MouseWheel>", _on_mousewheel)
+            self._on_mousewheel = _on_mousewheel
 
         # Footer
         self.footer = tk.Label(
@@ -276,7 +294,11 @@ class BrowseWindow:
 
         # Bind mousewheel and right-click context menu on all card widgets
         for widget in card_widgets:
-            widget.bind("<MouseWheel>", self._on_mousewheel)
+            if sys.platform == "linux":
+                widget.bind("<Button-4>", self._on_mousewheel_up)
+                widget.bind("<Button-5>", self._on_mousewheel_down)
+            else:
+                widget.bind("<MouseWheel>", self._on_mousewheel)
             widget.bind("<Button-3>", lambda e, n=note: (self._show_context_menu(e, n), None)[1])  # type: ignore[misc,return-value]
 
         self._card_frames.append(outer)
