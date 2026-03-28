@@ -1,0 +1,118 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+      - run: uv sync --extra dev
+      - run: uv run ruff check src/ tests/
+      - run: uv run mypy src/cogstash/
+      - name: Run tests
+        run: xvfb-run uv run pytest tests/ -v
+
+  build:
+    needs: validate
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            artifact_suffix: windows
+            exe_ext: .exe
+            shell: pwsh
+          - os: macos-latest
+            artifact_suffix: macos
+            exe_ext: ""
+            shell: bash
+          - os: ubuntu-latest
+            artifact_suffix: linux
+            exe_ext: ""
+            shell: bash
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - run: uv sync --extra dev
+      - name: Build executables
+        run: uv run python scripts/build.py
+      - name: Smoke test onefile (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          $binary = Get-ChildItem dist/CogStash-*${{ matrix.exe_ext }} -File | Where-Object { $_.Name -notmatch 'onedir' } | Select-Object -First 1
+          & $binary.FullName --version
+        shell: pwsh
+      - name: Smoke test onefile (Unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          binary=$(find dist -maxdepth 1 -name 'CogStash-*' -type f ! -name '*onedir*' ! -name '*.tar.gz' ! -name '*.zip' | head -1)
+          chmod +x "$binary"
+          "$binary" --version
+        shell: bash
+      - name: Archive onedir bundle (Windows)
+        if: matrix.os == 'windows-latest'
+        run: Compress-Archive -Path dist/CogStash-*-onedir -DestinationPath dist/CogStash-${{ github.ref_name }}-windows.zip
+        shell: pwsh
+      - name: Archive onedir bundle (macOS)
+        if: matrix.os == 'macos-latest'
+        run: cd dist && zip -r CogStash-${{ github.ref_name }}-macos.zip CogStash-*-onedir
+        shell: bash
+      - name: Archive onedir bundle (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: cd dist && tar -czf CogStash-${{ github.ref_name }}-linux.tar.gz CogStash-*-onedir
+        shell: bash
+      - name: Rename onefile for clarity
+        run: |
+          import glob, os
+          version = os.environ.get("GITHUB_REF_NAME", "unknown")
+          suffix = "${{ matrix.artifact_suffix }}"
+          ext = "${{ matrix.exe_ext }}"
+          pattern = f"dist/CogStash-*{ext}"
+          for f in glob.glob(pattern):
+              if "onedir" not in f and not f.endswith((".zip", ".tar.gz")):
+                  target = f"dist/CogStash-{version}-{suffix}{ext}"
+                  os.rename(f, target)
+                  break
+        shell: python
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cogstash-${{ matrix.artifact_suffix }}
+          path: |
+            dist/CogStash-*-${{ matrix.artifact_suffix }}*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: List artifacts
+        run: find artifacts -type f | sort
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: CogStash ${{ github.ref_name }}
+          generate_release_notes: true
+          files: artifacts/*
