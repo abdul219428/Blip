@@ -599,6 +599,26 @@ class WizardWindow:
         self.win.destroy()
 
 
+WHATS_NEW: dict[str, dict[str, object]] = {
+    "0.2.0": {
+        "title": "CogStash 0.2.0",
+        "items": [
+            ("new", "First-run wizard for easy setup"),
+            ("new", "Settings window — configure from tray menu"),
+            ("new", "What's New dialog on version upgrade"),
+            ("improved", "Theme and window size live preview"),
+            ("improved", "Custom tag management via GUI"),
+        ],
+    },
+}
+
+BADGE_COLORS = {
+    "new": "#4ade80",
+    "improved": "#60a5fa",
+    "fixed": "#fb923c",
+}
+
+
 class WhatsNewDialog:
     """Dialog shown once per version upgrade."""
 
@@ -607,11 +627,38 @@ class WhatsNewDialog:
         self.config = config
         self.config_path = config_path
         self.version = version
+        self.theme = THEMES[config.theme]
+        t = self.theme
+
         self.win = tk.Toplevel(parent)
         self.win.title("What's New in CogStash")
         self.win.geometry("400x350")
         self.win.resizable(False, False)
-        self.theme = THEMES[config.theme]
-        self.win.configure(bg=self.theme["bg"])
+        self.win.configure(bg=t["bg"])
         self.win.transient(parent)
         self.win.focus_force()
+
+        tk.Label(self.win, text="What's New in CogStash", bg=t["bg"], fg=t["fg"],
+                 font=(platform_font(), 14, "bold")).pack(pady=(20, 4))
+        tk.Label(self.win, text=f"v{version}", bg=t["bg"], fg=t["muted"],
+                 font=(platform_font(), 10)).pack(pady=(0, 16))
+
+        items = WHATS_NEW.get(version, {}).get("items", [])
+        if items:
+            list_frame = tk.Frame(self.win, bg=t["bg"])
+            list_frame.pack(fill="both", expand=True, padx=24)
+            for badge_type, text in items:
+                row = tk.Frame(list_frame, bg=t["bg"])
+                row.pack(fill="x", pady=3)
+                badge_color = BADGE_COLORS.get(badge_type, t["muted"])
+                tk.Label(row, text=f" {badge_type.upper()} ", bg=badge_color, fg="#000000",
+                         font=(platform_font(), 7, "bold"), padx=4, pady=1).pack(side="left", padx=(0, 8))
+                tk.Label(row, text=text, bg=t["bg"], fg=t["fg"],
+                         font=(platform_font(), 10)).pack(side="left")
+        else:
+            tk.Label(self.win, text="Thanks for updating!", bg=t["bg"], fg=t["muted"],
+                     font=(platform_font(), 10)).pack(pady=16)
+
+        tk.Button(self.win, text="Got it", command=self.win.destroy, bg=t["accent"], fg=t["bg"],
+                  relief="flat", font=(platform_font(), 10, "bold"), padx=24, pady=6,
+                  cursor="hand2").pack(pady=(16, 20))

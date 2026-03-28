@@ -110,3 +110,27 @@ def test_wizard_saves_config(tk_root, tmp_path):
     assert data["last_seen_version"] != ""
     wiz.win.destroy()
 
+
+def test_whats_new_detection():
+    """Version mismatch triggers What's New (but not on first run)."""
+    from cogstash import __version__
+    from cogstash.app import CogStashConfig
+    config_new = CogStashConfig(last_seen_version="")
+    assert config_new.last_seen_version == ""
+    config_old = CogStashConfig(last_seen_version="0.0.1")
+    assert config_old.last_seen_version != __version__
+    config_current = CogStashConfig(last_seen_version=__version__)
+    assert config_current.last_seen_version == __version__
+
+
+@needs_display
+def test_whats_new_dialog_creates(tk_root, tmp_path):
+    """WhatsNewDialog opens without error."""
+    from cogstash import __version__
+    from cogstash.app import CogStashConfig
+    from cogstash.settings import WhatsNewDialog
+    config = CogStashConfig(last_seen_version="0.0.1")
+    dialog = WhatsNewDialog(tk_root, config, tmp_path / ".cogstash.json", __version__)
+    assert dialog.win.winfo_exists()
+    dialog.win.destroy()
+
