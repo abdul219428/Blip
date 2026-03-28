@@ -238,16 +238,26 @@ def create_tray_icon(app_queue: queue.Queue, config: CogStashConfig) -> None:
         h = h.lstrip("#")
         return tuple(int(h[i:i+2], 16) for i in (0, 2, 4)) + (255,)
 
-    img = Image.new("RGBA", (64, 64), hex_to_rgba(theme["bg"]))
-    draw = ImageDraw.Draw(img)
-    try:
-        font: ImageFont.FreeTypeFont | ImageFont.ImageFont = ImageFont.truetype("arial", 40)
-    except OSError:
-        font = ImageFont.load_default()
-    bbox = draw.textbbox((0, 0), "⚡", font=font)
-    x = (64 - (bbox[2] - bbox[0])) // 2 - bbox[0]
-    y = (64 - (bbox[3] - bbox[1])) // 2 - bbox[1]
-    draw.text((x, y), "⚡", fill=hex_to_rgba(theme["fg"]), font=font)
+    # Try bundled icon first (PyInstaller frozen binary)
+    img = None
+    if getattr(sys, "frozen", False):
+        bundle_dir = Path(getattr(sys, "_MEIPASS", "."))
+        icon_path = bundle_dir / "assets" / "cogstash_icon.png"
+        if icon_path.exists():
+            img = Image.open(icon_path).resize((64, 64))
+
+    if img is None:
+        # Fallback: generate icon programmatically
+        img = Image.new("RGBA", (64, 64), hex_to_rgba(theme["bg"]))
+        draw = ImageDraw.Draw(img)
+        try:
+            font: ImageFont.FreeTypeFont | ImageFont.ImageFont = ImageFont.truetype("arial", 40)
+        except OSError:
+            font = ImageFont.load_default()
+        bbox = draw.textbbox((0, 0), "⚡", font=font)
+        x = (64 - (bbox[2] - bbox[0])) // 2 - bbox[0]
+        y = (64 - (bbox[3] - bbox[1])) // 2 - bbox[1]
+        draw.text((x, y), "⚡", fill=hex_to_rgba(theme["fg"]), font=font)
 
     def open_notes():
         path = str(config.output_file)

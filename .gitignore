@@ -34,3 +34,8 @@ Thumbs.db
 
 # Brainstorming sessions
 .superpowers/
+
+# PyInstaller
+*.spec
+*.ico
+*.icns
