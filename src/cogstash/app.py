@@ -623,7 +623,7 @@ class CogStash:
 
 
 def main():
-    from cogstash.cli import safe_print
+    from cogstash._output import safe_print
 
     config_path = Path.home() / ".cogstash.json"
     config = load_config(config_path)
