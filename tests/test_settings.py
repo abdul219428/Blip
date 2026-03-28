@@ -126,6 +126,18 @@ def test_wizard_saves_config(tk_root, tmp_path):
     wiz.win.destroy()
 
 
+@needs_display
+def test_wizard_close_releases_modal_window(tk_root, tmp_path):
+    """Wizard close handler destroys the modal window cleanly."""
+    from cogstash.app import CogStashConfig
+    from cogstash.settings import WizardWindow
+
+    config = CogStashConfig()
+    wiz = WizardWindow(tk_root, config, tmp_path / ".cogstash.json")
+    wiz._close()
+    assert not wiz.win.winfo_exists()
+
+
 def test_whats_new_detection():
     """Version mismatch triggers What's New (but not on first run)."""
     from cogstash import __version__

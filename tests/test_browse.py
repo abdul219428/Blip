@@ -1,5 +1,9 @@
 """Tests for cogstash_browse.py — Browse Window UI."""
 
+from __future__ import annotations
+
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from conftest import needs_display
 
@@ -101,6 +105,47 @@ def test_browse_context_menu_exists(tmp_path, tk_root):
 
 
 @needs_display
+def test_browse_context_menu_destroyed_after_popup(tmp_path, tk_root):
+    """Temporary context menu is destroyed after popup returns."""
+    f = tmp_path / "cogstash.md"
+    f.write_text("- [2026-03-26 14:30] test note #todo\n", encoding="utf-8")
+
+    from cogstash.app import CogStashConfig
+    from cogstash.browse import BrowseWindow
+
+    class FakeMenu:
+        last_instance = None
+
+        def __init__(self, *args, **kwargs):
+            self.destroyed = False
+            FakeMenu.last_instance = self
+
+        def add_command(self, *args, **kwargs):
+            return None
+
+        def add_separator(self):
+            return None
+
+        def tk_popup(self, x_root, y_root):
+            return None
+
+        def destroy(self):
+            self.destroyed = True
+
+    config = CogStashConfig(output_file=f)
+    win = BrowseWindow(tk_root, config)
+
+    event = SimpleNamespace(x_root=10, y_root=10)
+    note = win._all_notes[0]
+    with patch("cogstash.browse.tk.Menu", FakeMenu):
+        win._show_context_menu(event, note)
+
+    assert FakeMenu.last_instance is not None
+    assert FakeMenu.last_instance.destroyed is True
+    win.window.destroy()
+
+
+@needs_display
 def test_browse_edit_note(tmp_path, tk_root):
     """Edit via _on_edit updates file and refreshes cards."""
     f = tmp_path / "cogstash.md"
@@ -118,6 +163,34 @@ def test_browse_edit_note(tmp_path, tk_root):
     edit_note(f, note, "updated text")
     win._load_notes()
     assert win._all_notes[0].text == "updated text"
+    win.window.destroy()
+
+
+@needs_display
+def test_browse_edit_empty_text_shows_error(tmp_path, tk_root):
+    """Saving empty edit text shows validation error instead of silent return."""
+    f = tmp_path / "cogstash.md"
+    f.write_text("- [2026-03-26 14:30] original text\n", encoding="utf-8")
+
+    from cogstash.app import CogStashConfig
+    from cogstash.browse import BrowseWindow
+
+    config = CogStashConfig(output_file=f)
+    win = BrowseWindow(tk_root, config)
+    note = win._all_notes[0]
+
+    with patch("cogstash.browse.edit_note") as edit_mock, patch("tkinter.messagebox.showerror") as error_mock:
+        win._on_edit(note)
+        dialog = next(child for child in win.window.winfo_children() if child.winfo_class() == "Toplevel")
+        text_widget = next(child for child in dialog.winfo_children() if child.winfo_class() == "Text")
+        text_widget.delete("1.0", "end")
+        btn_frame = dialog.winfo_children()[-1]
+        save_button = next(child for child in btn_frame.winfo_children() if child.cget("text") == "Save")
+        save_button.invoke()
+
+    edit_mock.assert_not_called()
+    error_mock.assert_called_once()
+    dialog.destroy()
     win.window.destroy()
 
 

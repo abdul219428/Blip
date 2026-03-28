@@ -436,6 +436,7 @@ class WizardWindow:
         self.win.configure(bg=self.theme["bg"])
         self.win.transient(parent)
         self.win.grab_set()
+        self.win.protocol("WM_DELETE_WINDOW", self._close)
         self.win.focus_force()
 
         # Content area
@@ -633,7 +634,14 @@ class WizardWindow:
         self.config.window_size = self.selected_size.get()
         self.config.last_seen_version = __version__
         save_config(self.config, self.config_path)
-        self.win.grab_release()
+        self._close()
+
+    def _close(self):
+        """Close the wizard and release its modal grab."""
+        try:
+            self.win.grab_release()
+        except tk.TclError:
+            pass
         self.win.destroy()
 
 

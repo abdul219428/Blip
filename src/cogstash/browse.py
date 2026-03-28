@@ -316,7 +316,10 @@ class BrowseWindow:
         menu.add_command(label="🗑️ Delete", command=lambda: self._on_delete(note))
         menu.add_separator()
         menu.add_command(label="📋 Copy text", command=lambda: self._on_copy(note))
-        menu.tk_popup(event.x_root, event.y_root)
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.destroy()
 
     def _on_edit(self, note: Note):
         """Open themed edit dialog for a note."""
@@ -358,14 +361,16 @@ class BrowseWindow:
         btn_frame.pack(fill="x", padx=16, pady=(0, 12))
 
         def save():
+            from tkinter import messagebox
+
             new_text = text_widget.get("1.0", "end-1c").strip()
             if not new_text:
+                messagebox.showerror("Error", "Note text cannot be empty.", parent=dialog)
                 return
             if edit_note(self.config.output_file, note, new_text):
                 dialog.destroy()
                 self._load_notes()
             else:
-                from tkinter import messagebox
                 messagebox.showerror("Error", "Failed to save changes.", parent=dialog)
 
         tk.Button(
