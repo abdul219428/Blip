@@ -58,7 +58,9 @@ CogStash is a desktop brain-dump tool: press a global hotkey, type a thought, an
 - `requirements.txt` is runtime-only
 
 ## Commands
-- **Build/install**: `uv pip install -e ".[dev]" --system`
-- **Tests**: `python -m pytest tests/ -v`
-- **Lint**: `python -m ruff check src/ tests/`
-- **Type check**: `python -m mypy src/cogstash/`
+- **Install deps**: `uv sync --extra dev`
+- **Run anything**: `uv run <command>` (auto-uses managed .venv)
+- **Tests**: `uv run pytest tests/ -v`
+- **Lint**: `uv run ruff check src/ tests/`
+- **Type check**: `uv run mypy src/cogstash/`
+- **Add dep**: `uv add <package>` (runtime) / `uv add --optional dev <package>` (dev)
