@@ -438,7 +438,8 @@ class CogStash:
             if name.startswith(fragment)
         ]
 
-        if not matches:
+        # Hide if no matches, or if fragment is already a complete exact tag name
+        if not matches or (len(matches) == 1 and matches[0][0] == fragment):
             self.hide_autocomplete()
             return
 
