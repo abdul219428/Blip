@@ -46,7 +46,7 @@ cd CogStash
 # Windows: winget install astral-sh.uv
 # macOS/Linux: curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Install dependencies
+# Install dependencies (automatically creates .venv/)
 uv sync
 ```
 
