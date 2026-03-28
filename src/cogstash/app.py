@@ -62,8 +62,8 @@ logger.addHandler(_handler)
 @dataclass
 class CogStashConfig:
     hotkey: str = "<ctrl>+<shift>+<space>"
-    output_file: Path = None
-    log_file: Path = None
+    output_file: Path | None = None
+    log_file: Path | None = None
     theme: str = "tokyo-night"
     window_size: str = "default"
     tags: dict[str, dict[str, str]] | None = None
@@ -241,7 +241,7 @@ def create_tray_icon(app_queue: queue.Queue, config: CogStashConfig) -> None:
     img = Image.new("RGBA", (64, 64), hex_to_rgba(theme["bg"]))
     draw = ImageDraw.Draw(img)
     try:
-        font = ImageFont.truetype("arial", 40)
+        font: ImageFont.FreeTypeFont | ImageFont.ImageFont = ImageFont.truetype("arial", 40)
     except OSError:
         font = ImageFont.load_default()
     bbox = draw.textbbox((0, 0), "⚡", font=font)
@@ -265,6 +265,7 @@ def create_tray_icon(app_queue: queue.Queue, config: CogStashConfig) -> None:
     def browse_notes():
         app_queue.put("BROWSE")
 
+    assert config.output_file is not None, "output_file should be set by __post_init__"
     menu = pystray.Menu(
         pystray.MenuItem("CogStash ⚡", None, enabled=False),
         pystray.Menu.SEPARATOR,
@@ -282,7 +283,7 @@ class CogStash:
     def __init__(self, root: tk.Tk, config: CogStashConfig):
         self.root = root
         self.config = config
-        self.queue = queue.Queue()
+        self.queue: queue.Queue[str] = queue.Queue()
         self.is_visible = False
         self.theme = THEMES[config.theme]
         self.win_size = WINDOW_SIZES[config.window_size]
@@ -564,6 +565,7 @@ class CogStash:
     def append_note(self, text: str) -> bool:
         """Append a timestamped note to output file. Returns True on success."""
         smart_tags, _ = merge_tags(self.config)
+        assert self.config.output_file is not None, "output_file should be set by __post_init__"
         return append_note_to_file(text, self.config.output_file, smart_tags)
 
 

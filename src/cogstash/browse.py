@@ -243,11 +243,11 @@ class BrowseWindow:
             )
             check_btn.pack(side="right")
             if not note.is_done:
-                check_btn.bind("<Button-1>", lambda e, n=note: self._on_mark_done(n))
+                check_btn.bind("<Button-1>", lambda e, n=note: (self._on_mark_done(n), None)[1])  # type: ignore[misc,return-value]
 
         # Note text
         text_display = note.text
-        text_font_opts = (fnt, 11)
+        text_font_opts: tuple[str, int] | tuple[str, int, str] = (fnt, 11)
         if note.is_done:
             text_font_opts = (fnt, 11, "overstrike")
 
@@ -277,12 +277,13 @@ class BrowseWindow:
         # Bind mousewheel and right-click context menu on all card widgets
         for widget in card_widgets:
             widget.bind("<MouseWheel>", self._on_mousewheel)
-            widget.bind("<Button-3>", lambda e, n=note: self._show_context_menu(e, n))
+            widget.bind("<Button-3>", lambda e, n=note: (self._show_context_menu(e, n), None)[1])  # type: ignore[misc,return-value]
 
         self._card_frames.append(outer)
 
     def _on_mark_done(self, note: Note):
         """Mark a todo note as done and refresh the display."""
+        assert self.config.output_file is not None, "output_file should be set by __post_init__"
         if mark_done(self.config.output_file, note):
             self._load_notes()
 
@@ -367,6 +368,7 @@ class BrowseWindow:
             f"Delete this note?\n\n\"{preview}\"",
             parent=self.window,
         ):
+            assert self.config.output_file is not None, "output_file should be set by __post_init__"
             if delete_note(self.config.output_file, note):
                 self._load_notes()
             else:
