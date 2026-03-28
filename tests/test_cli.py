@@ -93,6 +93,21 @@ def test_stream_supports_color_handles_isatty_errors():
     assert stream_supports_color(BrokenStream()) is False
 
 
+def test_stream_supports_color_true_and_false_paths():
+    from cogstash.cli import stream_supports_color
+
+    class TtyStream:
+        def isatty(self):
+            return True
+
+    class NonTtyStream:
+        def isatty(self):
+            return False
+
+    assert stream_supports_color(TtyStream()) is True
+    assert stream_supports_color(NonTtyStream()) is False
+
+
 def test_cmd_recent_default(tmp_path, capsys):
     """Shows notes newest-first, up to 20 by default."""
     f = _make_notes_file(tmp_path)
@@ -260,6 +275,27 @@ def test_cmd_add_stdin(tmp_path, monkeypatch):
     cmd_add(SimpleNamespace(text=[]), CogStashConfig(output_file=f))
     content = f.read_text(encoding="utf-8")
     assert "from stdin" in content
+
+
+def test_cmd_add_interactive_stdin_shows_error(monkeypatch, tmp_path, capsys):
+    import argparse
+    import pytest
+
+    from cogstash.app import CogStashConfig
+    from cogstash.cli import cmd_add
+
+    class InteractiveStdin:
+        def isatty(self):
+            return True
+
+    config = CogStashConfig(output_file=tmp_path / "cogstash.md")
+    monkeypatch.setattr("sys.stdin", InteractiveStdin())
+
+    with pytest.raises(SystemExit) as exc:
+        cmd_add(argparse.Namespace(text=[]), config)
+
+    assert exc.value.code == 1
+    assert "provide note text" in capsys.readouterr().err.lower()
 
 
 def test_cmd_add_smart_tags(tmp_path):
