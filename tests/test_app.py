@@ -10,29 +10,29 @@ from conftest import needs_display
 
 
 def test_platform_font_windows():
+    from cogstash.app import platform_font
     with patch.object(sys, "platform", "win32"):
-        from cogstash.app import platform_font
         result = platform_font()
         assert result == "Segoe UI"
 
 
 def test_platform_font_macos():
+    from cogstash.app import platform_font
     with patch.object(sys, "platform", "darwin"):
-        from cogstash.app import platform_font
         result = platform_font()
         assert result == "Helvetica Neue"
 
 
 def test_platform_font_linux():
+    from cogstash.app import platform_font
     with patch.object(sys, "platform", "linux"):
-        from cogstash.app import platform_font
         result = platform_font()
         assert result == "sans-serif"
 
 
 def test_platform_font_unknown():
+    from cogstash.app import platform_font
     with patch.object(sys, "platform", "freebsd"):
-        from cogstash.app import platform_font
         result = platform_font()
         assert result == "TkDefaultFont"
 
@@ -73,8 +73,10 @@ def test_append_note_error_handling(tmp_path, tk_root):
     """append_note returns False and logs on write failure."""
     import cogstash.app as cogstash_mod
 
-    app = cogstash_mod.CogStash(tk_root, cogstash_mod.CogStashConfig(output_file=Path("\\\\nonexistent_server_xyz\\share\\cogstash.md")))
-    result = app.append_note("should fail")
+    test_file = tmp_path / "cogstash.md"
+    app = cogstash_mod.CogStash(tk_root, cogstash_mod.CogStashConfig(output_file=test_file))
+    with patch("cogstash.app.Path.open", side_effect=OSError("mock write failure")):
+        result = app.append_note("should fail")
 
     assert result is False
 
