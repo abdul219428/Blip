@@ -568,7 +568,7 @@ class CogStash:
 
 def main():
     # CLI subcommands — delegate before loading GUI
-    if len(sys.argv) > 1 and sys.argv[1] in ("recent", "search", "tags", "add", "edit", "delete"):
+    if len(sys.argv) > 1 and sys.argv[1] in ("recent", "search", "tags", "add", "edit", "delete", "export", "stats", "config"):
         from cogstash_cli import cli_main
         cli_main(sys.argv[1:])
         return

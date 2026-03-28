@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import sys
 import argparse
+from datetime import datetime
 from pathlib import Path
 
 from cogstash_search import Note, parse_notes, search_notes, edit_note, delete_note
@@ -228,6 +229,69 @@ def cmd_delete(args, config, ansi_tag=None):
     print(f"Note {note.index} deleted.")
 
 
+def cmd_export(args, config, ansi_tag=None):
+    """Export all notes to JSON, CSV, or Markdown."""
+    import json as json_mod
+    import csv
+
+    notes = parse_notes(config.output_file)
+    if not notes:
+        print("No notes to export.")
+        return
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    ext = {"json": "json", "csv": "csv", "md": "md"}[args.format]
+
+    if args.output:
+        out_path = Path(args.output)
+    else:
+        out_path = Path(f"cogstash-export-{today}.{ext}")
+
+    if args.format == "json":
+        data = [
+            {
+                "index": n.index,
+                "timestamp": n.timestamp.strftime("%Y-%m-%d %H:%M"),
+                "text": n.text,
+                "tags": n.tags,
+                "is_done": n.is_done,
+            }
+            for n in notes
+        ]
+        out_path.write_text(
+            json_mod.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+
+    elif args.format == "csv":
+        with open(out_path, "w", newline="", encoding="utf-8") as fh:
+            writer = csv.DictWriter(fh, fieldnames=["index", "timestamp", "text", "tags", "is_done"])
+            writer.writeheader()
+            for n in notes:
+                writer.writerow({
+                    "index": n.index,
+                    "timestamp": n.timestamp.strftime("%Y-%m-%d %H:%M"),
+                    "text": n.text,
+                    "tags": ";".join(n.tags),
+                    "is_done": n.is_done,
+                })
+
+    elif args.format == "md":
+        lines = ["# CogStash Export\n\n"]
+        lines.append(f"*Exported {len(notes)} notes on {today}*\n\n")
+        for n in notes:
+            ts = n.timestamp.strftime("%Y-%m-%d %H:%M")
+            tags = " ".join(f"`#{t}`" for t in n.tags) if n.tags else ""
+            status = "☑" if n.is_done else ""
+            line = f"- **[{ts}]** {status} {n.text}"
+            if tags:
+                line += f"  {tags}"
+            lines.append(line + "\n")
+        out_path.write_text("".join(lines), encoding="utf-8")
+
+    print(f"Exported {len(notes)} notes → {out_path}")
+
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI argument parser with subcommands."""
     parser = argparse.ArgumentParser(
@@ -269,6 +333,15 @@ def build_parser() -> argparse.ArgumentParser:
     p_delete.add_argument("--search", "-s", help="Find note by keyword")
     p_delete.add_argument("--yes", "-y", action="store_true", help="Skip confirmation")
     p_delete.set_defaults(func=cmd_delete)
+
+    # export
+    p_export = sub.add_parser("export", help="Export all notes to file")
+    p_export.add_argument(
+        "--format", "-f", choices=["json", "csv", "md"], default="json",
+        help="Export format (default: json)",
+    )
+    p_export.add_argument("--output", "-o", help="Output file path (default: auto-named)")
+    p_export.set_defaults(func=cmd_export)
 
     return parser
 

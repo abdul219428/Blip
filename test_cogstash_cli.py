@@ -400,3 +400,101 @@ def test_cmd_delete_not_found(tmp_path):
     with pytest.raises(SystemExit):
         cmd_delete(SimpleNamespace(number=99, yes=True, search=None), CogStashConfig(output_file=f))
 
+
+def test_cmd_export_json(tmp_path, monkeypatch, capsys):
+    """Export to JSON creates file with all notes."""
+    import json
+    f = _make_notes_file(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    from cogstash_cli import cmd_export
+    from cogstash import CogStashConfig
+    from types import SimpleNamespace
+
+    cmd_export(
+        SimpleNamespace(format="json", output=None),
+        CogStashConfig(output_file=f),
+    )
+    output = capsys.readouterr().out
+    assert "Exported" in output
+
+
+def test_cmd_export_json_content(tmp_path, monkeypatch, capsys):
+    """JSON export contains correct note data."""
+    import json
+    f = _make_notes_file(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    from cogstash_cli import cmd_export
+    from cogstash import CogStashConfig
+    from types import SimpleNamespace
+
+    cmd_export(
+        SimpleNamespace(format="json", output=None),
+        CogStashConfig(output_file=f),
+    )
+    exported = list(tmp_path.glob("cogstash-export-*.json"))
+    assert len(exported) == 1
+    data = json.loads(exported[0].read_text(encoding="utf-8"))
+    assert len(data) == 5
+    assert "text" in data[0]
+    assert "timestamp" in data[0]
+    assert "tags" in data[0]
+
+
+def test_cmd_export_csv(tmp_path, monkeypatch, capsys):
+    """CSV export creates valid CSV file."""
+    import csv
+    f = _make_notes_file(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    from cogstash_cli import cmd_export
+    from cogstash import CogStashConfig
+    from types import SimpleNamespace
+
+    cmd_export(
+        SimpleNamespace(format="csv", output=None),
+        CogStashConfig(output_file=f),
+    )
+    exported = list(tmp_path.glob("cogstash-export-*.csv"))
+    assert len(exported) == 1
+    with open(exported[0], encoding="utf-8") as fh:
+        reader = csv.DictReader(fh)
+        rows = list(reader)
+    assert len(rows) == 5
+    assert "timestamp" in reader.fieldnames
+    assert "text" in reader.fieldnames
+
+
+def test_cmd_export_md(tmp_path, monkeypatch, capsys):
+    """Markdown export creates valid .md file."""
+    f = _make_notes_file(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    from cogstash_cli import cmd_export
+    from cogstash import CogStashConfig
+    from types import SimpleNamespace
+
+    cmd_export(
+        SimpleNamespace(format="md", output=None),
+        CogStashConfig(output_file=f),
+    )
+    exported = list(tmp_path.glob("cogstash-export-*.md"))
+    assert len(exported) == 1
+    content = exported[0].read_text(encoding="utf-8")
+    assert "# CogStash Export" in content
+    assert "buy milk" in content
+
+
+def test_cmd_export_custom_output(tmp_path, capsys):
+    """--output flag writes to specified path."""
+    import json
+    f = _make_notes_file(tmp_path)
+    out_path = tmp_path / "custom.json"
+    from cogstash_cli import cmd_export
+    from cogstash import CogStashConfig
+    from types import SimpleNamespace
+
+    cmd_export(
+        SimpleNamespace(format="json", output=str(out_path)),
+        CogStashConfig(output_file=f),
+    )
+    assert out_path.exists()
+    data = json.loads(out_path.read_text(encoding="utf-8"))
+    assert len(data) == 5
