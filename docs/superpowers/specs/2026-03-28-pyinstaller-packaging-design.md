@@ -42,11 +42,12 @@ Package CogStash as standalone executables for Windows, macOS, and Linux using P
 | App name | `CogStash` |
 | Icon | Platform-converted from `assets/cogstash_icon.png` |
 | Console | `--noconsole` (release) / `--console` (debug) |
-| Hidden imports | `pynput.keyboard._win32`, `pynput.keyboard._darwin`, `pynput.keyboard._xorg`, `pynput.mouse._win32`, `pynput.mouse._darwin`, `pynput.mouse._xorg` |
+| Hidden imports | `pynput.keyboard._win32`, `pynput.keyboard._darwin`, `pynput.keyboard._xorg`, `pynput.mouse._win32`, `pynput.mouse._darwin`, `pynput.mouse._xorg`, `pystray._win32`, `pystray._darwin`, `pystray._xorg` |
 | Data files | `assets/cogstash_icon.png` bundled as data |
+| Copy metadata | `--copy-metadata cogstash` (ensures `importlib.metadata.version()` works in frozen binary) |
 | One-file | Both `--onefile` and `--onedir` builds |
 
-**Hidden imports rationale**: pynput uses dynamic imports for platform-specific backends that PyInstaller's static analysis cannot detect. All platform backends are listed so the same spec works cross-platform.
+**Hidden imports rationale**: pynput and pystray use dynamic imports for platform-specific backends that PyInstaller's static analysis cannot detect. All platform backends are listed so the same spec works cross-platform.
 
 ### 2. Icon Handling
 
@@ -69,7 +70,7 @@ The icon is also bundled as a data file inside the binary so the system tray can
 
 **Jobs**:
 
-1. **`validate`** — Runs existing CI checks (reuses ci.yml via `workflow_call` or duplicates lint+test steps). Release only proceeds if validation passes.
+1. **`validate`** — Duplicates the lint+test steps from `ci.yml` (not using `workflow_call`, to avoid modifying the existing CI workflow's triggers). Runs ruff, mypy, and pytest on Python 3.13. Release only proceeds if validation passes.
 
 2. **`build`** (depends on `validate`) — Matrix strategy:
 
@@ -115,7 +116,7 @@ requires = ["setuptools>=64", "setuptools-scm>=8"]
 **How it works**:
 - `git tag v0.1.0` → version `0.1.0`
 - Dev installs: `0.1.0.dev3+g5a5b9d3` (3 commits after tag)
-- `cogstash --version` reads `importlib.metadata.version("cogstash")`
+- `cogstash --version` reads `importlib.metadata.version("cogstash")` (works because `--copy-metadata cogstash` is passed to PyInstaller; in dev installs, setuptools-scm provides the metadata automatically)
 - Release workflow extracts version from git tag and uses it in artifact names
 
 **Release workflow**:
@@ -134,9 +135,9 @@ git push --tags
 **Modified files**:
 - `pyproject.toml` — dynamic version, setuptools-scm config, pyinstaller in dev deps
 - `.gitignore` — add `dist/`, `build/`, `*.spec`, `*.ico`, `*.icns`
-- `src/cogstash/__init__.py` — add `__version__` via `importlib.metadata`
+- `src/cogstash/__init__.py` — add `__version__` via `importlib.metadata` (with frozen-binary fallback)
 - `src/cogstash/cli.py` — add `--version` flag support
-- `src/cogstash/app.py` — use bundled icon for system tray when running as frozen binary
+- `src/cogstash/app.py` — (1) handle `--version` in argv dispatch before subcommand check so it works from the binary entry point, (2) use bundled icon for system tray when running as frozen binary
 
 **Committed assets**:
 - `assets/cogstash_icon.png` — source icon (already present)
