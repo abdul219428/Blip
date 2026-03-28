@@ -595,7 +595,12 @@ def cli_main(argv: list[str]) -> None:
         parser.print_help()
         return
 
-    config = load_config(Path.home() / ".cogstash.json")
+    config_path = Path.home() / ".cogstash.json"
+    config = load_config(config_path)
     _, tag_colors = merge_tags(config)
     ansi_tag = build_ansi_tag_map(tag_colors)
-    args.func(args, config, ansi_tag)
+
+    if args.func == cmd_config:
+        args.func(args, config, ansi_tag, config_path=config_path)
+    else:
+        args.func(args, config, ansi_tag)
