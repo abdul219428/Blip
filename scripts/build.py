@@ -92,7 +92,7 @@ def run_pyinstaller(*, onefile: bool, debug: bool, icon_path: str | None, versio
     print(f"Building {mode}...")
     print(f"{'='*60}")
     subprocess.run(cmd, check=True)
-    print(f"✅ {mode} build complete → dist/")
+    print(f"[OK] {mode} build complete -> dist/")
 
 
 def main():
@@ -118,7 +118,7 @@ def main():
     if build_onedir:
         run_pyinstaller(onefile=False, debug=args.debug, icon_path=icon_path, version=version)
 
-    print("\n🎉 All builds complete!")
+    print("\nAll builds complete!")
 
 
 if __name__ == "__main__":
