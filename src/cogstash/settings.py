@@ -635,9 +635,8 @@ class WizardWindow:
         self.win.destroy()
 
 
-WHATS_NEW: dict[str, dict[str, object]] = {
+WHATS_NEW: dict[str, dict[str, list[tuple[str, str]]]] = {
     "0.2.0": {
-        "title": "CogStash 0.2.0",
         "items": [
             ("new", "First-run wizard for easy setup"),
             ("new", "Settings window — configure from tray menu"),
