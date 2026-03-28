@@ -50,6 +50,16 @@ Startup should branch as early as possible into one of two modes:
 
 The codebase remains one application. Shared logic stays shared; only bootstrap/runtime handling becomes more explicit.
 
+#### CLI vs GUI detection rules
+
+Startup mode should be decided from `sys.argv[1:]` using explicit command recognition:
+
+- if the first argument is a recognized CLI command or CLI flag (for example `recent`, `search`, `tags`, `add`, `edit`, `delete`, `export`, `stats`, `config`, or `--version`), enter **CLI mode**
+- if no CLI arguments are present, enter **GUI mode**
+- if arguments are present but do not match a recognized CLI entry pattern, stay in **CLI mode** and let the CLI parser return a normal user-facing error rather than silently falling into GUI startup
+
+This keeps behavior script-friendly and avoids surprising mode switches.
+
 ### Console-safe output
 
 Packaged Windows runs can fail when the active console encoding cannot represent characters such as `→`, emoji, or other decorative symbols. They can also fail when stream objects do not support interactive assumptions.
@@ -64,6 +74,19 @@ To address this, output should pass through a shared safe-output helper that:
 
 This applies to CLI commands and any startup/status messages printed during packaged app startup.
 
+#### Safe output helper contract
+
+The output helper should be a small shared function, not a stream wrapper class. Its behavior should be:
+
+- accept the same practical inputs as `print()` for current use (`*args`, `sep`, `end`, optional target stream)
+- default to `sys.stdout` when no stream is provided
+- if the target stream is `None`, do nothing
+- if the target stream exposes `write()`, attempt to write the original text first
+- on `UnicodeEncodeError`, retry using the stream's declared encoding with replacement semantics
+- if the stream encoding is unknown or invalid, fall back to ASCII-safe replacement output
+
+Direct console-facing output in `cli.py` and startup status prints should route through this helper instead of raw `print()`.
+
 ### Installer-managed PATH ownership
 
 The installer should keep the optional **Add CogStash to PATH** task, but treat PATH removal as an ownership problem rather than a simple string removal.
@@ -77,6 +100,21 @@ The installer should:
 
 The preferred mechanism is an installer-owned marker stored in the installed app directory, because the uninstaller can inspect it directly and does not need to rely on fragile previous-data state.
 
+#### PATH ownership marker format
+
+The ownership marker should be a small file in the install root:
+
+- path: `{app}\.path-owned`
+- contents: a simple truthy marker such as `1`
+
+Behavior rules:
+
+- create the file only when the installer successfully adds or confirms installer ownership of the PATH entry
+- remove the file when the installer no longer owns the PATH entry
+- during uninstall, remove the PATH entry only if this marker file exists
+
+This keeps the contract simple and aligns install-time and uninstall-time checks.
+
 ## Components
 
 ### `src/cogstash/__main__.py` / bootstrap
@@ -88,7 +126,7 @@ The preferred mechanism is an installer-owned marker stored in the installed app
 ### `src/cogstash/cli.py`
 
 - Centralize console-safe writing behavior
-- Audit commands for stream assumptions and direct `print()` calls that can break packaged runs
+- Audit all commands in `src/cogstash/cli.py` for stream assumptions and direct `print()` calls that can break packaged runs
 - Keep current output style where possible, but make failure-safe fallback behavior the default when encoding is limited
 
 ### `src/cogstash/app.py`
@@ -111,6 +149,14 @@ The preferred mechanism is an installer-owned marker stored in the installed app
 - Returns stable exit codes for success vs failure
 - Uses colored/rich output only when supported
 - Falls back to plain-safe output when encoding or stream capability does not support richer output
+
+#### Exit code policy
+
+- success: `0`
+- normal user-facing CLI misuse or validation errors: `1`
+- unexpected internal command failures: `1` unless the existing CLI already uses a more specific nonzero code
+
+This phase does not introduce a large exit-code taxonomy; it standardizes on predictable success vs failure.
 
 ### GUI mode behavior
 
@@ -149,6 +195,11 @@ Verification should include:
 - `ruff`
 - `mypy`
 - Windows installer smoke verification for PATH add/remove behavior where feasible
+
+Windows-specific expectations for this phase:
+
+- packaged CLI reliability should be covered in automated tests using mocked or fake streams that simulate missing interactivity helpers and encoding failures
+- installer PATH add/remove behavior may remain a Windows smoke-verification concern rather than a fully automated end-to-end CI step
 
 ## Risks and Trade-offs
 
