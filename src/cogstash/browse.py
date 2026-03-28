@@ -69,6 +69,7 @@ class BrowseWindow:
         self.search_entry.pack(fill="x", pady=(0, 6))
         self.search_entry.insert(0, "")
         self.search_var.trace_add("write", lambda *_: self._schedule_search())
+        self.search_entry.bind("<Return>", lambda e: self.window.focus_set())
 
         # Tag filter pills
         pills_frame = tk.Frame(top, bg=t["entry_bg"])
@@ -333,6 +334,13 @@ class BrowseWindow:
         dialog.transient(self.window)
         dialog.grab_set()
 
+        def close_dialog():
+            try:
+                dialog.grab_release()
+            except tk.TclError:
+                pass
+            dialog.destroy()
+
         # Header: title + timestamp
         header = tk.Frame(dialog, bg=t["bg"])
         header.pack(fill="x", padx=16, pady=(12, 0))
@@ -368,13 +376,13 @@ class BrowseWindow:
                 messagebox.showerror("Error", "Note text cannot be empty.", parent=dialog)
                 return
             if edit_note(self.config.output_file, note, new_text):
-                dialog.destroy()
+                close_dialog()
                 self._load_notes()
             else:
                 messagebox.showerror("Error", "Failed to save changes.", parent=dialog)
 
         tk.Button(
-            btn_frame, text="Cancel", command=dialog.destroy,
+            btn_frame, text="Cancel", command=close_dialog,
             bg=t["entry_bg"], fg=t["fg"], font=(fnt, 10),
             relief="flat", padx=12, pady=4, cursor="hand2",
         ).pack(side="right", padx=(4, 0))
@@ -384,7 +392,7 @@ class BrowseWindow:
             relief="flat", padx=12, pady=4, cursor="hand2",
         ).pack(side="right")
 
-        dialog.bind("<Escape>", lambda e: dialog.destroy())
+        dialog.bind("<Escape>", lambda e: close_dialog())
 
     def _on_delete(self, note: Note):
         """Delete a note with confirmation dialog."""

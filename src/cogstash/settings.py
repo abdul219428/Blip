@@ -69,6 +69,7 @@ class SettingsWindow:
             self.win.transient(parent)
         self.win.lift()
         self.win.focus_force()
+        self.win.bind("<Escape>", lambda e: self.win.destroy())
 
         self._build_tab_bar()
         self.content_frame = tk.Frame(self.win, bg=self.theme["bg"])
@@ -286,25 +287,52 @@ class SettingsWindow:
         self._tag_name_var = tk.StringVar()
         self._tag_emoji_var = tk.StringVar()
         self._tag_color_var = tk.StringVar(value="#ffffff")
+        self._tag_error_label: tk.Label | None = None
 
         tk.Label(self._add_tag_frame, text="Name:", bg=t["entry_bg"], fg=t["fg"],
                  font=(platform_font(), 9)).grid(row=0, column=0, padx=4, pady=2, sticky="w")
-        tk.Entry(self._add_tag_frame, textvariable=self._tag_name_var, bg=t["bg"], fg=t["fg"],
-                 insertbackground=t["fg"], relief="flat", font=(platform_font(), 9),
-                 width=12).grid(row=0, column=1, padx=4, pady=2)
+        self._tag_name_entry = tk.Entry(
+            self._add_tag_frame,
+            textvariable=self._tag_name_var,
+            bg=t["bg"],
+            fg=t["fg"],
+            insertbackground=t["fg"],
+            relief="flat",
+            font=(platform_font(), 9),
+            width=12,
+        )
+        self._tag_name_entry.grid(row=0, column=1, padx=4, pady=2)
         tk.Label(self._add_tag_frame, text="Emoji:", bg=t["entry_bg"], fg=t["fg"],
                  font=(platform_font(), 9)).grid(row=0, column=2, padx=4, pady=2, sticky="w")
-        tk.Entry(self._add_tag_frame, textvariable=self._tag_emoji_var, bg=t["bg"], fg=t["fg"],
-                 insertbackground=t["fg"], relief="flat", font=(platform_font(), 9),
-                 width=4).grid(row=0, column=3, padx=4, pady=2)
+        self._tag_emoji_entry = tk.Entry(
+            self._add_tag_frame,
+            textvariable=self._tag_emoji_var,
+            bg=t["bg"],
+            fg=t["fg"],
+            insertbackground=t["fg"],
+            relief="flat",
+            font=(platform_font(), 9),
+            width=4,
+        )
+        self._tag_emoji_entry.grid(row=0, column=3, padx=4, pady=2)
         tk.Label(self._add_tag_frame, text="Color:", bg=t["entry_bg"], fg=t["fg"],
                  font=(platform_font(), 9)).grid(row=0, column=4, padx=4, pady=2, sticky="w")
-        tk.Entry(self._add_tag_frame, textvariable=self._tag_color_var, bg=t["bg"], fg=t["fg"],
-                 insertbackground=t["fg"], relief="flat", font=(platform_font(), 9),
-                 width=8).grid(row=0, column=5, padx=4, pady=2)
+        self._tag_color_entry = tk.Entry(
+            self._add_tag_frame,
+            textvariable=self._tag_color_var,
+            bg=t["bg"],
+            fg=t["fg"],
+            insertbackground=t["fg"],
+            relief="flat",
+            font=(platform_font(), 9),
+            width=8,
+        )
+        self._tag_color_entry.grid(row=0, column=5, padx=4, pady=2)
         tk.Button(self._add_tag_frame, text="Add", command=self._add_tag,
                   bg=t["accent"], fg=t["bg"], relief="flat",
                   font=(platform_font(), 9)).grid(row=0, column=6, padx=8, pady=2)
+        for entry in (self._tag_name_entry, self._tag_emoji_entry, self._tag_color_entry):
+            entry.bind("<Return>", lambda e: self._add_tag())
 
         # Save button
         tk.Button(frame, text="Save", command=self._save_tags,
@@ -387,6 +415,7 @@ class SettingsWindow:
     def _show_add_tag_form(self):
         """Show the add-tag form."""
         self._add_tag_frame.pack(fill="x", padx=(8, 0), pady=(4, 0))
+        self._tag_name_entry.focus_set()
 
     def _add_tag(self):
         """Add a new custom tag from the form fields."""
@@ -394,7 +423,17 @@ class SettingsWindow:
         name = self._tag_name_var.get().strip().lower()
         emoji = self._tag_emoji_var.get().strip()
         color = self._tag_color_var.get().strip()
+        if self._tag_error_label is not None and self._tag_error_label.winfo_exists():
+            self._tag_error_label.destroy()
         if not name or not emoji or not re.match(r"^#[0-9a-fA-F]{6}$", color):
+            self._tag_error_label = tk.Label(
+                self._add_tag_frame,
+                text="Invalid tag input. Name, emoji, and #RRGGBB color are required.",
+                bg=self.theme["entry_bg"],
+                fg=self.theme["error"],
+                font=(platform_font(), 8),
+            )
+            self._tag_error_label.grid(row=1, column=0, columnspan=7, padx=4, pady=(2, 0), sticky="w")
             return
         if self.config.tags is None:
             self.config.tags = {}
@@ -403,6 +442,7 @@ class SettingsWindow:
         self._tag_emoji_var.set("")
         self._tag_color_var.set("#ffffff")
         self._add_tag_frame.pack_forget()
+        self._tag_error_label = None
         self._render_tags()
 
     def _remove_tag(self, name: str):
@@ -438,6 +478,7 @@ class WizardWindow:
         self.win.grab_set()
         self.win.protocol("WM_DELETE_WINDOW", self._close)
         self.win.focus_force()
+        self.win.bind("<Escape>", lambda e: self._close())
 
         # Content area
         self.content = tk.Frame(self.win, bg=self.theme["bg"])
@@ -682,6 +723,7 @@ class WhatsNewDialog:
         self.win.configure(bg=t["bg"])
         self.win.transient(parent)
         self.win.focus_force()
+        self.win.bind("<Escape>", lambda e: self.win.destroy())
 
         tk.Label(self.win, text="What's New in CogStash", bg=t["bg"], fg=t["fg"],
                  font=(platform_font(), 14, "bold")).pack(pady=(20, 4))

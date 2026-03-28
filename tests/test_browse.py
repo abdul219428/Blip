@@ -195,6 +195,58 @@ def test_browse_edit_empty_text_shows_error(tmp_path, tk_root):
 
 
 @needs_display
+def test_browse_edit_cancel_releases_grab(tmp_path, tk_root):
+    """Cancel closes the edit dialog and releases its modal grab."""
+    f = tmp_path / "cogstash.md"
+    f.write_text("- [2026-03-26 14:30] original text\n", encoding="utf-8")
+
+    from cogstash.app import CogStashConfig
+    from cogstash.browse import BrowseWindow
+
+    config = CogStashConfig(output_file=f)
+    win = BrowseWindow(tk_root, config)
+    note = win._all_notes[0]
+
+    win._on_edit(note)
+    dialog = next(child for child in win.window.winfo_children() if child.winfo_class() == "Toplevel")
+    released = []
+    original_release = dialog.grab_release
+
+    def tracked_release():
+        released.append(True)
+        return original_release()
+
+    dialog.grab_release = tracked_release
+    btn_frame = dialog.winfo_children()[-1]
+    cancel_button = next(child for child in btn_frame.winfo_children() if child.cget("text") == "Cancel")
+    cancel_button.invoke()
+
+    assert released == [True]
+    assert not dialog.winfo_exists()
+    win.window.destroy()
+
+
+@needs_display
+def test_browse_search_enter_moves_focus_from_entry(tmp_path, tk_root):
+    """Pressing Enter in search should exit the entry for keyboard navigation."""
+    f = tmp_path / "cogstash.md"
+    f.write_text("- [2026-03-26 14:30] test note\n", encoding="utf-8")
+
+    from cogstash.app import CogStashConfig
+    from cogstash.browse import BrowseWindow
+
+    config = CogStashConfig(output_file=f)
+    win = BrowseWindow(tk_root, config)
+    win.search_entry.focus_force()
+    win.window.update()
+    win.search_entry.event_generate("<Return>")
+    win.window.update()
+
+    assert win.window.focus_get() == win.window
+    win.window.destroy()
+
+
+@needs_display
 def test_browse_delete_note(tmp_path, tk_root):
     """Delete via delete_note removes note and refreshes cards."""
     f = tmp_path / "cogstash.md"

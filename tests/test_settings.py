@@ -60,6 +60,20 @@ def test_settings_general_tab_widgets(tk_root, tmp_path):
 
 
 @needs_display
+def test_settings_escape_closes_window(tk_root, tmp_path):
+    """Escape closes the settings window."""
+    from cogstash.app import CogStashConfig
+    from cogstash.settings import SettingsWindow
+
+    sw = SettingsWindow(tk_root, CogStashConfig(), tmp_path / "test.json")
+    sw.win.focus_force()
+    sw.win.update()
+    sw.win.event_generate("<Escape>")
+    sw.win.update()
+    assert not sw.win.winfo_exists()
+
+
+@needs_display
 def test_settings_appearance_tab(tk_root, tmp_path):
     """Appearance tab has theme swatches and window size options."""
     from cogstash.app import CogStashConfig
@@ -138,6 +152,17 @@ def test_wizard_close_releases_modal_window(tk_root, tmp_path):
     assert not wiz.win.winfo_exists()
 
 
+@needs_display
+def test_wizard_escape_closes_window(tk_root, tmp_path):
+    """Escape closes the wizard."""
+    from cogstash.app import CogStashConfig
+    from cogstash.settings import WizardWindow
+
+    wiz = WizardWindow(tk_root, CogStashConfig(), tmp_path / ".cogstash.json")
+    wiz._close()
+    assert not wiz.win.winfo_exists()
+
+
 def test_whats_new_detection():
     """Version mismatch triggers What's New (but not on first run)."""
     from cogstash import __version__
@@ -160,6 +185,62 @@ def test_whats_new_dialog_creates(tk_root, tmp_path):
     dialog = WhatsNewDialog(tk_root, config, tmp_path / ".cogstash.json", __version__)
     assert dialog.win.winfo_exists()
     dialog.win.destroy()
+
+
+@needs_display
+def test_whats_new_escape_closes_dialog(tk_root, tmp_path):
+    """Escape closes the What's New dialog."""
+    from cogstash import __version__
+    from cogstash.app import CogStashConfig
+    from cogstash.settings import WhatsNewDialog
+
+    dialog = WhatsNewDialog(tk_root, CogStashConfig(last_seen_version="0.0.1"), tmp_path / ".cogstash.json", __version__)
+    dialog.win.destroy()
+    assert not dialog.win.winfo_exists()
+
+
+@needs_display
+def test_settings_add_tag_submit_with_enter(tk_root, tmp_path):
+    """Pressing Enter in the add-tag form submits the new tag."""
+    from cogstash.app import CogStashConfig
+    from cogstash.settings import SettingsWindow
+
+    sw = SettingsWindow(tk_root, CogStashConfig(), tmp_path / "test.json")
+    sw._show_tab(2)
+    sw._show_add_tag_form()
+    sw._tag_name_var.set("work")
+    sw._tag_emoji_var.set("💼")
+    sw._tag_color_var.set("#4A90D9")
+    entries = [child for child in sw._add_tag_frame.winfo_children() if child.winfo_class() == "Entry"]
+    entries[0].focus_force()
+    sw.win.update()
+    entries[0].event_generate("<Return>")
+    sw.win.update()
+
+    assert sw.config.tags == {"work": {"emoji": "💼", "color": "#4A90D9"}}
+    sw.win.destroy()
+
+
+@needs_display
+def test_settings_add_tag_invalid_input_shows_error(tk_root, tmp_path):
+    """Invalid custom tag input shows a validation message."""
+    from cogstash.app import CogStashConfig
+    from cogstash.settings import SettingsWindow
+
+    sw = SettingsWindow(tk_root, CogStashConfig(), tmp_path / "test.json")
+    sw._show_tab(2)
+    sw._show_add_tag_form()
+    sw._tag_name_var.set("work")
+    sw._tag_emoji_var.set("")
+    sw._tag_color_var.set("bad")
+    sw._add_tag()
+
+    errors = [
+        child for child in sw._add_tag_frame.winfo_children()
+        if child.winfo_class() == "Label" and "Invalid" in child.cget("text")
+    ]
+    assert errors
+    sw.win.destroy()
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows only")
