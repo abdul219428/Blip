@@ -31,7 +31,7 @@ a card-based UI, or query from the command line.
 - [`pynput`](https://pypi.org/project/pynput/) — global hotkey listener
 - [`pystray`](https://pypi.org/project/pystray/) + [`Pillow`](https://pypi.org/project/Pillow/) — system tray icon
 
-All dependencies are installed automatically via `pip`.
+All dependencies are installed automatically via [`uv`](https://docs.astral.sh/uv/).
 
 ---
 
@@ -42,14 +42,18 @@ All dependencies are installed automatically via `pip`.
 git clone https://github.com/abdul219428/CogStash.git
 cd CogStash
 
+# Install uv (if not already installed)
+# Windows: winget install astral-sh.uv
+# macOS/Linux: curl -LsSf https://astral.sh/uv/install.sh | sh
+
 # Install dependencies
-pip install -r requirements.txt
+uv sync
 ```
 
 Or install as a command-line tool:
 
 ```bash
-pip install .
+uv pip install .
 ```
 
 ---
@@ -57,8 +61,10 @@ pip install .
 ## Quick Start
 
 ```bash
-python cogstash.py
-# or, if installed via pip:
+# Run directly with uv
+uv run cogstash
+
+# Or, if installed globally:
 cogstash
 ```
 
@@ -228,6 +234,24 @@ and add your terminal or Python.
 
 **Linux:** Requires an X11 or Wayland session with `tkinter` support.
 Some minimal desktop environments may need `python3-tk` installed separately.
+
+---
+
+## Development
+
+```bash
+# Install with dev dependencies (ruff, mypy, pytest, etc.)
+uv sync --extra dev
+
+# Run tests
+uv run pytest
+
+# Lint
+uv run ruff check src/ tests/
+
+# Type check
+uv run mypy src/
+```
 
 ---
 
