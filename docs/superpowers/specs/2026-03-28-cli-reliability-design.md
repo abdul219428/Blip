@@ -2,237 +2,223 @@
 
 ## Summary
 
-This phase improves packaged Windows reliability for CogStash's command-line behavior while keeping the product simple to ship and use. The design keeps a single installed executable, adds a clearer runtime split between CLI and GUI startup, hardens console output for packaged Windows runs, and completes installer-managed PATH cleanup on uninstall.
+This phase focuses on making packaged Windows CLI commands reliable without splitting CogStash into separate GUI and CLI applications. The installed `cogstash` command should remain a single executable, but startup should branch early into a CLI-only path or the existing GUI/tray path. The same phase also adds an optional installer checkbox to expose CogStash on the user's `PATH`, so installed CLI commands work without manual environment-variable edits.
 
-The immediate user-visible goals are:
-
-- `cogstash` commands from the installed Windows app should run reliably
-- packaged Windows runs should not crash because of missing stream features or console encoding limits
-- the installer's optional PATH task should be reversible on uninstall without removing user-managed PATH entries
-
-## Chosen Direction
-
-Use a **single packaged executable** with an explicit **CLI-only vs GUI-only startup path** decided as early as possible at process start.
-
-This avoids premature packaging complexity from shipping separate GUI and CLI binaries while still creating a clean runtime boundary. The split happens in startup behavior, not in distribution shape.
+The core problem to solve is that packaged CLI commands currently inherit assumptions from the GUI build/runtime path. In practice that means commands like `cogstash stats` can crash when stdout/stderr or TTY detection behaves differently in the installed Windows executable than it does during source-based development.
 
 ## Goals
 
 - Keep one installed Windows executable for both GUI and CLI usage
 - Make packaged CLI commands reliable on Windows
-- Preserve rich CLI/output symbols when the console encoding can support them
-- Gracefully degrade to safe fallback output when the console cannot encode current symbols
-- Ensure installer-managed PATH changes can be removed during uninstall
-- Preserve current GUI behavior and current portable/distribution behavior as much as possible
+- Detect CLI mode before any GUI or tray startup happens
+- Make stream and color handling safe when stdout/stderr is missing, redirected, or non-interactive
+- Add an optional installer checkbox to add CogStash to the user `PATH`
+- Keep uninstall cleanup limited to installer-managed `PATH` changes
 
 ## Non-Goals
 
-- Shipping separate GUI and CLI binaries in this phase
-- Redesigning CLI output formatting wholesale
-- Adding major new CLI commands or scripting features
-- Changing data locations or installer install mode
-- Reworking the release/distribution model beyond what is needed for PATH handling and runtime reliability
+- Splitting CogStash into separate packaged GUI and CLI binaries
+- Adding a major new CLI feature set
+- Redesigning the entire CLI output format
+- Adding shell completions or advanced scripting integrations
+- Changing existing user-data locations
+
+## Chosen Approach
+
+The chosen direction is to keep a single packaged executable and introduce a clean runtime split very early in startup:
+
+- If the process is invoked with no additional arguments, route into the existing GUI/tray startup path.
+- If the process is invoked with additional arguments, treat that as an explicit CLI invocation and route into a CLI-only execution path.
+- Valid CLI commands and flags should then be resolved by the real CLI parser/dispatcher so invalid CLI-like input fails as a CLI error instead of accidentally launching the GUI.
+
+This avoids turning a small desktop app into a two-binary product while still addressing the real problem: packaged CLI execution should not depend on GUI-oriented startup assumptions.
+
+## Windows Packaging Constraint
+
+Keeping one executable means the design must explicitly account for Windows packaging behavior. The packaged executable must remain usable from PowerShell and Command Prompt for CLI commands while still serving as the normal GUI entrypoint when launched without arguments.
+
+This phase therefore assumes:
+
+- the packaged Windows executable remains callable as a CLI process from a shell
+- CLI mode behavior must be validated against the packaged executable itself, not only source execution
+- any unavoidable GUI-versus-console tradeoff in packaging must be treated as an implementation checkpoint, not discovered late in testing
+
+The implementation plan should include an explicit packaging validation step to confirm that the chosen single-executable build still delivers acceptable CLI behavior on Windows.
+
+If that packaging checkpoint fails, this phase should stop and return to design review rather than silently expanding scope mid-implementation. The fallback decision at that point would be whether to accept a packaging compromise or explicitly redesign around split packaged entrypoints in a later phase.
 
 ## Architecture
 
-### Runtime split
+### 1. Early mode detection
 
-Startup should branch as early as possible into one of two modes:
+Preferred ownership:
 
-1. **CLI mode**
-   - Triggered when arguments match CLI command usage
-   - Must not initialize GUI/tray runtime
-   - Must use console-safe output and error handling
+- `__main__.py` should be the primary bootstrap boundary for deciding CLI mode vs GUI mode
+- `__init__.py` should remain thin and avoid becoming a second source of startup truth
 
-2. **GUI mode**
-   - Current normal app startup path
-   - May still emit startup text, but only through the same safe-output path used by CLI mode
+The process entry path should determine whether the invocation is CLI or GUI before initializing Tkinter, tray setup, or other GUI-only behavior.
 
-The codebase remains one application. Shared logic stays shared; only bootstrap/runtime handling becomes more explicit.
+The rule should be simple and stable:
 
-#### CLI vs GUI detection rules
+- no additional arguments -> GUI mode
+- any invocation with additional arguments -> CLI mode, with command validity decided by the real CLI parser
 
-Startup mode should be decided from `sys.argv[1:]` using explicit command recognition:
+This creates one executable with two runtime paths, instead of one path that conditionally tries to unwind GUI assumptions later.
 
-- if the first argument is a recognized CLI command or CLI flag (for example `recent`, `search`, `tags`, `add`, `edit`, `delete`, `export`, `stats`, `config`, or `--version`), enter **CLI mode**
-- if no CLI arguments are present, enter **GUI mode**
-- if arguments are present but do not match a recognized CLI entry pattern, stay in **CLI mode** and let the CLI parser return a normal user-facing error rather than silently falling into GUI startup
+### 2. CLI-only startup path
 
-This keeps behavior script-friendly and avoids surprising mode switches.
+The CLI runtime path should:
 
-### Console-safe output
+- avoid Tkinter and tray initialization entirely
+- call the CLI command dispatcher directly
+- use console-safe stream handling
+- return meaningful exit codes
+- never attempt to recover by opening GUI mode
 
-Packaged Windows runs can fail when the active console encoding cannot represent characters such as `→`, emoji, or other decorative symbols. They can also fail when stream objects do not support interactive assumptions.
+This path should behave the same way whether CogStash is run from source or from the installed Windows executable.
 
-To address this, output should pass through a shared safe-output helper that:
+### 3. Existing GUI path remains unchanged
 
-- writes to the target stream when available
-- avoids assuming `.isatty()` exists
-- preserves current rich text when the stream encoding supports it
-- falls back with replacement-safe text when a `UnicodeEncodeError` occurs
-- behaves consistently for `stdout` and `stderr`
+The current GUI startup path should continue to behave as it does today for tray use, hotkey capture, settings, wizard, and browse flows. This phase is specifically about improving CLI reliability without destabilizing the desktop app.
 
-This applies to CLI commands and any startup/status messages printed during packaged app startup.
+## Runtime Behavior
 
-#### Safe output helper contract
+### Stream handling
 
-The output helper should be a small shared function, not a stream wrapper class. Its behavior should be:
+CLI output should not assume `sys.stdout` or `sys.stderr` is always a normal interactive stream.
 
-- accept the same practical inputs as `print()` for current use (`*args`, `sep`, `end`, optional target stream)
-- default to `sys.stdout` when no stream is provided
-- if the target stream is `None`, do nothing
-- if the target stream exposes `write()`, attempt to write the original text first
-- on `UnicodeEncodeError`, retry using the stream's declared encoding with replacement semantics
-- if the stream encoding is unknown or invalid, fall back to ASCII-safe replacement output
+The CLI layer should use a safe helper for:
 
-Direct console-facing output in `cli.py` and startup status prints should route through this helper instead of raw `print()`.
+- checking whether a stream exists
+- checking whether a stream supports `.isatty()`
+- deciding whether ANSI/color output is appropriate
+- writing fallback plain text when color support is unavailable
 
-### Installer-managed PATH ownership
+The helper should treat missing or non-TTY-like streams as plain text, not as exceptional conditions.
 
-The installer should keep the optional **Add CogStash to PATH** task, but treat PATH removal as an ownership problem rather than a simple string removal.
+CLI mode should derive command recognition from the actual parser/dispatcher rather than maintaining a separate hardcoded list of commands in the bootstrap layer.
 
-The installer should:
+### Error handling
 
-- add the install directory to the **user PATH** only when the user selects the PATH task
-- persist a durable ownership marker only when the installer owns that PATH entry
-- remove only installer-owned PATH entries during uninstall
-- avoid removing a PATH entry that the user added or preserved independently
+CLI mode should classify failures more clearly:
 
-The preferred mechanism is an installer-owned marker stored in the installed app directory, because the uninstaller can inspect it directly and does not need to rely on fragile previous-data state.
+- expected user/input errors -> short readable message, nonzero exit code
+- unexpected internal errors -> readable stderr output and nonzero exit code
+- no GUI fallback, no tray startup, no hidden crash path
 
-#### PATH ownership marker format
+The intent is to make packaged CLI behavior predictable and script-friendly without broadening scope into a full CLI redesign.
 
-The ownership marker should be a small file in the install root:
+### Exit-code behavior
 
-- path: `{app}\.path-owned`
-- contents: a simple truthy marker such as `1`
+Commands should terminate cleanly with explicit exit status:
 
-Behavior rules:
+- `0` for success
+- nonzero for operational or internal failure
 
-- create the file only when the installer successfully adds or confirms installer ownership of the PATH entry
-- remove the file when the installer no longer owns the PATH entry
-- during uninstall, remove the PATH entry only if this marker file exists
+This matters for shell use, release confidence, and future automation support.
 
-This keeps the contract simple and aligns install-time and uninstall-time checks.
+## Installer Integration
 
-## Components
+The Windows installer should gain an optional task such as:
 
-### `src/cogstash/__main__.py` / bootstrap
+- `addtopath` -> add `%LocalAppData%\Programs\CogStash` to the current user's `PATH`
 
-- Make the CLI-vs-GUI split explicit and early
-- Ensure CLI mode avoids GUI initialization paths
-- Route startup output through safe output helpers
+This should be exposed as an installer checkbox rather than enabled silently by default.
 
-### `src/cogstash/cli.py`
+### PATH behavior requirements
 
-- Centralize console-safe writing behavior
-- Audit all commands in `src/cogstash/cli.py` for stream assumptions and direct `print()` calls that can break packaged runs
-- Keep current output style where possible, but make failure-safe fallback behavior the default when encoding is limited
+- modify only the user `PATH`, not the system `PATH`
+- add the resolved install directory actually used by the installer
+- avoid duplicate entries using normalized, case-insensitive Windows path comparison
+- record whether the installer actually inserted the `PATH` entry so uninstall only removes installer-owned changes
+- if the same path already existed before install, leave it untouched on uninstall
+- note in installer UX that newly opened shells may be required before the updated `PATH` is visible everywhere
 
-### `src/cogstash/app.py`
+This keeps environment changes explicit and reversible while solving the real usability issue you encountered.
 
-- Any startup console output should use the same safe-output behavior
-- GUI startup should not crash because the active console cannot encode decorative characters
+## Components Affected
 
-### `installer/windows/CogStash.iss`
-
-- Keep the PATH task optional
-- Persist installer PATH ownership robustly
-- Remove PATH on uninstall only when ownership is proven
-
-## Behavior
-
-### CLI mode behavior
-
-- Runs the requested command without starting tray/GUI infrastructure
-- Uses safe stdout/stderr handling
-- Returns stable exit codes for success vs failure
-- Uses colored/rich output only when supported
-- Falls back to plain-safe output when encoding or stream capability does not support richer output
-
-#### Exit code policy
-
-- success: `0`
-- normal user-facing CLI misuse or validation errors: `1`
-- unexpected internal command failures: `1` unless the existing CLI already uses a more specific nonzero code
-
-This phase does not introduce a large exit-code taxonomy; it standardizes on predictable success vs failure.
-
-### GUI mode behavior
-
-- Keeps current app behavior
-- Uses safe output for any console-facing startup/status messages
-- Does not crash on Windows packaged runs because of console encoding
-
-### PATH behavior
-
-- Installer checkbox controls PATH addition
-- User PATH only, not system PATH
-- Uninstall removes only the installer-managed entry
-- If the user later manages PATH manually, uninstall should not remove user-managed entries accidentally
-
-## Error Handling
-
-- Missing or non-interactive stream features should not crash CLI commands
-- Encoding failures should degrade output, not abort the process
-- User-facing CLI errors should remain short and readable
-- Unexpected internal errors should still surface clearly, but not by triggering unrelated GUI behavior
-- PATH cleanup should be best-effort and ownership-aware
+- `src/cogstash/__main__.py` and/or `src/cogstash/__init__.py`
+  - early CLI-vs-GUI mode split
+- `src/cogstash/cli.py`
+  - safe stream detection, color fallback, robust packaged execution
+- installer script and installer helper
+  - add optional `PATH` task and uninstall cleanup
+- tests
+  - CLI runtime regressions and installer task coverage
 
 ## Testing Strategy
 
-Add regression coverage for:
+### CLI reliability tests
 
-- packaged-like CLI stream conditions (`stdout`/`stderr` missing or lacking interactive helpers)
-- Unicode-safe output fallback when a stream cannot encode current symbols
-- representative commands such as `stats`, `search`, and at least one other common command
-- installer PATH task presence and ownership marker behavior
-- uninstall PATH cleanup behavior based on ownership
+Add focused regression coverage for packaged-like conditions:
 
-Verification should include:
+- stdout/stderr missing or replaced with objects that do not expose `.isatty()`
+- non-interactive output mode falls back to plain text
+- representative commands such as `stats`, `search`, and one additional command complete without crashing
+- `--help` and `--version` work in packaged-like mode
+- invalid commands and invalid flags fail as CLI errors instead of launching GUI mode
+- stderr-only error paths remain readable
+- redirected or piped output remains stable
+- CLI mode bootstrap does not trigger GUI startup
 
-- `pytest`
-- `ruff`
-- `mypy`
-- Windows installer smoke verification for PATH add/remove behavior where feasible
+### Installer tests
 
-Windows-specific expectations for this phase:
+Add or extend installer-level tests to verify:
 
-- packaged CLI reliability should be covered in automated tests using mocked or fake streams that simulate missing interactivity helpers and encoding failures
-- installer PATH add/remove behavior may remain a Windows smoke-verification concern rather than a fully automated end-to-end CI step
+- presence of an optional `PATH` installer task
+- expected install-time behavior for that task
+- uninstall cleanup for the installer-managed `PATH` entry
 
-## Risks and Trade-offs
+### Verification
 
-### Why not split GUI and CLI binaries now?
+This phase should end with the usual repository verification:
 
-Separate packaged entrypoints would likely produce the cleanest Windows console behavior, but for CogStash's current size that adds packaging, installer, PATH, documentation, and support complexity. The single-executable approach is the simpler near-term choice and should be tried first.
+- `uv run pytest tests/ -q`
+- `uv run ruff check src/ tests/`
+- `uv run mypy src/cogstash/`
+- required packaged Windows smoke verification from a real Windows shell context using the packaged executable itself, including `--help` and at least one real command such as `stats` or `search`
 
-### Main risk
+## Trade-Offs
 
-The main risk is incomplete auditing of output paths, where one remaining direct `print()` or stream assumption could still crash packaged runs. The mitigation is a combination of centralized helpers and focused regression coverage.
+### Why not split GUI and CLI into separate packaged binaries?
+
+That approach is viable, but it adds:
+
+- more packaging complexity
+- installer and PATH complexity for two launchers
+- more user-facing documentation and support overhead
+
+For a relatively small app like CogStash, that would likely be premature. A single executable with a clean early runtime split gives most of the reliability benefit with less product and packaging complexity.
+
+### Why add PATH as an installer option instead of default?
+
+Making it optional avoids surprising environment changes while still solving the practical problem for users who want CLI access from any shell.
 
 ## Rollout Scope
 
 ### In scope
 
-- packaged Windows CLI reliability
-- safe output fallback for console encoding problems
-- explicit CLI vs GUI startup split
-- installer PATH add/remove ownership behavior
+- reliable packaged CLI execution on Windows
+- one executable with early CLI/GUI branching
+- safe stream and color handling
+- installer checkbox to add CogStash to user `PATH`
+- uninstall cleanup for installer-managed `PATH` changes
 
 ### Out of scope
 
-- separate GUI/CLI binaries
-- large CLI UX redesign
-- shell completions
-- new installer modes
-- unrelated feature work
+- dual packaged GUI/CLI products
+- broad CLI feature expansion
+- large output redesign
+- shell-completion support
 
-## Expected Outcome
+## Success Criteria
 
-After this phase:
+This phase is successful when:
 
-- installed Windows users can run `cogstash` commands more reliably
-- packaged runs no longer crash on common console encoding limitations
-- the installer can add CogStash to PATH optionally
-- uninstall removes only installer-owned PATH changes
+- installed Windows `cogstash stats` and `cogstash search` no longer crash
+- CLI commands do not initialize GUI/tray behavior
+- color handling degrades safely to plain text when stream capabilities are limited
+- installer can optionally make `cogstash` available via `PATH`
+- uninstall removes only installer-managed `PATH` changes
+- source and packaged CLI behavior are consistent from the user's perspective
