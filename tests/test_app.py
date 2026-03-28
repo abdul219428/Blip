@@ -333,12 +333,9 @@ def test_append_note_to_file_empty(tmp_path):
 
 def test_main_dispatches_version(monkeypatch, capsys):
     """main() handles --version before GUI launch."""
-    import cogstash.app as cogstash_mod
+    import cogstash
 
     monkeypatch.setattr("sys.argv", ["cogstash", "--version"])
-    try:
-        cogstash_mod.main()
-    except SystemExit:
-        pass
+    cogstash.main()
     captured = capsys.readouterr()
-    assert "0." in captured.out or "cogstash" in captured.out.lower()
+    assert "cogstash" in captured.out.lower() and "0." in captured.out
