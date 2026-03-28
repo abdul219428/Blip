@@ -160,10 +160,11 @@ def cmd_add(args, config, ansi_tag=None):
     if args.text:
         text = " ".join(args.text)
     else:
-        if stream_is_interactive(sys.stdin):
+        stdin = sys.stdin
+        if stdin is None or stream_is_interactive(stdin):
             print("Error: provide note text as argument or pipe via stdin.", file=sys.stderr)
             sys.exit(1)
-        text = sys.stdin.read()
+        text = stdin.read()
 
     smart_tags, _ = merge_tags(config)
     ok = append_note_to_file(text, config.output_file, smart_tags)
@@ -320,23 +321,30 @@ def cmd_stats(args, config, ansi_tag=None):
         return
 
     s = compute_stats(notes)
-    use_color = stream_supports_color(sys.stdout)
+    out = sys.stdout if sys.stdout is not None else sys.__stdout__
+    if out is None:
+        return
+
+    use_color = stream_supports_color(out)
 
     def c(code, text):
         return f"{code}{text}{ANSI_RESET}" if use_color else str(text)
+
+    def emit(*args, **kwargs):
+        print(*args, file=out, **kwargs)
 
     accent = "\033[36m"
     bold = ANSI_BOLD
     dim = ANSI_DIM
 
-    print(c(accent, "📊 CogStash Stats"))
-    print(f"📝 Total notes: {c(bold, s['total'])}")
+    emit(c(accent, "📊 CogStash Stats"))
+    emit(f"📝 Total notes: {c(bold, s['total'])}")
 
     if s["first_date"] and s["last_date"]:
         first = s["first_date"].strftime("%Y-%m-%d")
         last = s["last_date"].strftime("%Y-%m-%d")
         span = (s["last_date"].date() - s["first_date"].date()).days
-        print(f"📅 Date range: {c(dim, first)} → {c(dim, last)} {c(dim, f'({span} days)')}")
+        emit(f"📅 Date range: {c(dim, first)} → {c(dim, last)} {c(dim, f'({span} days)')}")
 
     done_pct = round(s["done"] / s["total"] * 100) if s["total"] else 0
     pend_pct = 100 - done_pct
@@ -344,25 +352,25 @@ def cmd_stats(args, config, ansi_tag=None):
     pending_n = s["pending"]
     avg_len = s["avg_length"]
     longest_len = s["longest"]
-    print(f"✅ Done: {c(bold, done_n)} ({done_pct}%) │ ☐ Pending: {c(bold, pending_n)} ({pend_pct}%)")
-    print(f"📏 Avg length: {c(dim, f'{avg_len} chars')} │ Longest: {c(dim, f'{longest_len} chars')}")
+    emit(f"✅ Done: {c(bold, done_n)} ({done_pct}%) │ ☐ Pending: {c(bold, pending_n)} ({pend_pct}%)")
+    emit(f"📏 Avg length: {c(dim, f'{avg_len} chars')} │ Longest: {c(dim, f'{longest_len} chars')}")
 
     # Activity
     tw = s["notes_this_week"]
     lw = s["notes_last_week"]
     apw = s["avg_per_week"]
-    print(f"\n{c(accent, '📈 Activity')}")
-    print(f"  This week: {c(bold, tw)} notes │ Last week: {c(bold, lw)} notes")
+    emit(f"\n{c(accent, '📈 Activity')}")
+    emit(f"  This week: {c(bold, tw)} notes │ Last week: {c(bold, lw)} notes")
     if s["busiest_day"]:
-        print(f"  Most active day: {s['busiest_day']}")
-    print(f"  Avg per week: {c(bold, apw)} notes")
+        emit(f"  Most active day: {s['busiest_day']}")
+    emit(f"  Avg per week: {c(bold, apw)} notes")
 
     # Tags
     tag_counts = s["tag_counts"]
     total = s["total"]
     if tag_counts:
         n_tags = len(tag_counts)
-        print(f"\n{c(accent, '🏷️  Tags')} ({n_tags} unique)")
+        emit(f"\n{c(accent, '🏷️  Tags')} ({n_tags} unique)")
         tag_map = ansi_tag or DEFAULT_ANSI_TAG
         max_count = max(tag_counts.values())
         for tag, count in tag_counts.items():
@@ -372,14 +380,14 @@ def cmd_stats(args, config, ansi_tag=None):
             color = tag_map.get(tag, "")
             reset = ANSI_RESET if (color and use_color) else ""
             tag_label = f"{color}#{tag}{reset}" if use_color else f"#{tag}"
-            print(f"  {tag_label} · {count} notes · {c(dim, f'{bar} {pct}%')}")
+            emit(f"  {tag_label} · {count} notes · {c(dim, f'{bar} {pct}%')}")
 
     # Streaks
     cur_streak = s["current_streak"]
     long_streak = s["longest_streak"]
-    print(f"\n{c(accent, '🔥 Streaks')}")
-    print(f"  Current streak: {c(bold, f'{cur_streak} days')}")
-    print(f"  Longest streak: {c(bold, f'{long_streak} days')}")
+    emit(f"\n{c(accent, '🔥 Streaks')}")
+    emit(f"  Current streak: {c(bold, f'{cur_streak} days')}")
+    emit(f"  Longest streak: {c(bold, f'{long_streak} days')}")
 
 
 VALID_CONFIG_KEYS = {"hotkey", "theme", "window_size", "output_file", "log_file", "tags"}

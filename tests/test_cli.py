@@ -17,6 +17,20 @@ def _make_notes_file(tmp_path):
     return f
 
 
+class _CaptureStream:
+    def __init__(self):
+        self.parts = []
+
+    def write(self, text):
+        self.parts.append(text)
+
+    def flush(self):
+        pass
+
+    def getvalue(self):
+        return "".join(self.parts)
+
+
 def test_format_note_color():
     """ANSI escape codes present when use_color=True."""
     from cogstash.cli import format_note
@@ -278,8 +292,8 @@ def test_cmd_add_stdin(tmp_path, monkeypatch):
 
 
 def test_cmd_add_interactive_stdin_shows_error(monkeypatch, tmp_path, capsys):
-    import argparse
     import pytest
+    import argparse
 
     from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_add
@@ -296,6 +310,24 @@ def test_cmd_add_interactive_stdin_shows_error(monkeypatch, tmp_path, capsys):
 
     assert exc.value.code == 1
     assert "provide note text" in capsys.readouterr().err.lower()
+
+
+def test_cmd_add_missing_stdin_none_shows_error(monkeypatch, tmp_path, capsys):
+    import pytest
+    import argparse
+
+    from cogstash.app import CogStashConfig
+    from cogstash.cli import cmd_add
+
+    config = CogStashConfig(output_file=tmp_path / "cogstash.md")
+    monkeypatch.setattr("sys.stdin", None)
+
+    with pytest.raises(SystemExit) as exc:
+        cmd_add(argparse.Namespace(text=[]), config)
+
+    assert exc.value.code == 1
+    err = capsys.readouterr().err.lower()
+    assert "provide note text" in err
 
 
 def test_cmd_add_smart_tags(tmp_path):
@@ -633,6 +665,47 @@ def test_cmd_stats_done_pending(tmp_path, capsys):
     assert "4" in output  # pending count
 
 
+def test_cmd_stats_handles_none_stdout(monkeypatch, tmp_path):
+    """Stats prints through sys.__stdout__ when sys.stdout is None."""
+    from types import SimpleNamespace
+
+    from cogstash.app import CogStashConfig
+    from cogstash.cli import cmd_stats
+
+    capture = _CaptureStream()
+    f = _make_notes_file(tmp_path)
+    import sys
+
+    monkeypatch.setattr(sys, "stdout", None)
+    monkeypatch.setattr(sys, "__stdout__", capture)
+
+    cmd_stats(SimpleNamespace(), CogStashConfig(output_file=f))
+
+    output = capture.getvalue()
+    assert "Total notes" in output
+    assert "5" in output
+
+
+def test_cmd_search_plain_output_without_isatty(monkeypatch, tmp_path):
+    """Search falls back to plain text when stdout lacks isatty()."""
+    from types import SimpleNamespace
+
+    from cogstash.app import CogStashConfig
+    from cogstash.cli import cmd_search
+
+    capture = _CaptureStream()
+    f = _make_notes_file(tmp_path)
+    import sys
+
+    monkeypatch.setattr(sys, "stdout", capture)
+
+    cmd_search(SimpleNamespace(query="milk", limit=20), CogStashConfig(output_file=f))
+
+    output = capture.getvalue()
+    assert "\033[" not in output
+    assert "buy milk" in output
+
+
 def test_cmd_config_get(tmp_path, capsys):
     """cogstash config get returns current value."""
     config_path = tmp_path / ".cogstash.json"
@@ -743,6 +816,72 @@ def test_version_flag(capsys):
         pass
     captured = capsys.readouterr()
     assert "cogstash" in captured.out.lower() or "0." in captured.out
+
+
+def test_version_flag_without_isatty(monkeypatch):
+    """--version prints even when stdout has no isatty()."""
+    import pytest
+
+    from cogstash.cli import build_parser
+
+    capture = _CaptureStream()
+    import sys
+
+    monkeypatch.setattr(sys, "stdout", capture)
+
+    parser = build_parser()
+    with pytest.raises(SystemExit) as exc:
+        parser.parse_args(["--version"])
+
+    assert exc.value.code == 0
+    output = capture.getvalue()
+    assert "cogstash" in output.lower()
+
+
+def test_invalid_command_exits_as_cli_error(capsys):
+    """Unknown subcommands raise argparse CLI errors."""
+    import pytest
+
+    from cogstash.cli import build_parser
+
+    parser = build_parser()
+    with pytest.raises(SystemExit) as exc:
+        parser.parse_args(["bogus"])
+
+    assert exc.value.code == 2
+    err = capsys.readouterr().err.lower()
+    assert "invalid choice" in err
+
+
+def test_invalid_flag_exits_as_cli_error(capsys):
+    """Unknown flags raise argparse CLI errors."""
+    import pytest
+
+    from cogstash.cli import build_parser
+
+    parser = build_parser()
+    with pytest.raises(SystemExit) as exc:
+        parser.parse_args(["--bogus"])
+
+    assert exc.value.code == 2
+    err = capsys.readouterr().err.lower()
+    assert "unrecognized arguments" in err
+
+
+def test_cli_path_does_not_call_gui_main(monkeypatch):
+    """CLI args should stay in CLI dispatch and avoid GUI main."""
+    import cogstash
+
+    cli_called = []
+    gui_called = []
+    monkeypatch.setattr("cogstash.cli.cli_main", lambda argv: cli_called.append(argv))
+    monkeypatch.setattr("cogstash.app.main", lambda: gui_called.append(True))
+    monkeypatch.setattr("sys.argv", ["cogstash", "stats"])
+
+    cogstash.main()
+
+    assert cli_called == [["stats"]]
+    assert gui_called == []
 
 
 def test_main_no_args_launches_gui(monkeypatch):
