@@ -52,11 +52,10 @@ def test_inno_setup_script_supports_optional_path_task():
     content = iss_path.read_text(encoding="utf-8")
 
     assert 'Name: "addtopath"; Description: "Add CogStash to PATH' in content
-    assert "RegisterPreviousData" in content
-    assert "GetPreviousData" in content
-    assert "SetPreviousData" in content
     assert "EnvAddPath" in content
     assert "EnvRemovePath" in content
+    assert "PathOwnershipMarkerPath" in content
+    assert "PathOwnershipMarkerExists" in content
 
 
 def test_inno_setup_script_tracks_path_ownership_and_duplicates():
@@ -73,7 +72,8 @@ def test_inno_setup_script_tracks_path_ownership_and_duplicates():
     assert "StringChangeEx(Result, '%localappdata%', LowerCase(GetEnv('LOCALAPPDATA')), True);" in content
     assert "StringChangeEx(Result, '%userprofile%', LowerCase(GetEnv('USERPROFILE')), True);" in content
     assert "StringChangeEx" in content
-    assert "Result := PreviouslyOwned;" in content
+    assert "Result := PathOwnershipMarkerExists();" in content
+    assert "Result := StringChangeEx" not in content
 
 
 def test_inno_setup_script_makes_uninstall_path_cleanup_best_effort():
@@ -95,6 +95,19 @@ def test_inno_setup_script_preserves_expandable_path_writes():
     content = iss_path.read_text(encoding="utf-8")
 
     assert "RegWriteExpandStringValue(HKEY_CURRENT_USER, UserEnvironmentSubkey, UserPathValueName, NewPath)" in content
+
+
+def test_inno_setup_script_persists_path_ownership_for_uninstall():
+    """Installer should persist PATH ownership in a marker the uninstaller can inspect."""
+    repo_root = Path(__file__).resolve().parents[1]
+    iss_path = repo_root / "installer" / "windows" / "CogStash.iss"
+
+    content = iss_path.read_text(encoding="utf-8")
+
+    assert "PathOwnershipMarkerPath" in content
+    assert "PathOwnershipMarkerExists" in content
+    assert "WritePathOwnershipMarker" in content
+    assert "RemovePathOwnershipMarker" in content
 
 
 def test_stage_windows_payload_copies_bundle_and_renames_exe(tmp_path):

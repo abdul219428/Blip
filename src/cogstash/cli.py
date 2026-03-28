@@ -45,6 +45,32 @@ def stream_is_interactive(stream: object | None) -> bool:
     return stream_supports_color(stream)
 
 
+def safe_print(*args: object, sep: str = " ", end: str = "\n", file: object | None = None) -> None:
+    """Print text while degrading unencodable characters instead of crashing."""
+    stream = sys.stdout if file is None else file
+    if stream is None:
+        return
+
+    text = sep.join(str(arg) for arg in args) + end
+    write = getattr(stream, "write", None)
+    if not callable(write):
+        raise AttributeError("Output stream does not support write().")
+
+    try:
+        write(text)
+    except UnicodeEncodeError:
+        encoding = getattr(stream, "encoding", None) or "ascii"
+        try:
+            fallback = text.encode(encoding, errors="replace").decode(encoding, errors="replace")
+        except LookupError:
+            fallback = text.encode("ascii", errors="replace").decode("ascii")
+        write(fallback)
+
+    flush = getattr(stream, "flush", None)
+    if callable(flush):
+        flush()
+
+
 def hex_to_ansi(hex_color: str) -> str:
     """Map a hex color to the nearest 8-color ANSI escape code."""
     r = int(hex_color[1:3], 16)
@@ -95,7 +121,7 @@ def cmd_recent(args, config, ansi_tag=None):
     """Show the most recent N notes."""
     notes = parse_notes(config.output_file)
     if not notes:
-        print("No notes found.")
+        safe_print("No notes found.")
         return
 
     use_color = stream_supports_color(sys.stdout)
@@ -103,7 +129,7 @@ def cmd_recent(args, config, ansi_tag=None):
     limited = newest_first[:args.limit] if args.limit > 0 else newest_first
 
     for note in limited:
-        print(format_note(note, use_color, ansi_tag))
+        safe_print(format_note(note, use_color, ansi_tag))
 
 
 def cmd_search(args, config, ansi_tag=None):
@@ -112,7 +138,7 @@ def cmd_search(args, config, ansi_tag=None):
     results = search_notes(notes, args.query)
 
     if not results:
-        print("No matching notes.")
+        safe_print("No matching notes.")
         return
 
     use_color = stream_supports_color(sys.stdout)
@@ -120,7 +146,7 @@ def cmd_search(args, config, ansi_tag=None):
     limited = newest_first[:args.limit] if args.limit > 0 else newest_first
 
     for note in limited:
-        print(format_note(note, use_color, ansi_tag))
+        safe_print(format_note(note, use_color, ansi_tag))
 
 
 def cmd_tags(args, config, ansi_tag=None):
@@ -134,7 +160,7 @@ def cmd_tags(args, config, ansi_tag=None):
             tag_counts[tag] = tag_counts.get(tag, 0) + 1
 
     if not tag_counts:
-        print("No tags found.")
+        safe_print("No tags found.")
         return
 
     use_color = stream_supports_color(sys.stdout)
@@ -147,9 +173,9 @@ def cmd_tags(args, config, ansi_tag=None):
         if use_color:
             color = tag_map.get(tag, "")
             reset = ANSI_RESET if color else ""
-            print(f"  {color}{label:<{max_len}}{reset}  {ANSI_BOLD}{count}{ANSI_RESET} {noun}")
+            safe_print(f"  {color}{label:<{max_len}}{reset}  {ANSI_BOLD}{count}{ANSI_RESET} {noun}")
         else:
-            print(f"  {label:<{max_len}}  {count} {noun}")
+            safe_print(f"  {label:<{max_len}}  {count} {noun}")
 
 
 def cmd_add(args, config, ansi_tag=None):
@@ -162,14 +188,14 @@ def cmd_add(args, config, ansi_tag=None):
     else:
         stdin = sys.stdin
         if stdin is None or stream_is_interactive(stdin):
-            print("Error: provide note text as argument or pipe via stdin.", file=sys.stderr)
+            safe_print("Error: provide note text as argument or pipe via stdin.", file=sys.stderr)
             sys.exit(1)
         text = stdin.read()
 
     smart_tags, _ = merge_tags(config)
     ok = append_note_to_file(text, config.output_file, smart_tags)
     if not ok:
-        print("Error: failed to save note.", file=sys.stderr)
+        safe_print("Error: failed to save note.", file=sys.stderr)
         sys.exit(1)
 
 
@@ -181,21 +207,21 @@ def _find_note(config, number: int | None = None, search: str | None = None,
         for n in notes:
             if n.index == number:
                 return n
-        print(f"Error: note #{number} not found.", file=sys.stderr)
+        safe_print(f"Error: note #{number} not found.", file=sys.stderr)
         return None
     if search is not None:
         results = search_notes(notes, search)
         if len(results) == 1:
             return results[0]
         if len(results) == 0:
-            print(f"Error: no notes match '{search}'.", file=sys.stderr)
+            safe_print(f"Error: no notes match '{search}'.", file=sys.stderr)
             return None
         use_color = stream_supports_color(sys.stdout)
-        print(f"Multiple matches ({len(results)}). Use a note number instead:", file=sys.stderr)
+        safe_print(f"Multiple matches ({len(results)}). Use a note number instead:", file=sys.stderr)
         for n in results:
-            print(f"  {n.index}: {format_note(n, use_color, ansi_tag)}", file=sys.stderr)
+            safe_print(f"  {n.index}: {format_note(n, use_color, ansi_tag)}", file=sys.stderr)
         return None
-    print("Error: provide a note number or --search.", file=sys.stderr)
+    safe_print("Error: provide a note number or --search.", file=sys.stderr)
     return None
 
 
@@ -209,11 +235,11 @@ def cmd_edit(args, config, ansi_tag=None):
     elif text_parts and text_parts[0].isdigit():
         number = int(text_parts.pop(0))
     else:
-        print("Error: provide a note number or --search.", file=sys.stderr)
+        safe_print("Error: provide a note number or --search.", file=sys.stderr)
         sys.exit(1)
 
     if not text_parts:
-        print("Error: no replacement text provided.", file=sys.stderr)
+        safe_print("Error: no replacement text provided.", file=sys.stderr)
         sys.exit(1)
 
     note = _find_note(config, number=number, search=args.search, ansi_tag=ansi_tag)
@@ -222,10 +248,10 @@ def cmd_edit(args, config, ansi_tag=None):
 
     new_text = " ".join(text_parts)
     if not edit_note(config.output_file, note, new_text):
-        print("Error: failed to update note.", file=sys.stderr)
+        safe_print("Error: failed to update note.", file=sys.stderr)
         sys.exit(1)
 
-    print(f"Note {note.index} updated.")
+    safe_print(f"Note {note.index} updated.")
 
 
 def cmd_delete(args, config, ansi_tag=None):
@@ -238,14 +264,14 @@ def cmd_delete(args, config, ansi_tag=None):
         preview = note.text[:60] + ("..." if len(note.text) > 60 else "")
         answer = input(f"Delete note {note.index}: \"{preview}\"? [y/N] ")
         if answer.lower() != "y":
-            print("Cancelled.")
+            safe_print("Cancelled.")
             return
 
     if not delete_note(config.output_file, note):
-        print("Error: failed to delete note.", file=sys.stderr)
+        safe_print("Error: failed to delete note.", file=sys.stderr)
         sys.exit(1)
 
-    print(f"Note {note.index} deleted.")
+    safe_print(f"Note {note.index} deleted.")
 
 
 def cmd_export(args, config, ansi_tag=None):
@@ -255,7 +281,7 @@ def cmd_export(args, config, ansi_tag=None):
 
     notes = parse_notes(config.output_file)
     if not notes:
-        print("No notes to export.")
+        safe_print("No notes to export.")
         return
 
     today = datetime.now().strftime("%Y-%m-%d")
@@ -307,7 +333,7 @@ def cmd_export(args, config, ansi_tag=None):
             lines.append(line + "\n")
         out_path.write_text("".join(lines), encoding="utf-8")
 
-    print(f"Exported {len(notes)} notes → {out_path}")
+    safe_print(f"Exported {len(notes)} notes → {out_path}")
 
 
 
@@ -317,7 +343,7 @@ def cmd_stats(args, config, ansi_tag=None):
 
     notes = parse_notes(config.output_file)
     if not notes:
-        print("No notes found.")
+        safe_print("No notes found.")
         return
 
     s = compute_stats(notes)
@@ -331,7 +357,7 @@ def cmd_stats(args, config, ansi_tag=None):
         return f"{code}{text}{ANSI_RESET}" if use_color else str(text)
 
     def emit(*args, **kwargs):
-        print(*args, file=out, **kwargs)
+        safe_print(*args, file=out, **kwargs)
 
     accent = "\033[36m"
     bold = ANSI_BOLD
@@ -417,67 +443,67 @@ def _config_wizard(config, config_path: Path) -> None:
         except (json_mod.JSONDecodeError, OSError):
             data = {}
 
-    print("⚙️  CogStash Configuration Wizard")
-    print("Press Enter to keep current value\n")
+    safe_print("⚙️  CogStash Configuration Wizard")
+    safe_print("Press Enter to keep current value\n")
 
     # ❶ Hotkey
-    print("❶ Hotkey")
-    print(f"  Current: {config.hotkey}")
+    safe_print("❶ Hotkey")
+    safe_print(f"  Current: {config.hotkey}")
     val = input("  New hotkey: ").strip()
     if val:
         data["hotkey"] = val
 
     # ❷ Theme
-    print(f"\n❷ Theme [{' / '.join(valid_themes)}]")
-    print(f"  Current: {config.theme}")
+    safe_print(f"\n❷ Theme [{' / '.join(valid_themes)}]")
+    safe_print(f"  Current: {config.theme}")
     val = input("  Select theme: ").strip()
     if val:
         if val not in valid_themes:
-            print(f"  ⚠ Unknown theme '{val}', keeping {config.theme}")
+            safe_print(f"  ⚠ Unknown theme '{val}', keeping {config.theme}")
         else:
             data["theme"] = val
 
     # ❸ Window Size
-    print(f"\n❸ Window Size [{' / '.join(valid_sizes)}]")
-    print(f"  Current: {config.window_size}")
+    safe_print(f"\n❸ Window Size [{' / '.join(valid_sizes)}]")
+    safe_print(f"  Current: {config.window_size}")
     val = input("  Select size: ").strip()
     if val:
         if val not in valid_sizes:
-            print(f"  ⚠ Unknown size '{val}', keeping {config.window_size}")
+            safe_print(f"  ⚠ Unknown size '{val}', keeping {config.window_size}")
         else:
             data["window_size"] = val
 
     # ❹ Notes File
-    print("\n❹ Notes File")
-    print(f"  Current: {config.output_file}")
+    safe_print("\n❹ Notes File")
+    safe_print(f"  Current: {config.output_file}")
     val = input("  New path: ").strip()
     if val:
         data["output_file"] = val
 
     # ❺ Log File
-    print("\n❺ Log File")
-    print(f"  Current: {config.log_file}")
+    safe_print("\n❺ Log File")
+    safe_print(f"  Current: {config.log_file}")
     val = input("  New path: ").strip()
     if val:
         data["log_file"] = val
 
     # ❻ Custom Tags
-    print("\n❻ Custom Tags")
+    safe_print("\n❻ Custom Tags")
     if config.tags:
         tags_display = " ".join(f"#{name}" for name in config.tags)
-        print(f"  Current tags: {tags_display}")
+        safe_print(f"  Current tags: {tags_display}")
     else:
-        print("  No custom tags configured")
+        safe_print("  No custom tags configured")
     val = input("  Add/remove tags? (y/N) ").strip().lower()
     if val == "y":
-        print("  Edit tags in ~/.cogstash.json directly (JSON format)")
+        safe_print("  Edit tags in ~/.cogstash.json directly (JSON format)")
 
     # Save
     config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text(
         json_mod.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8"
     )
-    print(f"\n✅ Config saved to {config_path}")
+    safe_print(f"\n✅ Config saved to {config_path}")
 
 
 def cmd_config(args, config, ansi_tag=None, config_path: Path | None = None):
@@ -503,31 +529,31 @@ def cmd_config(args, config, ansi_tag=None, config_path: Path | None = None):
 
     if args.action == "get":
         if args.key not in VALID_CONFIG_KEYS:
-            print(f"Error: unknown key '{args.key}'. Valid: {', '.join(sorted(VALID_CONFIG_KEYS))}", file=sys.stderr)
+            safe_print(f"Error: unknown key '{args.key}'. Valid: {', '.join(sorted(VALID_CONFIG_KEYS))}", file=sys.stderr)
             sys.exit(1)
         value = config_map[args.key]
         if isinstance(value, dict):
-            print(json_mod.dumps(value, indent=2, ensure_ascii=False))
+            safe_print(json_mod.dumps(value, indent=2, ensure_ascii=False))
         else:
-            print(value)
+            safe_print(value)
         return
 
     if args.action == "set":
         if args.key not in VALID_CONFIG_KEYS:
-            print(f"Error: unknown key '{args.key}'. Valid: {', '.join(sorted(VALID_CONFIG_KEYS))}", file=sys.stderr)
+            safe_print(f"Error: unknown key '{args.key}'. Valid: {', '.join(sorted(VALID_CONFIG_KEYS))}", file=sys.stderr)
             sys.exit(1)
         if args.key == "tags":
-            print("Error: use the wizard to manage tags, or edit ~/.cogstash.json directly.", file=sys.stderr)
+            safe_print("Error: use the wizard to manage tags, or edit ~/.cogstash.json directly.", file=sys.stderr)
             sys.exit(1)
 
         # Validate value
         valid_themes = _get_valid_themes()
         valid_sizes = _get_valid_window_sizes()
         if args.key == "theme" and args.value not in valid_themes:
-            print(f"Error: invalid theme '{args.value}'. Valid: {', '.join(valid_themes)}", file=sys.stderr)
+            safe_print(f"Error: invalid theme '{args.value}'. Valid: {', '.join(valid_themes)}", file=sys.stderr)
             sys.exit(1)
         if args.key == "window_size" and args.value not in valid_sizes:
-            print(f"Error: invalid window_size '{args.value}'. Valid: {', '.join(valid_sizes)}", file=sys.stderr)
+            safe_print(f"Error: invalid window_size '{args.value}'. Valid: {', '.join(valid_sizes)}", file=sys.stderr)
             sys.exit(1)
 
         # Read, update, write
@@ -541,7 +567,7 @@ def cmd_config(args, config, ansi_tag=None, config_path: Path | None = None):
         config_path.write_text(
             json_mod.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8"
         )
-        print(f"{args.key} = {args.value}")
+        safe_print(f"{args.key} = {args.value}")
 
 
 def build_parser() -> argparse.ArgumentParser:

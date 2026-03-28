@@ -67,7 +67,6 @@ Type: files; Name: "{userstartup}\CogStash.bat"
 const
   UserEnvironmentSubkey = 'Environment';
   UserPathValueName = 'Path';
-  PathOwnershipKey = 'AddToPathOwned';
   PathTaskName = 'addtopath';
 
 var
@@ -78,13 +77,36 @@ begin
   Result := '@echo off' + #13#10 + 'start "" "' + ExpandConstant('{app}\CogStash.exe') + '"' + #13#10;
 end;
 
+function PathOwnershipMarkerPath(): String;
+begin
+  Result := ExpandConstant('{app}\.path-owned');
+end;
+
+function PathOwnershipMarkerExists(): Boolean;
+begin
+  Result := FileExists(PathOwnershipMarkerPath());
+end;
+
+procedure WritePathOwnershipMarker();
+begin
+  SaveStringToFile(PathOwnershipMarkerPath(), '1', False);
+end;
+
+procedure RemovePathOwnershipMarker();
+begin
+  if PathOwnershipMarkerExists() then
+  begin
+    DeleteFile(PathOwnershipMarkerPath());
+  end;
+end;
+
 function NormalizePathEntry(Value: String): String;
 begin
   Result := Trim(Value);
-  Result := StringChangeEx(Result, '/', '\', True);
+  StringChangeEx(Result, '/', '\', True);
   Result := LowerCase(Result);
-  Result := StringChangeEx(Result, '%localappdata%', LowerCase(GetEnv('LOCALAPPDATA')), True);
-  Result := StringChangeEx(Result, '%userprofile%', LowerCase(GetEnv('USERPROFILE')), True);
+  StringChangeEx(Result, '%localappdata%', LowerCase(GetEnv('LOCALAPPDATA')), True);
+  StringChangeEx(Result, '%userprofile%', LowerCase(GetEnv('USERPROFILE')), True);
   while (Length(Result) > 0) and (Result[Length(Result)] = '\') do
   begin
     Delete(Result, Length(Result), 1);
@@ -184,10 +206,7 @@ function EnvAddPath(Entry: String): Boolean;
 var
   CurrentPath: String;
   NewPath: String;
-  PreviouslyOwned: Boolean;
 begin
-  PreviouslyOwned := GetPreviousData(PathOwnershipKey, '0') = '1';
-
   if not RegQueryStringValue(HKEY_CURRENT_USER, UserEnvironmentSubkey, UserPathValueName, CurrentPath) then
   begin
     CurrentPath := '';
@@ -195,7 +214,7 @@ begin
 
   if PathContainsEntry(CurrentPath, Entry) then
   begin
-    Result := PreviouslyOwned;
+    Result := PathOwnershipMarkerExists();
     Exit;
   end;
 
@@ -244,6 +263,7 @@ begin
   if CurStep = ssPostInstall then
   begin
     AppPath := ExpandConstant('{app}');
+    PathEntryOwned := PathOwnershipMarkerExists();
 
     if WizardIsTaskSelected('startup') then
     begin
@@ -253,29 +273,22 @@ begin
     if WizardIsTaskSelected(PathTaskName) then
     begin
       PathEntryOwned := EnvAddPath(AppPath);
+    end;
+
+    if PathEntryOwned then
+    begin
+      WritePathOwnershipMarker();
     end
     else
     begin
-      PathEntryOwned := GetPreviousData(PathOwnershipKey, '0') = '1';
+      RemovePathOwnershipMarker();
     end;
-  end;
-end;
-
-procedure RegisterPreviousData(PreviousDataKey: Integer);
-begin
-  if PathEntryOwned then
-  begin
-    SetPreviousData(PreviousDataKey, PathOwnershipKey, '1');
-  end
-  else
-  begin
-    SetPreviousData(PreviousDataKey, PathOwnershipKey, '0');
   end;
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
-  if (CurUninstallStep = usUninstall) and (GetPreviousData(PathOwnershipKey, '0') = '1') then
+  if (CurUninstallStep = usUninstall) and PathOwnershipMarkerExists() then
   begin
     EnvRemovePath(ExpandConstant('{app}'));
   end;

@@ -23,12 +23,23 @@ class _CaptureStream:
 
     def write(self, text):
         self.parts.append(text)
+        return len(text)
 
     def flush(self):
         pass
 
     def getvalue(self):
         return "".join(self.parts)
+
+
+class _StrictEncodedStream(_CaptureStream):
+    def __init__(self, encoding: str):
+        super().__init__()
+        self.encoding = encoding
+
+    def write(self, text):
+        text.encode(self.encoding)
+        return super().write(text)
 
 
 def test_format_note_color():
@@ -706,6 +717,48 @@ def test_cmd_search_plain_output_without_isatty(monkeypatch, tmp_path):
     output = capture.getvalue()
     assert "\033[" not in output
     assert "buy milk" in output
+
+
+def test_cmd_stats_replaces_unencodable_chars(monkeypatch, tmp_path):
+    """Stats stays readable when stdout encoding cannot emit emoji."""
+    from types import SimpleNamespace
+
+    from cogstash.app import CogStashConfig
+    from cogstash.cli import cmd_stats
+
+    capture = _StrictEncodedStream("cp1252")
+    f = _make_notes_file(tmp_path)
+    import sys
+
+    monkeypatch.setattr(sys, "stdout", capture)
+
+    cmd_stats(SimpleNamespace(), CogStashConfig(output_file=f))
+
+    output = capture.getvalue()
+    assert "CogStash Stats" in output
+    assert "Total notes" in output
+    assert "📊" not in output
+
+
+def test_cmd_search_replaces_unencodable_note_chars(monkeypatch, tmp_path):
+    """Search should not crash when note text contains characters outside stdout encoding."""
+    from types import SimpleNamespace
+
+    from cogstash.app import CogStashConfig
+    from cogstash.cli import cmd_search
+
+    capture = _StrictEncodedStream("cp1252")
+    f = tmp_path / "cogstash.md"
+    f.write_text("- [2026-03-28 09:00] smile 😀 note\n", encoding="utf-8")
+    import sys
+
+    monkeypatch.setattr(sys, "stdout", capture)
+
+    cmd_search(SimpleNamespace(query="smile", limit=20), CogStashConfig(output_file=f))
+
+    output = capture.getvalue()
+    assert "smile" in output
+    assert "😀" not in output
 
 
 def test_cmd_config_get(tmp_path, capsys):
