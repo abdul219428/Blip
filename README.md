@@ -26,16 +26,36 @@ a card-based UI, or query from the command line.
 
 ## Requirements
 
+**Standalone executable:** None — just download and run.
+
+**From source:**
 - Python 3.9+
 - `tkinter` (included with most Python installations)
 - [`pynput`](https://pypi.org/project/pynput/) — global hotkey listener
 - [`pystray`](https://pypi.org/project/pystray/) + [`Pillow`](https://pypi.org/project/Pillow/) — system tray icon
 
-All dependencies are installed automatically via [`uv`](https://docs.astral.sh/uv/).
+All source dependencies are installed automatically via [`uv`](https://docs.astral.sh/uv/).
 
 ---
 
 ## Installation
+
+### Option 1: Download (no Python required)
+
+Grab the latest release from the [**Releases page**](https://github.com/abdul219428/CogStash/releases):
+
+| Platform | Download |
+|----------|----------|
+| **Windows** | `CogStash-vX.Y.Z-windows.exe` |
+| **macOS** | `CogStash-vX.Y.Z-macos` |
+| **Linux** | `CogStash-vX.Y.Z-linux` |
+
+Just download and run — everything is bundled into a single executable.
+
+> **Tip:** The `.zip` / `.tar.gz` files are onedir bundles (a folder with all files).
+> They start slightly faster but aren't a single portable file.
+
+### Option 2: From source (with uv)
 
 ```bash
 # Clone the repo
@@ -50,22 +70,16 @@ cd CogStash
 uv sync
 ```
 
-Or install as a command-line tool:
-
-```bash
-uv pip install .
-```
-
 ---
 
 ## Quick Start
 
 ```bash
-# Run directly with uv
-uv run cogstash
+# If using the standalone executable:
+./CogStash-vX.Y.Z-windows.exe
 
-# Or, if installed globally:
-cogstash
+# If installed from source with uv:
+uv run cogstash
 ```
 
 CogStash starts in the system tray. Press the hotkey to capture a note:
