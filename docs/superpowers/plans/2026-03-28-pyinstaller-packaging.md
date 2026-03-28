@@ -318,7 +318,7 @@ def convert_icon() -> str | None:
 def run_pyinstaller(*, onefile: bool, debug: bool, icon_path: str | None, version: str) -> None:
     """Run PyInstaller with the given configuration."""
     mode = "onefile" if onefile else "onedir"
-    name = f"CogStash-{version}" if not onefile else f"CogStash-{version}"
+    name = f"CogStash-{version}" if onefile else f"CogStash-{version}-onedir"
 
     cmd = [
         sys.executable, "-m", "PyInstaller",
@@ -511,7 +511,7 @@ jobs:
           - os: macos-latest
             artifact_suffix: macos
             exe_ext: ""
-            archive_cmd: cd dist && tar -czf CogStash-${{ github.ref_name }}-macos.tar.gz CogStash-*-onedir
+            archive_cmd: cd dist && zip -r CogStash-${{ github.ref_name }}-macos.zip CogStash-*-onedir
             shell: bash
           - os: ubuntu-latest
             artifact_suffix: linux
@@ -655,6 +655,6 @@ Check the GitHub Actions "Release" workflow completes successfully and a GitHub 
 - `CogStash-v0.1.0-windows.exe` (onefile)
 - `CogStash-v0.1.0-windows.zip` (onedir)
 - `CogStash-v0.1.0-macos` (onefile)
-- `CogStash-v0.1.0-macos.tar.gz` (onedir)
+- `CogStash-v0.1.0-macos.zip` (onedir)
 - `CogStash-v0.1.0-linux` (onefile)
 - `CogStash-v0.1.0-linux.tar.gz` (onedir)
