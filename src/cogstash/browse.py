@@ -38,6 +38,7 @@ class BrowseWindow:
         self._visible_cards: list[Note] = []
         self._active_tag: str | None = None
         self._card_frames: list[tk.Frame] = []
+        self._context_menu: tk.Menu | None = None
 
         self.window = tk.Toplevel(root)
         self.window.title("CogStash — Browse Notes")
@@ -312,15 +313,33 @@ class BrowseWindow:
 
     def _show_context_menu(self, event, note: Note):
         """Show right-click context menu for a note card."""
+        self._destroy_context_menu()
         menu = tk.Menu(self.window, tearoff=0)
-        menu.add_command(label="✏️ Edit", command=lambda: self._on_edit(note))
-        menu.add_command(label="🗑️ Delete", command=lambda: self._on_delete(note))
+        self._context_menu = menu
+        menu.add_command(label="✏️ Edit", command=lambda: self._run_context_action(self._on_edit, note))
+        menu.add_command(label="🗑️ Delete", command=lambda: self._run_context_action(self._on_delete, note))
         menu.add_separator()
-        menu.add_command(label="📋 Copy text", command=lambda: self._on_copy(note))
+        menu.add_command(label="📋 Copy text", command=lambda: self._run_context_action(self._on_copy, note))
         try:
             menu.tk_popup(event.x_root, event.y_root)
         finally:
-            menu.destroy()
+            menu.grab_release()
+
+    def _run_context_action(self, action, note: Note):
+        """Run a context menu action and clean up the menu afterward."""
+        try:
+            action(note)
+        finally:
+            self._destroy_context_menu()
+
+    def _destroy_context_menu(self):
+        """Destroy the current context menu if it exists."""
+        if self._context_menu is None:
+            return
+        try:
+            self._context_menu.destroy()
+        finally:
+            self._context_menu = None
 
     def _on_edit(self, note: Note):
         """Open themed edit dialog for a note."""

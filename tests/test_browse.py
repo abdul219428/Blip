@@ -105,8 +105,8 @@ def test_browse_context_menu_exists(tmp_path, tk_root):
 
 
 @needs_display
-def test_browse_context_menu_destroyed_after_popup(tmp_path, tk_root):
-    """Temporary context menu is destroyed after popup returns."""
+def test_browse_context_menu_releases_grab_after_popup(tmp_path, tk_root):
+    """Context menu should release popup grab after tk_popup returns."""
     f = tmp_path / "cogstash.md"
     f.write_text("- [2026-03-26 14:30] test note #todo\n", encoding="utf-8")
 
@@ -118,6 +118,7 @@ def test_browse_context_menu_destroyed_after_popup(tmp_path, tk_root):
 
         def __init__(self, *args, **kwargs):
             self.destroyed = False
+            self.grab_released = False
             FakeMenu.last_instance = self
 
         def add_command(self, *args, **kwargs):
@@ -128,6 +129,9 @@ def test_browse_context_menu_destroyed_after_popup(tmp_path, tk_root):
 
         def tk_popup(self, x_root, y_root):
             return None
+
+        def grab_release(self):
+            self.grab_released = True
 
         def destroy(self):
             self.destroyed = True
@@ -141,7 +145,79 @@ def test_browse_context_menu_destroyed_after_popup(tmp_path, tk_root):
         win._show_context_menu(event, note)
 
     assert FakeMenu.last_instance is not None
-    assert FakeMenu.last_instance.destroyed is True
+    assert FakeMenu.last_instance.grab_released is True
+    assert FakeMenu.last_instance.destroyed is False
+    win.window.destroy()
+
+
+@needs_display
+def test_browse_context_menu_commands_remain_callable_after_popup(tmp_path, tk_root):
+    """Context menu actions should still be invocable after tk_popup returns."""
+    f = tmp_path / "cogstash.md"
+    f.write_text("- [2026-03-26 14:30] test note #todo\n", encoding="utf-8")
+
+    from cogstash.app import CogStashConfig
+    from cogstash.browse import BrowseWindow
+
+    class FakeMenu:
+        last_instance = None
+
+        def __init__(self, *args, **kwargs):
+            self.destroyed = False
+            self.commands = {}
+            self.grab_released = False
+            FakeMenu.last_instance = self
+
+        def add_command(self, label, command):
+            self.commands[label] = command
+
+        def add_separator(self):
+            return None
+
+        def tk_popup(self, x_root, y_root):
+            return None
+
+        def grab_release(self):
+            self.grab_released = True
+
+        def destroy(self):
+            self.destroyed = True
+
+        def invoke(self, label):
+            if self.destroyed:
+                raise RuntimeError("menu destroyed before command invocation")
+            self.commands[label]()
+
+    config = CogStashConfig(output_file=f)
+    win = BrowseWindow(tk_root, config)
+    event = SimpleNamespace(x_root=10, y_root=10)
+    note = win._all_notes[0]
+
+    with patch("cogstash.browse.tk.Menu", FakeMenu):
+        with (
+            patch.object(win, "_on_edit") as edit_mock,
+            patch.object(win, "_on_delete") as delete_mock,
+            patch.object(win, "_on_copy") as copy_mock,
+        ):
+            win._show_context_menu(event, note)
+            menu = FakeMenu.last_instance
+            assert menu is not None
+            menu.invoke("✏️ Edit")
+
+            win._show_context_menu(event, note)
+            menu = FakeMenu.last_instance
+            assert menu is not None
+            menu.invoke("🗑️ Delete")
+
+            win._show_context_menu(event, note)
+            menu = FakeMenu.last_instance
+            assert menu is not None
+            menu.invoke("📋 Copy text")
+
+            edit_mock.assert_called_once_with(note)
+            delete_mock.assert_called_once_with(note)
+            copy_mock.assert_called_once_with(note)
+            assert FakeMenu.last_instance.destroyed is True
     win.window.destroy()
 
 

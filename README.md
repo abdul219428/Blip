@@ -46,14 +46,21 @@ Grab the latest release from the [**Releases page**](https://github.com/abdul219
 
 | Platform | Download |
 |----------|----------|
-| **Windows** | `CogStash-vX.Y.Z-windows.exe` |
+| **Windows** | `CogStash-vX.Y.Z-setup.exe` or `CogStash-vX.Y.Z-windows.exe` |
 | **macOS** | `CogStash-vX.Y.Z-macos` |
 | **Linux** | `CogStash-vX.Y.Z-linux` |
 
-Just download and run — everything is bundled into a single executable.
+On Windows you can now choose between:
+
+- `CogStash-vX.Y.Z-setup.exe` — installs CogStash to `%LocalAppData%\Programs\CogStash`, adds an Apps & Features entry, creates a Start Menu shortcut, and can optionally enable launch at sign-in during setup.
+- `CogStash-vX.Y.Z-windows.exe` — portable onefile executable; download and run without installing.
 
 > **Tip:** The `.zip` / `.tar.gz` files are onedir bundles (a folder with all files).
 > They start slightly faster but aren't a single portable file.
+
+> **Uninstall note (Windows installer):** uninstall removes the installed app, shortcuts,
+> uninstall entry, and installer-managed startup entry, but keeps your personal notes,
+> config, and log files by default.
 
 ### Option 2: From source (with uv)
 
@@ -75,8 +82,11 @@ uv sync
 ## Quick Start
 
 ```bash
-# If using the standalone executable:
+# If using the Windows portable executable:
 ./CogStash-vX.Y.Z-windows.exe
+
+# If using the Windows installer:
+# Launch from the Start Menu after setup
 
 # If installed from source with uv:
 uv run cogstash

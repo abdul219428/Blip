@@ -51,12 +51,22 @@ jobs:
         with:
           python-version: "3.13"
       - run: uv sync --extra dev
+      - name: Install Inno Setup
+        if: matrix.os == 'windows-latest'
+        run: choco install innosetup --no-progress -y
+        shell: pwsh
       - name: Build executables
         run: uv run python scripts/build.py
+      - name: Build Windows installer
+        if: matrix.os == 'windows-latest'
+        run: |
+          $compiler = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          uv run python scripts/build_installer.py --compiler $compiler
+        shell: pwsh
       - name: Smoke test onefile (Windows)
         if: matrix.os == 'windows-latest'
         run: |
-          $binary = Get-ChildItem dist/CogStash-*${{ matrix.exe_ext }} -File | Where-Object { $_.Name -notmatch 'onedir' } | Select-Object -First 1
+          $binary = Get-ChildItem dist/CogStash-*${{ matrix.exe_ext }} -File | Where-Object { $_.Name -notmatch 'onedir|setup' } | Select-Object -First 1
           & $binary.FullName --version
         shell: pwsh
       - name: Smoke test onefile (Unix)
@@ -86,7 +96,7 @@ jobs:
           ext = "${{ matrix.exe_ext }}"
           pattern = f"dist/CogStash-*{ext}"
           for f in glob.glob(pattern):
-              if "onedir" not in f and not f.endswith((".zip", ".tar.gz")):
+              if "onedir" not in f and "setup" not in f and not f.endswith((".zip", ".tar.gz")):
                   target = f"dist/CogStash-{version}-{suffix}{ext}"
                   os.rename(f, target)
                   break
@@ -97,6 +107,12 @@ jobs:
           name: cogstash-${{ matrix.artifact_suffix }}
           path: |
             dist/CogStash-*-${{ matrix.artifact_suffix }}*
+      - name: Upload Windows installer
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v5
+        with:
+          name: cogstash-windows-installer
+          path: dist/CogStash-v*-setup.exe
 
   release:
     needs: build

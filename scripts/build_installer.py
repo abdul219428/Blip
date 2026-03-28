@@ -1,0 +1,141 @@
+#!/usr/bin/env python3
+"""Build the Windows CogStash installer from a staged PyInstaller bundle."""
+
+from __future__ import annotations
+
+import argparse
+import re
+import shutil
+import subprocess
+from importlib.metadata import version as package_version
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+BUILD_DIR = ROOT / "build"
+DIST_DIR = ROOT / "dist"
+ISS_PATH = ROOT / "installer" / "windows" / "CogStash.iss"
+STAGED_APP_DIRNAME = "CogStash"
+STAGED_EXE_NAME = "CogStash.exe"
+
+
+def get_version() -> str:
+    """Get the installed package version."""
+    return package_version("cogstash")
+
+
+def get_onedir_dir_name(version: str) -> str:
+    """Return the expected versioned onedir folder name."""
+    return f"CogStash-{version}-onedir"
+
+
+def get_onedir_exe_name(version: str) -> str:
+    """Return the expected versioned onedir executable name."""
+    return f"{get_onedir_dir_name(version)}.exe"
+
+
+def make_version_info_version(version: str) -> str:
+    """Convert a package version string into a numeric Windows file version."""
+    parts = re.findall(r"\d+", version)
+    numeric_parts = parts[:4]
+    while len(numeric_parts) < 4:
+        numeric_parts.append("0")
+    return ".".join(numeric_parts)
+
+
+def find_windows_onedir_bundle(dist_dir: Path, version: str) -> Path:
+    """Locate the Windows onedir bundle created by scripts/build.py."""
+    bundle_dir = dist_dir / get_onedir_dir_name(version)
+    if not bundle_dir.is_dir():
+        raise FileNotFoundError(f"Windows onedir bundle not found: {bundle_dir}")
+
+    bundle_exe = bundle_dir / get_onedir_exe_name(version)
+    if not bundle_exe.is_file():
+        raise FileNotFoundError(f"Expected bundle executable not found: {bundle_exe}")
+
+    return bundle_dir
+
+
+def stage_windows_payload(*, bundle_dir: Path, version: str, staging_root: Path) -> Path:
+    """Copy the versioned onedir bundle into a versionless installer payload."""
+    staged_dir = staging_root / STAGED_APP_DIRNAME
+    if staged_dir.exists():
+        shutil.rmtree(staged_dir)
+
+    staging_root.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(bundle_dir, staged_dir)
+
+    versioned_exe = staged_dir / get_onedir_exe_name(version)
+    staged_exe = staged_dir / STAGED_EXE_NAME
+    versioned_exe.rename(staged_exe)
+    return staged_dir
+
+
+def compile_installer(*, compiler: str, iss_path: Path, version: str, source_dir: Path, output_dir: Path) -> None:
+    """Invoke Inno Setup with the staged payload and output directory."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    version_info_version = make_version_info_version(version)
+
+    cmd = [
+        compiler,
+        f"/DAppVersion={version}",
+        f"/DVersionInfoVersion={version_info_version}",
+        f"/DSourceDir={source_dir}",
+        f"/DOutputDir={output_dir}",
+        str(iss_path),
+    ]
+    subprocess.run(cmd, check=True)
+
+
+def build_installer(
+    *,
+    version: str,
+    dist_dir: Path = DIST_DIR,
+    build_dir: Path = BUILD_DIR,
+    iss_path: Path = ISS_PATH,
+    compiler: str = "iscc",
+    output_dir: Path = DIST_DIR,
+) -> Path:
+    """Stage the onedir payload and compile the Windows installer."""
+    if not iss_path.is_file():
+        raise FileNotFoundError(f"Inno Setup script not found: {iss_path}")
+
+    bundle_dir = find_windows_onedir_bundle(dist_dir=dist_dir, version=version)
+    staged_dir = stage_windows_payload(
+        bundle_dir=bundle_dir,
+        version=version,
+        staging_root=build_dir / "installer",
+    )
+    compile_installer(
+        compiler=compiler,
+        iss_path=iss_path,
+        version=version,
+        source_dir=staged_dir,
+        output_dir=output_dir,
+    )
+    return staged_dir
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Build the CogStash Windows installer")
+    parser.add_argument("--version", default=get_version(), help="Package version to package into the installer")
+    parser.add_argument("--dist-dir", type=Path, default=DIST_DIR, help="Directory containing PyInstaller outputs")
+    parser.add_argument("--build-dir", type=Path, default=BUILD_DIR, help="Directory used for staged installer files")
+    parser.add_argument("--iss-path", type=Path, default=ISS_PATH, help="Path to the Inno Setup .iss file")
+    parser.add_argument("--compiler", default="iscc", help="Inno Setup compiler executable")
+    parser.add_argument("--output-dir", type=Path, default=DIST_DIR, help="Directory for the final setup executable")
+    args = parser.parse_args()
+
+    staged_dir = build_installer(
+        version=args.version,
+        dist_dir=args.dist_dir,
+        build_dir=args.build_dir,
+        iss_path=args.iss_path,
+        compiler=args.compiler,
+        output_dir=args.output_dir,
+    )
+    print(f"Staged installer payload: {staged_dir}")
+    print(f"Installer output directory: {args.output_dir}")
+
+
+if __name__ == "__main__":
+    main()
