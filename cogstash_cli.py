@@ -292,6 +292,232 @@ def cmd_export(args, config, ansi_tag=None):
 
 
 
+def cmd_stats(args, config, ansi_tag=None):
+    """Display extended note statistics."""
+    from cogstash_search import compute_stats
+
+    notes = parse_notes(config.output_file)
+    if not notes:
+        print("No notes found.")
+        return
+
+    s = compute_stats(notes)
+    use_color = sys.stdout.isatty()
+
+    def c(code, text):
+        return f"{code}{text}{ANSI_RESET}" if use_color else str(text)
+
+    accent = "\033[36m"
+    bold = ANSI_BOLD
+    dim = ANSI_DIM
+
+    print(c(accent, "📊 CogStash Stats"))
+    print(f"📝 Total notes: {c(bold, s['total'])}")
+
+    if s["first_date"] and s["last_date"]:
+        first = s["first_date"].strftime("%Y-%m-%d")
+        last = s["last_date"].strftime("%Y-%m-%d")
+        span = (s["last_date"].date() - s["first_date"].date()).days
+        print(f"📅 Date range: {c(dim, first)} → {c(dim, last)} {c(dim, f'({span} days)')}")
+
+    done_pct = round(s["done"] / s["total"] * 100) if s["total"] else 0
+    pend_pct = 100 - done_pct
+    done_n = s["done"]
+    pending_n = s["pending"]
+    avg_len = s["avg_length"]
+    longest_len = s["longest"]
+    print(f"✅ Done: {c(bold, done_n)} ({done_pct}%) │ ☐ Pending: {c(bold, pending_n)} ({pend_pct}%)")
+    print(f"📏 Avg length: {c(dim, f'{avg_len} chars')} │ Longest: {c(dim, f'{longest_len} chars')}")
+
+    # Activity
+    tw = s["notes_this_week"]
+    lw = s["notes_last_week"]
+    apw = s["avg_per_week"]
+    print(f"\n{c(accent, '📈 Activity')}")
+    print(f"  This week: {c(bold, tw)} notes │ Last week: {c(bold, lw)} notes")
+    if s["busiest_day"]:
+        print(f"  Most active day: {s['busiest_day']}")
+    print(f"  Avg per week: {c(bold, apw)} notes")
+
+    # Tags
+    tag_counts = s["tag_counts"]
+    total = s["total"]
+    if tag_counts:
+        n_tags = len(tag_counts)
+        print(f"\n{c(accent, '🏷️  Tags')} ({n_tags} unique)")
+        tag_map = ansi_tag or DEFAULT_ANSI_TAG
+        max_count = max(tag_counts.values())
+        for tag, count in tag_counts.items():
+            bar_len = round(count / max_count * 10)
+            bar = "█" * bar_len + "░" * (10 - bar_len)
+            pct = round(count / total * 100)
+            color = tag_map.get(tag, "")
+            reset = ANSI_RESET if (color and use_color) else ""
+            tag_label = f"{color}#{tag}{reset}" if use_color else f"#{tag}"
+            print(f"  {tag_label} · {count} notes · {c(dim, f'{bar} {pct}%')}")
+
+    # Streaks
+    cur_streak = s["current_streak"]
+    long_streak = s["longest_streak"]
+    print(f"\n{c(accent, '🔥 Streaks')}")
+    print(f"  Current streak: {c(bold, f'{cur_streak} days')}")
+    print(f"  Longest streak: {c(bold, f'{long_streak} days')}")
+
+
+VALID_CONFIG_KEYS = {"hotkey", "theme", "window_size", "output_file", "log_file", "tags"}
+
+
+def _get_valid_themes() -> list[str]:
+    from cogstash import THEMES
+    return list(THEMES.keys())
+
+
+def _get_valid_window_sizes() -> list[str]:
+    from cogstash import WINDOW_SIZES
+    return list(WINDOW_SIZES.keys())
+
+
+def _config_wizard(config, config_path: Path) -> None:
+    """Interactive configuration wizard — walks through all settings."""
+    import json as json_mod
+
+    valid_themes = _get_valid_themes()
+    valid_sizes = _get_valid_window_sizes()
+
+    data = {}
+    if config_path.exists():
+        try:
+            data = json_mod.loads(config_path.read_text(encoding="utf-8"))
+        except (json_mod.JSONDecodeError, OSError):
+            data = {}
+
+    print(f"⚙️  CogStash Configuration Wizard")
+    print(f"Press Enter to keep current value\n")
+
+    # ❶ Hotkey
+    print(f"❶ Hotkey")
+    print(f"  Current: {config.hotkey}")
+    val = input("  New hotkey: ").strip()
+    if val:
+        data["hotkey"] = val
+
+    # ❷ Theme
+    print(f"\n❷ Theme [{' / '.join(valid_themes)}]")
+    print(f"  Current: {config.theme}")
+    val = input("  Select theme: ").strip()
+    if val:
+        if val not in valid_themes:
+            print(f"  ⚠ Unknown theme '{val}', keeping {config.theme}")
+        else:
+            data["theme"] = val
+
+    # ❸ Window Size
+    print(f"\n❸ Window Size [{' / '.join(valid_sizes)}]")
+    print(f"  Current: {config.window_size}")
+    val = input("  Select size: ").strip()
+    if val:
+        if val not in valid_sizes:
+            print(f"  ⚠ Unknown size '{val}', keeping {config.window_size}")
+        else:
+            data["window_size"] = val
+
+    # ❹ Notes File
+    print(f"\n❹ Notes File")
+    print(f"  Current: {config.output_file}")
+    val = input("  New path: ").strip()
+    if val:
+        data["output_file"] = val
+
+    # ❺ Log File
+    print(f"\n❺ Log File")
+    print(f"  Current: {config.log_file}")
+    val = input("  New path: ").strip()
+    if val:
+        data["log_file"] = val
+
+    # ❻ Custom Tags
+    print(f"\n❻ Custom Tags")
+    if config.tags:
+        tags_display = " ".join(f"#{name}" for name in config.tags)
+        print(f"  Current tags: {tags_display}")
+    else:
+        print("  No custom tags configured")
+    val = input("  Add/remove tags? (y/N) ").strip().lower()
+    if val == "y":
+        print("  Edit tags in ~/.cogstash.json directly (JSON format)")
+
+    # Save
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(
+        json_mod.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+    print(f"\n✅ Config saved to {config_path}")
+
+
+def cmd_config(args, config, ansi_tag=None, config_path: Path | None = None):
+    """View or modify CogStash configuration."""
+    import json as json_mod
+
+    if config_path is None:
+        config_path = Path.home() / ".cogstash.json"
+
+    if args.action is None:
+        _config_wizard(config, config_path)
+        return
+
+    # Map config key to current values
+    config_map = {
+        "hotkey": config.hotkey,
+        "theme": config.theme,
+        "window_size": config.window_size,
+        "output_file": str(config.output_file),
+        "log_file": str(config.log_file),
+        "tags": config.tags,
+    }
+
+    if args.action == "get":
+        if args.key not in VALID_CONFIG_KEYS:
+            print(f"Error: unknown key '{args.key}'. Valid: {', '.join(sorted(VALID_CONFIG_KEYS))}", file=sys.stderr)
+            sys.exit(1)
+        value = config_map[args.key]
+        if isinstance(value, dict):
+            print(json_mod.dumps(value, indent=2, ensure_ascii=False))
+        else:
+            print(value)
+        return
+
+    if args.action == "set":
+        if args.key not in VALID_CONFIG_KEYS:
+            print(f"Error: unknown key '{args.key}'. Valid: {', '.join(sorted(VALID_CONFIG_KEYS))}", file=sys.stderr)
+            sys.exit(1)
+        if args.key == "tags":
+            print("Error: use the wizard to manage tags, or edit ~/.cogstash.json directly.", file=sys.stderr)
+            sys.exit(1)
+
+        # Validate value
+        valid_themes = _get_valid_themes()
+        valid_sizes = _get_valid_window_sizes()
+        if args.key == "theme" and args.value not in valid_themes:
+            print(f"Error: invalid theme '{args.value}'. Valid: {', '.join(valid_themes)}", file=sys.stderr)
+            sys.exit(1)
+        if args.key == "window_size" and args.value not in valid_sizes:
+            print(f"Error: invalid window_size '{args.value}'. Valid: {', '.join(valid_sizes)}", file=sys.stderr)
+            sys.exit(1)
+
+        # Read, update, write
+        data = {}
+        if config_path.exists():
+            try:
+                data = json_mod.loads(config_path.read_text(encoding="utf-8"))
+            except (json_mod.JSONDecodeError, OSError):
+                data = {}
+        data[args.key] = args.value
+        config_path.write_text(
+            json_mod.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+        print(f"{args.key} = {args.value}")
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI argument parser with subcommands."""
     parser = argparse.ArgumentParser(
@@ -342,6 +568,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_export.add_argument("--output", "-o", help="Output file path (default: auto-named)")
     p_export.set_defaults(func=cmd_export)
+
+    # stats
+    p_stats = sub.add_parser("stats", help="Show note statistics")
+    p_stats.set_defaults(func=cmd_stats)
+
+    # config
+    p_config = sub.add_parser("config", help="View or set configuration")
+    p_config.add_argument("action", nargs="?", choices=["get", "set"], default=None,
+                          help="Action: get or set (omit for wizard)")
+    p_config.add_argument("key", nargs="?", help="Config key")
+    p_config.add_argument("value", nargs="?", help="New value (for set)")
+    p_config.set_defaults(func=cmd_config)
 
     return parser
 

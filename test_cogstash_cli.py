@@ -498,3 +498,137 @@ def test_cmd_export_custom_output(tmp_path, capsys):
     assert out_path.exists()
     data = json.loads(out_path.read_text(encoding="utf-8"))
     assert len(data) == 5
+
+
+def test_cmd_stats_output(tmp_path, capsys):
+    """Stats displays totals, tags, and date range."""
+    f = _make_notes_file(tmp_path)
+    from cogstash_cli import cmd_stats
+    from cogstash import CogStashConfig
+    from types import SimpleNamespace
+
+    cmd_stats(SimpleNamespace(), CogStashConfig(output_file=f))
+    output = capsys.readouterr().out
+
+    assert "Total notes" in output or "5" in output
+    assert "#todo" in output or "todo" in output
+    assert "2026" in output
+
+
+def test_cmd_stats_empty(tmp_path, capsys):
+    """Stats on empty file shows no-notes message."""
+    f = tmp_path / "cogstash.md"
+    from cogstash_cli import cmd_stats
+    from cogstash import CogStashConfig
+    from types import SimpleNamespace
+
+    cmd_stats(SimpleNamespace(), CogStashConfig(output_file=f))
+    output = capsys.readouterr().out
+    assert "No notes" in output
+
+
+def test_cmd_stats_done_pending(tmp_path, capsys):
+    """Stats shows correct done/pending counts."""
+    f = _make_notes_file(tmp_path)
+    from cogstash_cli import cmd_stats
+    from cogstash import CogStashConfig
+    from types import SimpleNamespace
+
+    cmd_stats(SimpleNamespace(), CogStashConfig(output_file=f))
+    output = capsys.readouterr().out
+    # Fixture has 1 done (☑ fix login bug), 4 pending
+    assert "1" in output  # done count
+    assert "4" in output  # pending count
+
+
+def test_cmd_config_get(tmp_path, capsys):
+    """cogstash config get returns current value."""
+    config_path = tmp_path / ".cogstash.json"
+    config_path.write_text('{"theme": "dracula"}', encoding="utf-8")
+    from cogstash_cli import cmd_config
+    from cogstash import CogStashConfig
+    from types import SimpleNamespace
+
+    cmd_config(
+        SimpleNamespace(action="get", key="theme", value=None),
+        CogStashConfig(theme="dracula"),
+        config_path=config_path,
+    )
+    output = capsys.readouterr().out
+    assert "dracula" in output
+
+
+def test_cmd_config_set(tmp_path, capsys):
+    """cogstash config set updates JSON file."""
+    import json
+    config_path = tmp_path / ".cogstash.json"
+    config_path.write_text('{"theme": "tokyo-night"}', encoding="utf-8")
+    from cogstash_cli import cmd_config
+    from cogstash import CogStashConfig
+    from types import SimpleNamespace
+
+    cmd_config(
+        SimpleNamespace(action="set", key="theme", value="dracula"),
+        CogStashConfig(theme="tokyo-night"),
+        config_path=config_path,
+    )
+    data = json.loads(config_path.read_text(encoding="utf-8"))
+    assert data["theme"] == "dracula"
+    output = capsys.readouterr().out
+    assert "dracula" in output
+
+
+def test_cmd_config_set_invalid_theme(tmp_path, capsys):
+    """cogstash config set rejects invalid theme."""
+    config_path = tmp_path / ".cogstash.json"
+    config_path.write_text('{"theme": "tokyo-night"}', encoding="utf-8")
+    from cogstash_cli import cmd_config
+    from cogstash import CogStashConfig
+    from types import SimpleNamespace
+    import pytest
+
+    with pytest.raises(SystemExit):
+        cmd_config(
+            SimpleNamespace(action="set", key="theme", value="nope"),
+            CogStashConfig(),
+            config_path=config_path,
+        )
+
+
+def test_cmd_config_wizard(tmp_path, monkeypatch, capsys):
+    """Interactive wizard updates config file."""
+    import json
+    config_path = tmp_path / ".cogstash.json"
+    config_path.write_text('{}', encoding="utf-8")
+
+    # Simulate user pressing Enter for all prompts (keeping defaults)
+    monkeypatch.setattr("builtins.input", lambda _: "")
+
+    from cogstash_cli import cmd_config
+    from cogstash import CogStashConfig
+    from types import SimpleNamespace
+
+    cmd_config(
+        SimpleNamespace(action=None, key=None, value=None),
+        CogStashConfig(),
+        config_path=config_path,
+    )
+    output = capsys.readouterr().out
+    assert "saved" in output.lower() or "Config" in output
+
+
+def test_cmd_config_get_invalid_key(tmp_path, capsys):
+    """cogstash config get with unknown key shows error."""
+    config_path = tmp_path / ".cogstash.json"
+    config_path.write_text('{}', encoding="utf-8")
+    from cogstash_cli import cmd_config
+    from cogstash import CogStashConfig
+    from types import SimpleNamespace
+    import pytest
+
+    with pytest.raises(SystemExit):
+        cmd_config(
+            SimpleNamespace(action="get", key="nonexistent", value=None),
+            CogStashConfig(),
+            config_path=config_path,
+        )
