@@ -682,3 +682,42 @@ def test_version_flag(capsys):
         pass
     captured = capsys.readouterr()
     assert "cogstash" in captured.out.lower() or "0." in captured.out
+
+
+def test_main_no_args_launches_gui(monkeypatch):
+    import cogstash
+
+    launched = []
+    monkeypatch.setattr("cogstash.app.main", lambda: launched.append("gui"))
+    monkeypatch.setattr("sys.argv", ["cogstash"])
+
+    cogstash.main()
+
+    assert launched == ["gui"]
+
+
+def test_main_with_cli_args_calls_cli_main(monkeypatch):
+    import cogstash
+
+    called = []
+    monkeypatch.setattr("cogstash.cli.cli_main", lambda argv: called.append(argv))
+    monkeypatch.setattr("sys.argv", ["cogstash", "stats"])
+
+    cogstash.main()
+
+    assert called == [["stats"]]
+
+
+def test_main_invalid_cli_arg_stays_in_cli_mode(monkeypatch):
+    import cogstash
+
+    called = []
+    gui_called = []
+    monkeypatch.setattr("cogstash.cli.cli_main", lambda argv: called.append(argv))
+    monkeypatch.setattr("cogstash.app.main", lambda: gui_called.append(True))
+    monkeypatch.setattr("sys.argv", ["cogstash", "statz"])
+
+    cogstash.main()
+
+    assert called == [["statz"]]
+    assert gui_called == []
