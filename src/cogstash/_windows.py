@@ -22,7 +22,7 @@ class _WindowsMutexGuard:
         if self.handle:
             import ctypes
 
-            kernel32: Any = ctypes.windll.kernel32
+            kernel32: Any = cast(Any, ctypes).windll.kernel32
             kernel32.CloseHandle(self.handle)
             self.handle = 0
 
@@ -40,7 +40,7 @@ def prepare_windows_cli_console() -> None:
 
     import ctypes
 
-    kernel32: Any = ctypes.windll.kernel32
+    kernel32: Any = cast(Any, ctypes).windll.kernel32
     attached = kernel32.AttachConsole(_ATTACH_PARENT_PROCESS)
     if not attached and kernel32.GetLastError() != _ERROR_ACCESS_DENIED:
         return
@@ -60,7 +60,7 @@ def acquire_single_instance(name: str = WINDOWS_MUTEX_NAME):
 
     import ctypes
 
-    kernel32: Any = ctypes.windll.kernel32
+    kernel32: Any = cast(Any, ctypes).windll.kernel32
     handle = kernel32.CreateMutexW(None, False, name)
     if not handle:
         raise OSError("Could not create CogStash single-instance mutex.")
