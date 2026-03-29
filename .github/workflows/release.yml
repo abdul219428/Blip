@@ -22,7 +22,7 @@ jobs:
       - run: uv run ruff check src/ tests/
       - run: uv run mypy src/cogstash/
       - name: Run tests
-        run: xvfb-run uv run pytest tests/ -v
+        run: xvfb-run uv run pytest tests/ -v --timeout=30
 
   build:
     needs: validate

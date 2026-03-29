@@ -441,7 +441,8 @@ def test_app_main_refuses_duplicate_instance_before_startup(monkeypatch, tmp_pat
 
     original_handlers = app_mod.logger.handlers[:]
     try:
-        app_mod.main()
+        with patch("cogstash.app.messagebox.showinfo"):
+            app_mod.main()
     finally:
         for handler in [h for h in app_mod.logger.handlers[:] if h not in original_handlers]:
             app_mod.logger.removeHandler(handler)
