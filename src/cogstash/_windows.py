@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from typing import TextIO, cast
+from typing import TextIO, cast, Any
 
 WINDOWS_MUTEX_NAME = r"Local\CogStash.SingleInstance"
 _ATTACH_PARENT_PROCESS = -1
@@ -39,7 +39,7 @@ def prepare_windows_cli_console() -> None:
 
     import ctypes
 
-    kernel32 = ctypes.windll.kernel32
+    kernel32: Any = ctypes.windll.kernel32
     attached = kernel32.AttachConsole(_ATTACH_PARENT_PROCESS)
     if not attached and kernel32.GetLastError() != _ERROR_ACCESS_DENIED:
         return
@@ -59,7 +59,7 @@ def acquire_single_instance(name: str = WINDOWS_MUTEX_NAME):
 
     import ctypes
 
-    kernel32 = ctypes.windll.kernel32
+    kernel32: Any = ctypes.windll.kernel32
     handle = kernel32.CreateMutexW(None, False, name)
     if not handle:
         raise OSError("Could not create CogStash single-instance mutex.")
