@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from tkinter import messagebox
+from typing import Any
 
 from pynput import keyboard
 
@@ -150,6 +151,11 @@ def load_config(config_path: Path) -> CogStashConfig:
         launch_at_startup=bool(merged.get("launch_at_startup", False)),
         last_seen_version=str(merged.get("last_seen_version", "")),
     )
+
+
+def get_default_config_path() -> Path:
+    """Return the default config file path."""
+    return Path.home() / ".cogstash.json"
 
 
 def save_config(config: CogStashConfig, config_path: Path) -> None:
@@ -322,13 +328,15 @@ def create_tray_icon(app_queue: queue.Queue, config: CogStashConfig) -> None:
 
 
 class CogStash:
-    def __init__(self, root: tk.Tk, config: CogStashConfig):
+    def __init__(self, root: tk.Tk, config: CogStashConfig, config_path: Path | None = None):
         self.root = root
         self.config = config
+        self.config_path = config_path or get_default_config_path()
         self.queue: queue.Queue[str] = queue.Queue()
         self.is_visible = False
         self.theme = THEMES[config.theme]
         self.win_size = WINDOW_SIZES[config.window_size]
+        self._browse_windows: list[Any] = []
 
         self.setup_ui()
         self.root.withdraw()
@@ -342,16 +350,17 @@ class CogStash:
         self.root.configure(bg=t["bg"])
 
         padding = 12
-        frame = tk.Frame(self.root, bg=t["bg"], padx=padding, pady=padding)
-        frame.pack()
+        self.frame = tk.Frame(self.root, bg=t["bg"], padx=padding, pady=padding)
+        self.frame.pack()
 
-        tk.Label(
-            frame, text="⚡  CogStash", bg=t["bg"], fg=t["fg"],
+        self.title_label = tk.Label(
+            self.frame, text="⚡  CogStash", bg=t["bg"], fg=t["fg"],
             font=(platform_font(), 9), anchor="w",
-        ).pack(fill="x", pady=(0, 6))
+        )
+        self.title_label.pack(fill="x", pady=(0, 6))
 
         self.text = tk.Text(
-            frame, width=self.win_size["width"] // 7,
+            self.frame, width=self.win_size["width"] // 7,
             height=self.win_size["lines"],
             bg=t["entry_bg"], fg=t["fg"], insertbackground=t["fg"],
             relief="flat", font=(platform_font(), 12),
@@ -360,7 +369,7 @@ class CogStash:
         self.text.pack(ipady=6)
 
         self.hint_label = tk.Label(
-            frame,
+            self.frame,
             text="Enter to save · Shift+Enter for new line · Esc to cancel",
             bg=t["bg"], fg=t["muted"],
             font=(platform_font(), 8), anchor="w",
@@ -369,10 +378,11 @@ class CogStash:
 
         # Tag hints footer
         tag_hints = "  ".join(f"{emoji} #{name}" for name, emoji in DEFAULT_SMART_TAGS.items())
-        tk.Label(
-            frame, text=tag_hints, bg=t["bg"], fg=t["muted"],
+        self.tag_hints_label = tk.Label(
+            self.frame, text=tag_hints, bg=t["bg"], fg=t["muted"],
             font=(platform_font(), 8), anchor="w",
-        ).pack(fill="x", pady=(2, 0))
+        )
+        self.tag_hints_label.pack(fill="x", pady=(2, 0))
 
         # Keybindings
         self.text.bind("<Return>", self.on_submit)
@@ -564,7 +574,8 @@ class CogStash:
         """Open the Browse Notes window."""
         from cogstash.browse import BrowseWindow
         smart_tags, tag_colors = merge_tags(self.config)
-        BrowseWindow(self.root, self.config, smart_tags, tag_colors)
+        browse_window = BrowseWindow(self.root, self.config, smart_tags, tag_colors)
+        self._browse_windows.append(browse_window)
 
     def _open_settings(self):
         """Open the Settings window (singleton — reuse if already open)."""
@@ -573,7 +584,41 @@ class CogStash:
             self._settings_win.win.focus_force()
             return
         from cogstash.settings import SettingsWindow
-        self._settings_win = SettingsWindow(self.root, self.config, Path.home() / ".cogstash.json")
+        self._settings_win = SettingsWindow(
+            self.root,
+            self.config,
+            self.config_path,
+            on_config_changed=self._on_config_changed,
+        )
+
+    def _on_config_changed(self, config: CogStashConfig) -> None:
+        """Apply config changes to already-open windows."""
+        self.config = config
+        self.theme = THEMES[config.theme]
+        self.win_size = WINDOW_SIZES[config.window_size]
+        self.root.configure(bg=self.theme["bg"])
+        self.frame.configure(bg=self.theme["bg"])
+        self.title_label.configure(bg=self.theme["bg"], fg=self.theme["fg"])
+        self.text.configure(
+            width=self.win_size["width"] // 7,
+            height=max(int(self.text.cget("height")), self.win_size["lines"]),
+            bg=self.theme["entry_bg"],
+            fg=self.theme["fg"],
+            insertbackground=self.theme["fg"],
+        )
+        self.hint_label.configure(bg=self.theme["bg"], fg=self.theme["muted"])
+        self.tag_hints_label.configure(bg=self.theme["bg"], fg=self.theme["muted"])
+        self._prune_browse_windows()
+        smart_tags, tag_colors = merge_tags(config)
+        for browse_window in self._browse_windows:
+            browse_window.apply_config(config, smart_tags, tag_colors)
+
+    def _prune_browse_windows(self) -> None:
+        """Drop closed browse windows from tracking."""
+        self._browse_windows = [
+            browse_window for browse_window in self._browse_windows
+            if browse_window.window.winfo_exists()
+        ]
 
     def show_window(self):
         """Reveal the window, clear past text, and steal focus."""
@@ -627,7 +672,7 @@ def main():
     from cogstash._output import safe_print
     from cogstash._windows import WINDOWS_MUTEX_NAME, acquire_single_instance
 
-    config_path = Path.home() / ".cogstash.json"
+    config_path = get_default_config_path()
     config = load_config(config_path)
 
     # Reconfigure logger to use config's log_file
@@ -668,6 +713,7 @@ def main():
     safe_print(f"Notes → {config.output_file}")
 
     app = CogStash(root, config)
+    app.config_path = config_path
 
     create_tray_icon(app.queue, config)
 

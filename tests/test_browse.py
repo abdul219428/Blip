@@ -223,22 +223,30 @@ def test_browse_context_menu_commands_remain_callable_after_popup(tmp_path, tk_r
 
 @needs_display
 def test_browse_edit_note(tmp_path, tk_root):
-    """Edit via _on_edit updates file and refreshes cards."""
+    """Edit via dialog saves to disk and updates in-memory cards without full reload."""
     f = tmp_path / "cogstash.md"
     f.write_text("- [2026-03-26 14:30] original text\n", encoding="utf-8")
 
     from cogstash.app import CogStashConfig
     from cogstash.browse import BrowseWindow
-    from cogstash.search import edit_note
 
     config = CogStashConfig(output_file=f)
     win = BrowseWindow(tk_root, config)
     note = win._all_notes[0]
 
-    # Directly call edit_note (dialog would be interactive)
-    edit_note(f, note, "updated text")
-    win._load_notes()
+    with patch.object(win, "_load_notes") as reload_mock:
+        win._on_edit(note)
+        dialog = next(child for child in win.window.winfo_children() if child.winfo_class() == "Toplevel")
+        text_widget = next(child for child in dialog.winfo_children() if child.winfo_class() == "Text")
+        text_widget.delete("1.0", "end")
+        text_widget.insert("1.0", "updated text")
+        btn_frame = dialog.winfo_children()[-1]
+        save_button = next(child for child in btn_frame.winfo_children() if child.cget("text") == "Save")
+        save_button.invoke()
+
+    reload_mock.assert_not_called()
     assert win._all_notes[0].text == "updated text"
+    assert "updated text" in f.read_text(encoding="utf-8")
     win.window.destroy()
 
 
@@ -324,7 +332,7 @@ def test_browse_search_enter_moves_focus_from_entry(tmp_path, tk_root):
 
 @needs_display
 def test_browse_delete_note(tmp_path, tk_root):
-    """Delete via delete_note removes note and refreshes cards."""
+    """Delete removes note and updates in-memory cards without full reload."""
     f = tmp_path / "cogstash.md"
     f.write_text(
         "- [2026-03-26 14:30] first note\n"
@@ -334,15 +342,69 @@ def test_browse_delete_note(tmp_path, tk_root):
 
     from cogstash.app import CogStashConfig
     from cogstash.browse import BrowseWindow
-    from cogstash.search import delete_note
 
     config = CogStashConfig(output_file=f)
     win = BrowseWindow(tk_root, config)
     assert len(win._all_notes) == 2
 
     note = win._all_notes[0]
-    delete_note(f, note)
-    win._load_notes()
+    with (
+        patch("tkinter.messagebox.askyesno", return_value=True),
+        patch.object(win, "_load_notes") as reload_mock,
+    ):
+        win._on_delete(note)
+
+    reload_mock.assert_not_called()
     assert len(win._all_notes) == 1
     assert "second note" in win._all_notes[0].text
+    win.window.destroy()
+
+
+@needs_display
+def test_browse_copy_shows_non_blocking_notice(tmp_path, tk_root):
+    """Copy action should acknowledge success without a modal dialog."""
+    f = tmp_path / "cogstash.md"
+    f.write_text("- [2026-03-26 14:30] copied text\n", encoding="utf-8")
+
+    from cogstash.app import CogStashConfig
+    from cogstash.browse import BrowseWindow
+
+    win = BrowseWindow(tk_root, CogStashConfig(output_file=f))
+    note = win._all_notes[0]
+
+    with patch.object(win, "_show_notice") as notice_mock:
+        win._on_copy(note)
+
+    notice_mock.assert_called_once_with("Copied")
+    assert win.window.clipboard_get() == "copied text"
+    win.window.destroy()
+
+
+@needs_display
+def test_browse_stale_edit_reloads_and_shows_notice(tmp_path, tk_root):
+    """Stale note actions should auto-reload notes and show a brief notice."""
+    f = tmp_path / "cogstash.md"
+    f.write_text("- [2026-03-26 14:30] original text\n", encoding="utf-8")
+
+    from cogstash.app import CogStashConfig
+    from cogstash.browse import BrowseWindow
+
+    win = BrowseWindow(tk_root, CogStashConfig(output_file=f))
+    note = win._all_notes[0]
+
+    with (
+        patch("cogstash.browse.edit_note", return_value=False),
+        patch.object(win, "_load_notes") as reload_mock,
+        patch.object(win, "_show_notice") as notice_mock,
+        patch("tkinter.messagebox.showerror") as error_mock,
+    ):
+        win._on_edit(note)
+        dialog = next(child for child in win.window.winfo_children() if child.winfo_class() == "Toplevel")
+        btn_frame = dialog.winfo_children()[-1]
+        save_button = next(child for child in btn_frame.winfo_children() if child.cget("text") == "Save")
+        save_button.invoke()
+
+    reload_mock.assert_called_once()
+    notice_mock.assert_called_once()
+    error_mock.assert_not_called()
     win.window.destroy()

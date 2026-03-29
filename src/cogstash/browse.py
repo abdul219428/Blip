@@ -6,6 +6,7 @@ Opened from the system tray icon. Uses cogstash_search for all data operations.
 
 from __future__ import annotations
 
+import re
 import sys
 import tkinter as tk
 from datetime import datetime, timedelta
@@ -39,6 +40,8 @@ class BrowseWindow:
         self._active_tag: str | None = None
         self._card_frames: list[tk.Frame] = []
         self._context_menu: tk.Menu | None = None
+        self._notice_label: tk.Label | None = None
+        self._notice_after_id: str | None = None
 
         self.window = tk.Toplevel(root)
         self.window.title("CogStash — Browse Notes")
@@ -144,6 +147,26 @@ class BrowseWindow:
             font=(fnt, 9), anchor="center", pady=4,
         )
         self.footer.pack(fill="x")
+
+    def apply_config(
+        self,
+        config: CogStashConfig,
+        smart_tags: dict[str, str] | None = None,
+        tag_colors: dict[str, str] | None = None,
+    ) -> None:
+        """Refresh the browse window after settings change."""
+        query = self.search_var.get()
+        self.config = config
+        self.theme = THEMES[config.theme]
+        self.smart_tags = smart_tags or dict(DEFAULT_SMART_TAGS)
+        if tag_colors is not None:
+            self.tag_colors = tag_colors
+        for child in self.window.winfo_children():
+            child.destroy()
+        self.search_var = tk.StringVar(value=query)
+        self._build_ui()
+        self._update_pill_styles()
+        self._apply_filters()
 
     def _on_canvas_resize(self, event):
         self.canvas.itemconfig(self.canvas_window, width=event.width)
@@ -309,7 +332,9 @@ class BrowseWindow:
         """Mark a todo note as done and refresh the display."""
         assert self.config.output_file is not None, "output_file should be set by __post_init__"
         if mark_done(self.config.output_file, note):
-            self._load_notes()
+            self._replace_note(note, self._build_updated_note(note, note.text.replace("☐", "☑", 1), is_done=True))
+            return
+        self._handle_stale_action()
 
     def _show_context_menu(self, event, note: Note):
         """Show right-click context menu for a note card."""
@@ -395,10 +420,11 @@ class BrowseWindow:
                 messagebox.showerror("Error", "Note text cannot be empty.", parent=dialog)
                 return
             if edit_note(self.config.output_file, note, new_text):
+                self._replace_note(note, self._build_updated_note(note, new_text))
                 close_dialog()
-                self._load_notes()
             else:
-                messagebox.showerror("Error", "Failed to save changes.", parent=dialog)
+                close_dialog()
+                self._handle_stale_action()
 
         tk.Button(
             btn_frame, text="Cancel", command=close_dialog,
@@ -424,11 +450,64 @@ class BrowseWindow:
         ):
             assert self.config.output_file is not None, "output_file should be set by __post_init__"
             if delete_note(self.config.output_file, note):
-                self._load_notes()
-            else:
-                messagebox.showerror("Error", "Failed to delete note.", parent=self.window)
+                self._all_notes = [existing for existing in self._all_notes if existing is not note]
+                self._apply_filters()
+                return
+            self._handle_stale_action()
 
     def _on_copy(self, note: Note):
         """Copy note text to clipboard."""
         self.window.clipboard_clear()
         self.window.clipboard_append(note.text)
+        self._show_notice("Copied")
+
+    def _handle_stale_action(self) -> None:
+        """Reload notes after an out-of-date edit target and notify the user."""
+        self._load_notes()
+        self._show_notice("Notes changed on disk — reloaded")
+
+    def _show_notice(self, text: str) -> None:
+        """Show a brief non-blocking status notice."""
+        if self._notice_after_id is not None:
+            self.window.after_cancel(self._notice_after_id)
+            self._notice_after_id = None
+        if self._notice_label is not None and self._notice_label.winfo_exists():
+            self._notice_label.destroy()
+        self._notice_label = tk.Label(
+            self.window,
+            text=text,
+            bg=self.theme["accent"],
+            fg=self.theme["bg"],
+            font=(platform_font(), 9),
+            padx=10,
+            pady=4,
+        )
+        self._notice_label.place(relx=0.5, rely=0.94, anchor="center")
+        self._notice_after_id = self.window.after(1500, self._clear_notice)
+
+    def _clear_notice(self) -> None:
+        """Remove the transient status notice."""
+        self._notice_after_id = None
+        if self._notice_label is not None and self._notice_label.winfo_exists():
+            self._notice_label.destroy()
+        self._notice_label = None
+
+    def _replace_note(self, original: Note, updated: Note) -> None:
+        """Replace a note in the in-memory list and refresh filtered cards."""
+        for index, existing in enumerate(self._all_notes):
+            if existing is original:
+                self._all_notes[index] = updated
+                break
+        self._apply_filters()
+
+    def _build_updated_note(self, note: Note, new_text: str, is_done: bool | None = None) -> Note:
+        """Return a note copy with updated text-derived fields."""
+        tags = list(dict.fromkeys(re.findall(r"(?:^|\s)#(\w+)", new_text)))
+        return Note(
+            index=note.index,
+            timestamp=note.timestamp,
+            text=new_text,
+            tags=tags,
+            is_done=note.is_done if is_done is None else is_done,
+            line_number=note.line_number,
+        )

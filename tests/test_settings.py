@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from unittest.mock import patch
 
 import pytest
 from conftest import needs_display
@@ -84,6 +85,28 @@ def test_settings_appearance_tab(tk_root, tmp_path):
     assert sw.selected_theme.get() == "tokyo-night"
     assert hasattr(sw, "selected_size")
     assert sw.selected_size.get() == "default"
+    sw.win.destroy()
+
+
+@needs_display
+def test_settings_save_appearance_applies_changes_immediately(tk_root, tmp_path):
+    """Appearance save should notify the app so open windows restyle immediately."""
+    from cogstash.app import CogStashConfig
+    from cogstash.settings import SettingsWindow
+
+    calls = []
+    sw = SettingsWindow(
+        tk_root,
+        CogStashConfig(),
+        tmp_path / "test.json",
+        on_config_changed=lambda config: calls.append((config.theme, config.window_size)),
+    )
+    sw.selected_theme.set("light")
+    sw.selected_size.set("compact")
+
+    sw._save_appearance()
+
+    assert calls == [("light", "compact")]
     sw.win.destroy()
 
 
@@ -250,4 +273,25 @@ def test_startup_shortcut_path():
     path = get_startup_shortcut_path()
     assert "Startup" in str(path) or "startup" in str(path)
     assert str(path).endswith(".bat")
+
+
+@needs_display
+def test_app_open_settings_uses_shared_config_path(tk_root, tmp_path):
+    """App should reuse its stored config path when opening Settings."""
+    from cogstash.app import CogStash, CogStashConfig
+
+    config_path = tmp_path / ".cogstash.json"
+    app = CogStash(tk_root, CogStashConfig(), config_path=config_path)
+
+    created = []
+
+    class DummySettingsWindow:
+        def __init__(self, parent, config, passed_config_path, on_config_changed=None):
+            created.append((parent, config, passed_config_path, on_config_changed))
+            self.win = None
+
+    with patch("cogstash.settings.SettingsWindow", DummySettingsWindow):
+        app._open_settings()
+
+    assert created[0][2] == config_path
 

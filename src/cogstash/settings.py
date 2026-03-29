@@ -55,10 +55,17 @@ class SettingsWindow:
 
     TAB_NAMES = ["General", "Appearance", "Tags", "About"]
 
-    def __init__(self, parent: tk.Tk, config: CogStashConfig, config_path: Path):
+    def __init__(
+        self,
+        parent: tk.Tk,
+        config: CogStashConfig,
+        config_path: Path,
+        on_config_changed=None,
+    ):
         self.parent = parent
         self.config = config
         self.config_path = config_path
+        self.on_config_changed = on_config_changed
         self.win = tk.Toplevel(parent)
         self.win.title("CogStash Settings")
         self.win.geometry("500x450")
@@ -71,6 +78,11 @@ class SettingsWindow:
         self.win.focus_force()
         self.win.bind("<Escape>", lambda e: self.win.destroy())
 
+        self._active_tab = 0
+        self._build_ui()
+
+    def _build_ui(self) -> None:
+        """Build or rebuild the window UI from the current config."""
         self._build_tab_bar()
         self.content_frame = tk.Frame(self.win, bg=self.theme["bg"])
         self.content_frame.pack(fill="both", expand=True, padx=16, pady=(0, 16))
@@ -80,7 +92,15 @@ class SettingsWindow:
         self._build_tags_tab()
         self._build_about_tab()
 
-        self._show_tab(0)
+        self._show_tab(self._active_tab)
+
+    def _rebuild_ui(self) -> None:
+        """Rebuild the settings window after theme changes."""
+        self.theme = THEMES[self.config.theme]
+        self.win.configure(bg=self.theme["bg"])
+        for child in self.win.winfo_children():
+            child.destroy()
+        self._build_ui()
 
     def _build_tab_bar(self):
         """Create the tab button bar at the top."""
@@ -178,6 +198,8 @@ class SettingsWindow:
         self.config.launch_at_startup = new_launch
         save_config(self.config, self.config_path)
         self._flash_saved()
+        if self.on_config_changed is not None:
+            self.on_config_changed(self.config)
 
     def _flash_saved(self):
         """Briefly show a 'Saved' indicator."""
@@ -199,7 +221,10 @@ class SettingsWindow:
         self.config.theme = self.selected_theme.get()
         self.config.window_size = self.selected_size.get()
         save_config(self.config, self.config_path)
+        self._rebuild_ui()
         self._flash_saved()
+        if self.on_config_changed is not None:
+            self.on_config_changed(self.config)
 
     def _build_appearance_tab(self):
         """Build the Appearance settings tab with theme picker and window size."""
@@ -250,8 +275,8 @@ class SettingsWindow:
                 font=(platform_font(), 10),
             ).pack(anchor="w", pady=2)
 
-        # Info label about restart
-        tk.Label(frame, text="Theme and window size changes take effect after restart.",
+        # Info label about live updates
+        tk.Label(frame, text="Theme updates immediately. Window size applies on the next capture.",
                  bg=t["bg"], fg=t["muted"], font=(platform_font(), 8)).pack(anchor="w", padx=(8, 0), pady=(12, 0))
 
         # Save button
@@ -457,6 +482,8 @@ class SettingsWindow:
         """Save Tags tab settings."""
         save_config(self.config, self.config_path)
         self._flash_saved()
+        if self.on_config_changed is not None:
+            self.on_config_changed(self.config)
 
 
 class WizardWindow:
