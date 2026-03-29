@@ -560,7 +560,7 @@ jobs:
                   break
         shell: python
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: cogstash-${{ matrix.artifact_suffix }}
           path: |
