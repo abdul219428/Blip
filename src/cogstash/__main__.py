@@ -7,8 +7,10 @@ import sys
 
 def main() -> None:
     if len(sys.argv) > 1:
+        from cogstash._windows import prepare_windows_cli_console
         from cogstash.cli import cli_main
 
+        prepare_windows_cli_console()
         cli_main(sys.argv[1:])
         return
 

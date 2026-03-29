@@ -983,3 +983,27 @@ def test_main_invalid_cli_arg_stays_in_cli_mode(monkeypatch):
 
     assert called == [["statz"]]
     assert gui_called == []
+
+
+def test_module_main_prepares_windows_console_for_cli(monkeypatch):
+    """Windows CLI launches should prepare console streams before running CLI handlers."""
+    import sys
+    import types
+
+    import cogstash.__main__ as main_mod
+
+    calls = []
+    windows_mod = types.ModuleType("cogstash._windows")
+    windows_mod.prepare_windows_cli_console = lambda: calls.append("prepare")
+
+    cli_mod = types.ModuleType("cogstash.cli")
+    cli_mod.cli_main = lambda argv: calls.append(("cli", argv))
+
+    monkeypatch.setattr(main_mod.sys, "platform", "win32")
+    monkeypatch.setattr(main_mod.sys, "argv", ["cogstash", "stats"])
+    monkeypatch.setitem(sys.modules, "cogstash._windows", windows_mod)
+    monkeypatch.setitem(sys.modules, "cogstash.cli", cli_mod)
+
+    main_mod.main()
+
+    assert calls == ["prepare", ("cli", ["stats"])]

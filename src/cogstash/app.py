@@ -19,6 +19,7 @@ import tkinter as tk
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from tkinter import messagebox
 
 from pynput import keyboard
 
@@ -624,6 +625,7 @@ class CogStash:
 
 def main():
     from cogstash._output import safe_print
+    from cogstash._windows import WINDOWS_MUTEX_NAME, acquire_single_instance
 
     config_path = Path.home() / ".cogstash.json"
     config = load_config(config_path)
@@ -634,6 +636,15 @@ def main():
     _handler = logging.FileHandler(config.log_file, encoding="utf-8")
     _handler.setFormatter(logging.Formatter("[%(asctime)s] %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M"))
     logger.addHandler(_handler)
+
+    instance_guard = acquire_single_instance(WINDOWS_MUTEX_NAME)
+    if instance_guard is None:
+        logger.warning("CogStash is already running; refusing to launch a second GUI instance.")
+        try:
+            messagebox.showinfo("CogStash", "CogStash is already running in the system tray.")
+        except tk.TclError:
+            pass
+        return
 
     configure_dpi()
 
@@ -678,6 +689,7 @@ def main():
     finally:
         if listener is not None:
             listener.stop()
+        instance_guard.close()
 
 
 if __name__ == "__main__":

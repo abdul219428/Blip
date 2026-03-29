@@ -417,6 +417,43 @@ def test_app_main_startup_output_is_cp1252_safe(monkeypatch, tmp_path):
     assert str(config.output_file) in output
 
 
+def test_app_main_refuses_duplicate_instance_before_startup(monkeypatch, tmp_path):
+    """A second GUI launch should stop before creating another root/tray instance."""
+    import types
+
+    import cogstash
+    import cogstash.app as app_mod
+
+    config = app_mod.CogStashConfig(
+        output_file=tmp_path / "notes.md",
+        log_file=tmp_path / "cogstash.log",
+        last_seen_version=cogstash.__version__,
+    )
+
+    windows_mod = types.ModuleType("cogstash._windows")
+    windows_mod.WINDOWS_MUTEX_NAME = "Local\\CogStash.Test"
+    windows_mod.acquire_single_instance = lambda _name: None
+
+    monkeypatch.setattr(app_mod, "load_config", lambda _path: config)
+    monkeypatch.setattr(app_mod, "configure_dpi", lambda: None)
+    monkeypatch.setattr(app_mod.tk, "Tk", lambda: (_ for _ in ()).throw(AssertionError("should not create root")))
+    monkeypatch.setitem(sys.modules, "cogstash._windows", windows_mod)
+
+    original_handlers = app_mod.logger.handlers[:]
+    try:
+        app_mod.main()
+    finally:
+        for handler in [h for h in app_mod.logger.handlers[:] if h not in original_handlers]:
+            app_mod.logger.removeHandler(handler)
+            try:
+                handler.close()
+            except Exception:
+                pass
+        for handler in original_handlers:
+            if handler not in app_mod.logger.handlers:
+                app_mod.logger.addHandler(handler)
+
+
 def test_config_new_fields_defaults(tmp_path):
     """Fresh config has launch_at_startup=False and last_seen_version=''."""
     from cogstash.app import load_config

@@ -17,6 +17,17 @@ def _load_build_installer_module():
     return module
 
 
+def _load_build_module():
+    repo_root = Path(__file__).resolve().parents[1]
+    module_path = repo_root / "scripts" / "build.py"
+    spec = importlib.util.spec_from_file_location("build_script", module_path)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def test_inno_setup_script_uses_per_user_defaults():
     """Installer script should target a per-user install with standard shortcuts."""
     repo_root = Path(__file__).resolve().parents[1]
@@ -179,6 +190,25 @@ def test_compile_installer_invokes_iscc_with_expected_defines(monkeypatch, tmp_p
             True,
         )
     ]
+
+
+def test_build_script_uses_noconsole_on_windows_when_not_debug(monkeypatch):
+    """Windows release builds should use the GUI subsystem to avoid a persistent console window."""
+    module = _load_build_module()
+    calls = []
+
+    def fake_run(cmd, check):
+        calls.append((cmd, check))
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+    monkeypatch.setattr(module.sys, "platform", "win32")
+
+    module.run_pyinstaller(onefile=True, debug=False, icon_path=None, version="1.2.3")
+
+    assert calls, "Expected PyInstaller to be invoked"
+    cmd, check = calls[0]
+    assert "--noconsole" in cmd
+    assert check is True
 
 
 def test_make_version_info_version_normalizes_dev_versions():
