@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from typing import TextIO, cast, Any
+from typing import Any, cast, TextIO
 
 WINDOWS_MUTEX_NAME = r"Local\CogStash.SingleInstance"
 _ATTACH_PARENT_PROCESS = -1
