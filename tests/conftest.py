@@ -43,9 +43,7 @@ except tk.TclError:
     _session_root = None
     HAS_DISPLAY = False
 
-needs_display = pytest.mark.skipif(
-    not HAS_DISPLAY, reason="No display or Tcl unavailable"
-)
+needs_display = pytest.mark.skipif(not HAS_DISPLAY, reason="No display or Tcl unavailable")
 
 # Defensive test-time stubs: prevent real OS/global listeners or tray icons from
 # starting during tests which can hang CI (pynput, pystray create background
@@ -70,7 +68,7 @@ def pytest_sessionstart(session):
     if pynput is not None:
         try:
             from types import SimpleNamespace
-n
+
             class _FakeListener:
                 def __init__(self, mapping=None):
                     self.started = False
@@ -89,6 +87,7 @@ n
     # Patch pystray.Icon.run to a no-op to avoid creating tray threads
     if pystray is not None:
         try:
+
             class _FakeIcon:
                 def __init__(self, *args, **kwargs):
                     pass
