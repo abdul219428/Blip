@@ -67,7 +67,6 @@ def pytest_sessionstart(session):
     # Patch pynput.keyboard.GlobalHotKeys to a fake that does nothing
     if pynput is not None:
         try:
-            from types import SimpleNamespace
 
             class _FakeListener:
                 def __init__(self, mapping=None):
