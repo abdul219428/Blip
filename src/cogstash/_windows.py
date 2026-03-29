@@ -22,7 +22,8 @@ class _WindowsMutexGuard:
         if self.handle:
             import ctypes
 
-            ctypes.windll.kernel32.CloseHandle(self.handle)
+            kernel32: Any = ctypes.windll.kernel32
+            kernel32.CloseHandle(self.handle)
             self.handle = 0
 
 
