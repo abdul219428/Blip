@@ -9,11 +9,11 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - uses: astral-sh/setup-uv@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
       - name: Install system dependencies
@@ -43,11 +43,11 @@ jobs:
             shell: bash
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - uses: astral-sh/setup-uv@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
       - run: uv sync --extra dev
@@ -124,14 +124,14 @@ jobs:
                   break
         shell: python
       - name: Upload artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v4
         with:
           name: cogstash-${{ matrix.artifact_suffix }}
           path: |
             dist/CogStash-*-${{ matrix.artifact_suffix }}*
       - name: Upload Windows installer
         if: matrix.os == 'windows-latest'
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v4
         with:
           name: cogstash-windows-installer
           path: dist/CogStash-v*-setup.exe
@@ -142,10 +142,10 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v4
         with:
           path: artifacts
           merge-multiple: true
