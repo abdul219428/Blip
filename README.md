@@ -46,21 +46,18 @@ Grab the latest release from the [**Releases page**](https://github.com/abdul219
 
 | Platform | Download |
 |----------|----------|
-| **Windows** | `CogStash-vX.Y.Z-setup.exe` or `CogStash-vX.Y.Z-windows.exe` |
-| **macOS** | `CogStash-vX.Y.Z-macos` |
-| **Linux** | `CogStash-vX.Y.Z-linux` |
+| **Windows** | `CogStash-vX.Y.Z-setup.exe`, `CogStash-vX.Y.Z-windows.exe`, `CogStash-CLI-vX.Y.Z-windows.exe`, or `CogStash-vX.Y.Z-windows.zip` |
+| **macOS** | `CogStash-vX.Y.Z-macos`, `CogStash-CLI-vX.Y.Z-macos`, or `CogStash-vX.Y.Z-macos.zip` |
+| **Linux** | `CogStash-vX.Y.Z-linux`, `CogStash-CLI-vX.Y.Z-linux`, or `CogStash-vX.Y.Z-linux.tar.gz` |
 
 On Windows you can now choose between:
 
-- `CogStash-vX.Y.Z-setup.exe` — installs CogStash to `%LocalAppData%\Programs\CogStash`, adds an Apps & Features entry, creates a Start Menu shortcut, and can optionally enable launch at sign-in during setup.
-- The Windows installer can optionally add CogStash to your user `PATH` so commands like `cogstash stats` work from new shells without manual PATH edits.
+- `CogStash-vX.Y.Z-setup.exe` — installs `CogStash.exe` and `CogStash-CLI.exe` to `%LocalAppData%\Programs\CogStash`, adds an Apps & Features entry, creates Start Menu/Desktop shortcuts only for the UI app, and can optionally enable launch at sign-in during setup.
 - `CogStash-vX.Y.Z-windows.exe` — portable onefile executable; download and run without installing.
+- `CogStash-CLI-vX.Y.Z-windows.exe` — portable CLI executable for shell-only usage.
 
-> **Tip:** The `.zip` / `.tar.gz` files are onedir bundles (a folder with all files).
+> **Tip:** The `.zip` / `.tar.gz` files are UI onedir bundles (a folder with all files).
 > They start slightly faster but aren't a single portable file.
-
-> **PATH note (Windows installer):** newly opened shells may be required before the updated
-> user `PATH` is visible everywhere.
 
 > **Uninstall note (Windows installer):** uninstall removes the installed app, shortcuts,
 > uninstall entry, and installer-managed startup entry, but keeps your personal notes,
@@ -89,8 +86,12 @@ uv sync
 # If using the Windows portable executable:
 ./CogStash-vX.Y.Z-windows.exe
 
+# If using the standalone CLI executable:
+./CogStash-CLI-vX.Y.Z-windows.exe --help
+
 # If using the Windows installer:
-# Launch from the Start Menu after setup
+# Launch CogStash from the Start Menu after setup
+# Or run %LocalAppData%\Programs\CogStash\CogStash-CLI.exe from a shell
 
 # If installed from source with uv:
 uv run cogstash
@@ -138,7 +139,7 @@ Tags can appear anywhere in the note text. Multiple tags per note are supported.
 ## CLI Commands
 
 CogStash includes a command-line interface for querying notes without opening
-the GUI.
+the GUI. Release builds ship it as `CogStash-CLI` alongside the UI app.
 
 ### `cogstash recent`
 

@@ -16,6 +16,7 @@ DIST_DIR = ROOT / "dist"
 ISS_PATH = ROOT / "installer" / "windows" / "CogStash.iss"
 STAGED_APP_DIRNAME = "CogStash"
 STAGED_EXE_NAME = "CogStash.exe"
+STAGED_CLI_EXE_NAME = "CogStash-CLI.exe"
 
 
 def get_version() -> str:
@@ -31,6 +32,11 @@ def get_onedir_dir_name(version: str) -> str:
 def get_onedir_exe_name(version: str) -> str:
     """Return the expected versioned onedir executable name."""
     return f"{get_onedir_dir_name(version)}.exe"
+
+
+def get_cli_exe_name(version: str) -> str:
+    """Return the expected versioned CLI executable name."""
+    return f"CogStash-CLI-{version}.exe"
 
 
 def make_version_info_version(version: str) -> str:
@@ -55,7 +61,15 @@ def find_windows_onedir_bundle(dist_dir: Path, version: str) -> Path:
     return bundle_dir
 
 
-def stage_windows_payload(*, bundle_dir: Path, version: str, staging_root: Path) -> Path:
+def find_windows_cli_binary(dist_dir: Path, version: str) -> Path:
+    """Locate the Windows CLI onefile binary created by scripts/build.py."""
+    cli_binary = dist_dir / get_cli_exe_name(version)
+    if not cli_binary.is_file():
+        raise FileNotFoundError(f"Windows CLI binary not found: {cli_binary}")
+    return cli_binary
+
+
+def stage_windows_payload(*, bundle_dir: Path, cli_binary: Path, version: str, staging_root: Path) -> Path:
     """Copy the versioned onedir bundle into a versionless installer payload."""
     staged_dir = staging_root / STAGED_APP_DIRNAME
     if staged_dir.exists():
@@ -67,6 +81,7 @@ def stage_windows_payload(*, bundle_dir: Path, version: str, staging_root: Path)
     versioned_exe = staged_dir / get_onedir_exe_name(version)
     staged_exe = staged_dir / STAGED_EXE_NAME
     versioned_exe.rename(staged_exe)
+    shutil.copy2(cli_binary, staged_dir / STAGED_CLI_EXE_NAME)
     return staged_dir
 
 
@@ -100,8 +115,10 @@ def build_installer(
         raise FileNotFoundError(f"Inno Setup script not found: {iss_path}")
 
     bundle_dir = find_windows_onedir_bundle(dist_dir=dist_dir, version=version)
+    cli_binary = find_windows_cli_binary(dist_dir=dist_dir, version=version)
     staged_dir = stage_windows_payload(
         bundle_dir=bundle_dir,
+        cli_binary=cli_binary,
         version=version,
         staging_root=build_dir / "installer",
     )

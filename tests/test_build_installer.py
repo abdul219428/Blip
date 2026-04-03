@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import importlib.util
+import runpy
+import sys
 from pathlib import Path
 
 
@@ -49,90 +51,43 @@ def test_inno_setup_script_supports_optional_startup_task():
     content = iss_path.read_text(encoding="utf-8")
 
     assert 'Name: "startup"; Description: "Launch CogStash when I sign in"' in content
-    assert 'if WizardIsTaskSelected(\'startup\') then' in content
+    assert "WizardIsTaskSelected('startup')" in content
     assert 'SaveStringToFile(ExpandConstant(\'{userstartup}\\CogStash.bat\')' in content
     assert 'ExpandConstant(\'{app}\\CogStash.exe\')' in content
     assert 'Type: files; Name: "{userstartup}\\CogStash.bat"' in content
 
 
-def test_inno_setup_script_supports_optional_path_task():
-    """Installer should expose an optional PATH task for CLI access."""
+def test_inno_setup_script_does_not_offer_path_task():
+    """Installer should no longer offer PATH mutation tasks."""
     repo_root = Path(__file__).resolve().parents[1]
     iss_path = repo_root / "installer" / "windows" / "CogStash.iss"
 
     content = iss_path.read_text(encoding="utf-8")
 
-    assert 'Name: "addtopath"; Description: "Add CogStash to PATH' in content
-    assert "EnvAddPath" in content
-    assert "EnvRemovePath" in content
-    assert "PathOwnershipMarkerPath" in content
-    assert "PathOwnershipMarkerExists" in content
+    assert 'Name: "addtopath"; Description: "Add CogStash to PATH' not in content
+    assert "EnvAddPath" not in content
+    assert "EnvRemovePath" not in content
+    assert "ChangesEnvironment=yes" not in content
 
 
-def test_inno_setup_script_tracks_path_ownership_and_duplicates():
-    """Installer PATH code should normalize duplicates and remove only owned entries."""
+def test_inno_setup_script_does_not_track_path_ownership():
+    """Installer should not include PATH ownership or cleanup code."""
     repo_root = Path(__file__).resolve().parents[1]
     iss_path = repo_root / "installer" / "windows" / "CogStash.iss"
 
     content = iss_path.read_text(encoding="utf-8")
 
-    assert "ExpandConstant('{app}')" in content
-    assert "Result := LowerCase(Result);" in content
-    assert "AddPathEntry" in content
-    assert "RemovePathEntry" in content
-    assert "StringChangeEx(Result, '%localappdata%', LowerCase(GetEnv('LOCALAPPDATA')), True);" in content
-    assert "StringChangeEx(Result, '%userprofile%', LowerCase(GetEnv('USERPROFILE')), True);" in content
-    assert "StringChangeEx" in content
-    assert "Result := PathOwnershipMarkerExists();" in content
-    assert "Result := StringChangeEx" not in content
-
-
-def test_inno_setup_script_makes_uninstall_path_cleanup_best_effort():
-    """Optional PATH cleanup should log failures instead of aborting uninstall."""
-    repo_root = Path(__file__).resolve().parents[1]
-    iss_path = repo_root / "installer" / "windows" / "CogStash.iss"
-
-    content = iss_path.read_text(encoding="utf-8")
-
-    assert "Log('Could not remove the installer-managed PATH entry." in content
-    assert "RaiseException('Could not remove the installer-managed PATH entry." not in content
-
-
-def test_inno_setup_script_preserves_expandable_path_writes():
-    """PATH rewrites should preserve expandable registry semantics."""
-    repo_root = Path(__file__).resolve().parents[1]
-    iss_path = repo_root / "installer" / "windows" / "CogStash.iss"
-
-    content = iss_path.read_text(encoding="utf-8")
-
-    assert "RegWriteExpandStringValue(HKEY_CURRENT_USER, UserEnvironmentSubkey, UserPathValueName, NewPath)" in content
-
-
-def test_inno_setup_script_persists_path_ownership_for_uninstall():
-    """Installer should persist PATH ownership in a marker the uninstaller can inspect."""
-    repo_root = Path(__file__).resolve().parents[1]
-    iss_path = repo_root / "installer" / "windows" / "CogStash.iss"
-
-    content = iss_path.read_text(encoding="utf-8")
-
-    assert "PathOwnershipMarkerPath" in content
-    assert "PathOwnershipMarkerExists" in content
-    assert "WritePathOwnershipMarker" in content
-    assert "RemovePathOwnershipMarker" in content
-
-
-def test_inno_setup_script_removes_path_marker_on_uninstall():
-    """Uninstall should remove the PATH ownership marker so the install dir can be deleted."""
-    repo_root = Path(__file__).resolve().parents[1]
-    iss_path = repo_root / "installer" / "windows" / "CogStash.iss"
-
-    content = iss_path.read_text(encoding="utf-8")
-
-    assert 'Type: files; Name: "{app}\\.path-owned"' in content
+    assert "PathOwnershipMarkerPath" not in content
+    assert "PathOwnershipMarkerExists" not in content
+    assert "WritePathOwnershipMarker" not in content
+    assert "RemovePathOwnershipMarker" not in content
+    assert "AddPathEntry" not in content
+    assert "RemovePathEntry" not in content
+    assert "RegWriteExpandStringValue" not in content
 
 
 def test_stage_windows_payload_copies_bundle_and_renames_exe(tmp_path):
-    """Stage helper should normalize the app dir and executable name."""
+    """Stage helper should normalize app names and include the CLI executable."""
     module = _load_build_installer_module()
     version = "1.2.3"
     bundle_dir = tmp_path / "dist" / f"CogStash-{version}-onedir"
@@ -141,15 +96,19 @@ def test_stage_windows_payload_copies_bundle_and_renames_exe(tmp_path):
     (bundle_dir / "support.dll").write_text("dll", encoding="utf-8")
     (bundle_dir / "assets").mkdir()
     (bundle_dir / "assets" / "icon.png").write_text("png", encoding="utf-8")
+    cli_binary = tmp_path / "dist" / f"CogStash-CLI-{version}.exe"
+    cli_binary.write_text("cli", encoding="utf-8")
 
     staged_dir = module.stage_windows_payload(
         bundle_dir=bundle_dir,
+        cli_binary=cli_binary,
         version=version,
         staging_root=tmp_path / "build" / "installer",
     )
 
     assert staged_dir.name == "CogStash"
     assert (staged_dir / "CogStash.exe").read_text(encoding="utf-8") == "exe"
+    assert (staged_dir / "CogStash-CLI.exe").read_text(encoding="utf-8") == "cli"
     assert not (staged_dir / f"CogStash-{version}-onedir.exe").exists()
     assert (staged_dir / "support.dll").read_text(encoding="utf-8") == "dll"
     assert (staged_dir / "assets" / "icon.png").read_text(encoding="utf-8") == "png"
@@ -203,12 +162,78 @@ def test_build_script_uses_noconsole_on_windows_when_not_debug(monkeypatch):
     monkeypatch.setattr(module.subprocess, "run", fake_run)
     monkeypatch.setattr(module.sys, "platform", "win32")
 
-    module.run_pyinstaller(onefile=True, debug=False, icon_path=None, version="1.2.3")
+    module.run_pyinstaller(target="ui", bundle_mode="onefile", debug=False, icon_path=None, version="1.2.3")
 
     assert calls, "Expected PyInstaller to be invoked"
     cmd, check = calls[0]
     assert "--noconsole" in cmd
     assert check is True
+
+
+def test_build_script_cli_target_uses_cli_entrypoint_without_gui_hidden_imports(monkeypatch):
+    """CLI target should build from the CLI bootstrap without tray hidden imports."""
+    module = _load_build_module()
+    calls = []
+
+    def fake_run(cmd, check):
+        calls.append((cmd, check))
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+    monkeypatch.setattr(module.sys, "platform", "win32")
+
+    module.run_pyinstaller(target="cli", bundle_mode="onefile", debug=False, icon_path=None, version="1.2.3")
+
+    assert calls, "Expected PyInstaller to be invoked"
+    cmd, check = calls[0]
+    assert str(module.CLI_ENTRY) in cmd
+    assert "--name" in cmd
+    assert "CogStash-CLI-1.2.3" in cmd
+    assert "pystray._win32" not in cmd
+    assert check is True
+
+
+def test_cli_entrypoint_can_run_as_main_script(monkeypatch):
+    """CLI bootstrap should work when PyInstaller executes it as __main__."""
+    repo_root = Path(__file__).resolve().parents[1]
+    src_dir = repo_root / "src"
+    entry_path = src_dir / "cogstash" / "cli" / "__main__.py"
+    calls: list[tuple[str, object]] = []
+
+    monkeypatch.syspath_prepend(str(src_dir))
+
+    import cogstash.cli
+    import cogstash.cli.windows
+
+    monkeypatch.setattr(cogstash.cli.windows, "prepare_windows_cli_console", lambda: calls.append(("prepare", None)))
+    monkeypatch.setattr(cogstash.cli, "cli_main", lambda argv: calls.append(("cli", argv)))
+    monkeypatch.setattr(sys, "argv", [str(entry_path), "--help"])
+
+    runpy.run_path(str(entry_path), run_name="__main__")
+
+    assert calls == [("prepare", None), ("cli", ["--help"])]
+
+
+def test_build_script_main_builds_ui_and_cli_targets_for_both(monkeypatch):
+    """Default target=both should build UI onefile+onedir and CLI onefile."""
+    module = _load_build_module()
+    calls = []
+
+    monkeypatch.setattr(module, "get_version", lambda: "1.2.3")
+    monkeypatch.setattr(module, "convert_icon", lambda: None)
+    monkeypatch.setattr(
+        module,
+        "run_pyinstaller",
+        lambda **kwargs: calls.append(kwargs),
+    )
+    monkeypatch.setattr(module.sys, "argv", ["build.py", "--target", "both"])
+
+    module.main()
+
+    assert calls == [
+        {"target": "ui", "bundle_mode": "onefile", "debug": False, "icon_path": None, "version": "1.2.3"},
+        {"target": "ui", "bundle_mode": "onedir", "debug": False, "icon_path": None, "version": "1.2.3"},
+        {"target": "cli", "bundle_mode": "onefile", "debug": False, "icon_path": None, "version": "1.2.3"},
+    ]
 
 
 def test_make_version_info_version_normalizes_dev_versions():
@@ -237,3 +262,14 @@ def test_release_workflow_builds_and_uploads_windows_installer():
     assert "dist\\CogStash-*-onedir\\CogStash-*-onedir.exe" in content
     assert "--help output unexpectedly contained Traceback" in content
     assert "--version output unexpectedly contained Traceback" in content
+
+
+def test_release_workflow_uploads_ui_and_cli_artifacts():
+    workflow = Path(".github/workflows/release.yml").read_text(encoding="utf-8")
+    assert "CogStash-CLI" in workflow
+
+
+def test_installer_script_installs_cli_binary_without_shortcut():
+    iss = Path("installer/windows/CogStash.iss").read_text(encoding="utf-8")
+    assert "CogStash-CLI.exe" in iss
+    assert "CogStash CLI" not in iss
