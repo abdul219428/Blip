@@ -59,6 +59,17 @@ def test_load_config_unknown_theme(tmp_path):
     assert config.theme == "tokyo-night"
 
 
+def test_load_config_unknown_window_size(tmp_path):
+    from cogstash.core import load_config
+
+    cfg_file = tmp_path / "cogstash.json"
+    cfg_file.write_text(json.dumps({"window_size": "giant"}), encoding="utf-8")
+
+    config = load_config(cfg_file)
+
+    assert config.window_size == "default"
+
+
 def test_get_default_config_path_uses_home(monkeypatch, tmp_path):
     import cogstash.core as core_mod
     import cogstash.core.config as config_mod

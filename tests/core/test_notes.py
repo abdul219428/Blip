@@ -39,10 +39,35 @@ def test_parse_notes_multiline(tmp_path):
     assert notes[0].text == "first line\nsecond line\nthird line"
 
 
+def test_parse_notes_empty_file(tmp_path):
+    from cogstash.core import parse_notes
+
+    notes_file = tmp_path / "cogstash.md"
+    notes_file.write_text("", encoding="utf-8")
+
+    assert parse_notes(notes_file) == []
+
+
 def test_parse_notes_missing_file(tmp_path):
     from cogstash.core import parse_notes
 
     assert parse_notes(tmp_path / "nonexistent.md") == []
+
+
+def test_parse_notes_done_status(tmp_path):
+    from cogstash.core import parse_notes
+
+    notes_file = tmp_path / "cogstash.md"
+    notes_file.write_text(
+        "- [2026-03-26 14:30] ☐ open item #todo\n"
+        "- [2026-03-26 15:00] ☑ done item #todo\n",
+        encoding="utf-8",
+    )
+
+    notes = parse_notes(notes_file)
+
+    assert notes[0].is_done is False
+    assert notes[1].is_done is True
 
 
 def _make_notes_file(tmp_path):
@@ -165,6 +190,18 @@ def test_mark_done_and_stale_line_rejected(tmp_path):
     assert mark_done(notes_file, stale_note) is False
 
 
+def test_mark_done_already_done(tmp_path):
+    from cogstash.core import mark_done, parse_notes
+
+    notes_file = tmp_path / "cogstash.md"
+    notes_file.write_text("- [2026-03-26 14:30] ☑ already done #todo\n", encoding="utf-8")
+
+    note = parse_notes(notes_file)[0]
+
+    assert mark_done(notes_file, note) is False
+    assert notes_file.read_text(encoding="utf-8") == "- [2026-03-26 14:30] ☑ already done #todo\n"
+
+
 def test_note_line_span_single_and_multiline(tmp_path):
     from cogstash.core import parse_notes
     from cogstash.core.notes import _note_line_span
@@ -206,6 +243,26 @@ def test_edit_note(tmp_path):
     assert "  new second\n" in content
     assert "  new third\n" in content
     assert "- [2026-03-26 15:00] keep this\n" in content
+
+
+def test_edit_note_single_line(tmp_path):
+    from cogstash.core import edit_note, parse_notes
+
+    notes_file = tmp_path / "cogstash.md"
+    notes_file.write_text(
+        "- [2026-03-26 14:30] buy milk #todo\n"
+        "- [2026-03-26 15:00] meeting\n",
+        encoding="utf-8",
+    )
+
+    note = parse_notes(notes_file)[0]
+
+    assert edit_note(notes_file, note, "buy oat milk #todo") is True
+
+    content = notes_file.read_text(encoding="utf-8")
+    assert "- [2026-03-26 14:30] buy oat milk #todo\n" in content
+    assert "buy milk" not in content
+    assert "- [2026-03-26 15:00] meeting\n" in content
 
 
 def test_edit_and_delete_stale_line_rejected(tmp_path):

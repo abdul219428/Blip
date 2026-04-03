@@ -1,6 +1,5 @@
 """Tests for cogstash.py."""
 
-import json
 import re
 import sys
 from unittest.mock import patch
@@ -117,46 +116,6 @@ def test_window_size_presets():
         assert size["lines"] <= size["max_lines"], f"Size '{name}' lines > max_lines"
 
 
-def test_load_config_defaults(tmp_path):
-    """No config file → returns default CogStashConfig."""
-    from cogstash.app import CogStashConfig, load_config
-    config = load_config(tmp_path / "nonexistent.json")
-    assert isinstance(config, CogStashConfig)
-    assert config.hotkey == "<ctrl>+<shift>+<space>"
-    assert config.theme == "tokyo-night"
-    assert config.window_size == "default"
-    # Config file should be created with defaults
-    assert (tmp_path / "nonexistent.json").exists()
-
-
-def test_load_config_partial(tmp_path):
-    """Partial JSON → missing keys filled from defaults."""
-    from cogstash.app import load_config
-    cfg_file = tmp_path / "cogstash.json"
-    cfg_file.write_text(json.dumps({"theme": "dracula"}), encoding="utf-8")
-    config = load_config(cfg_file)
-    assert config.theme == "dracula"
-    assert config.hotkey == "<ctrl>+<shift>+<space>"  # filled from default
-
-
-def test_load_config_malformed(tmp_path):
-    """Bad JSON → warning logged, defaults returned."""
-    from cogstash.app import load_config
-    cfg_file = tmp_path / "cogstash.json"
-    cfg_file.write_text("{bad json!!!", encoding="utf-8")
-    config = load_config(cfg_file)
-    assert config.theme == "tokyo-night"  # all defaults
-
-
-def test_load_config_unknown_theme(tmp_path):
-    """Unknown theme → falls back to tokyo-night."""
-    from cogstash.app import load_config
-    cfg_file = tmp_path / "cogstash.json"
-    cfg_file.write_text(json.dumps({"theme": "nonexistent"}), encoding="utf-8")
-    config = load_config(cfg_file)
-    assert config.theme == "tokyo-night"
-
-
 def test_parse_tags_smart():
     """Smart tags get emoji prefixes prepended to text."""
     from cogstash.app import parse_smart_tags
@@ -243,36 +202,6 @@ def test_merge_tags_override_builtin():
     smart, colors = merge_tags(config)
     assert smart["todo"] == "✅"
     assert colors["todo"] == "#00FF00"
-
-
-def test_load_config_custom_tags(tmp_path):
-    """Config with tags key loads custom tags into CogStashConfig."""
-    from cogstash.app import load_config
-    cfg_path = tmp_path / "cogstash.json"
-    cfg_path.write_text(json.dumps({
-        "tags": {"work": {"emoji": "💼", "color": "#4A90D9"}}
-    }), encoding="utf-8")
-    config = load_config(cfg_path)
-    assert config.tags == {"work": {"emoji": "💼", "color": "#4A90D9"}}
-
-
-def test_load_config_invalid_tag_skipped(tmp_path):
-    """Tags missing emoji or color are skipped."""
-    from cogstash.app import load_config
-    cfg_path = tmp_path / "cogstash.json"
-    cfg_path.write_text(json.dumps({
-        "tags": {
-            "good": {"emoji": "✅", "color": "#00FF00"},
-            "bad_no_emoji": {"color": "#FF0000"},
-            "bad_no_color": {"emoji": "❌"},
-            "bad_hex": {"emoji": "❌", "color": "not-hex"},
-        }
-    }), encoding="utf-8")
-    config = load_config(cfg_path)
-    assert "good" in config.tags
-    assert "bad_no_emoji" not in config.tags
-    assert "bad_no_color" not in config.tags
-    assert "bad_hex" not in config.tags
 
 
 def test_parse_smart_tags_custom():
@@ -470,43 +399,6 @@ def test_app_main_refuses_duplicate_instance_before_startup(monkeypatch, tmp_pat
                 app_mod.logger.addHandler(handler)
 
 
-def test_config_new_fields_defaults(tmp_path):
-    """Fresh config has launch_at_startup=False and last_seen_version=''."""
-    from cogstash.app import load_config
-    config = load_config(tmp_path / ".cogstash.json")
-    assert config.launch_at_startup is False
-    assert config.last_seen_version == ""
-
-
-def test_config_new_fields_roundtrip(tmp_path):
-    """New fields survive write-read cycle."""
-    import json
-    config_path = tmp_path / ".cogstash.json"
-    data = {"launch_at_startup": True, "last_seen_version": "0.1.0", "theme": "dracula"}
-    config_path.write_text(json.dumps(data), encoding="utf-8")
-    from cogstash.app import load_config
-    config = load_config(config_path)
-    assert config.launch_at_startup is True
-    assert config.last_seen_version == "0.1.0"
-    assert config.theme == "dracula"
-
-
-def test_save_config(tmp_path):
-    """save_config writes config to JSON file."""
-    import json
-
-    from cogstash.app import CogStashConfig, save_config
-
-    config = CogStashConfig(theme="dracula", window_size="wide", last_seen_version="0.2.0")
-    config_path = tmp_path / ".cogstash.json"
-    save_config(config, config_path)
-    data = json.loads(config_path.read_text(encoding="utf-8"))
-    assert data["theme"] == "dracula"
-    assert data["window_size"] == "wide"
-    assert data["last_seen_version"] == "0.2.0"
-    assert data["launch_at_startup"] is False
-
-
 def test_app_reexports_core_helpers():
     import cogstash.app as app_mod
     import cogstash.core as core_mod
@@ -514,6 +406,7 @@ def test_app_reexports_core_helpers():
     assert app_mod.DEFAULT_SMART_TAGS is core_mod.DEFAULT_SMART_TAGS
     assert app_mod.CogStashConfig is core_mod.CogStashConfig
     assert app_mod.append_note_to_file is core_mod.append_note_to_file
+    assert app_mod.get_default_config_path is core_mod.get_default_config_path
     assert app_mod.load_config is core_mod.load_config
     assert app_mod.save_config is core_mod.save_config
     assert app_mod.merge_tags is core_mod.merge_tags

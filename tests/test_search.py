@@ -39,38 +39,11 @@ def test_parse_notes_multiline(tmp_path):
     assert notes[0].text == "first line\nsecond line\nthird line"
 
 
-def test_parse_notes_empty_file(tmp_path):
-    """Empty file returns empty list."""
-    f = tmp_path / "cogstash.md"
-    f.write_text("", encoding="utf-8")
-
-    from cogstash.search import parse_notes
-    notes = parse_notes(f)
-    assert notes == []
-
-
 def test_parse_notes_missing_file(tmp_path):
     """Missing file returns empty list."""
     from cogstash.search import parse_notes
     notes = parse_notes(tmp_path / "nonexistent.md")
     assert notes == []
-
-
-def test_parse_notes_done_status(tmp_path):
-    """☐ → is_done=False, ☑ → is_done=True."""
-    f = tmp_path / "cogstash.md"
-    f.write_text(
-        "- [2026-03-26 14:30] ☐ open item #todo\n"
-        "- [2026-03-26 15:00] ☑ done item #todo\n",
-        encoding="utf-8",
-    )
-
-    from cogstash.search import parse_notes
-    notes = parse_notes(f)
-
-    assert notes[0].is_done is False
-    assert notes[1].is_done is True
-
 
 def test_parse_notes_no_prefix(tmp_path):
     """Note without smart-tag emoji → is_done=False."""
@@ -147,20 +120,6 @@ def test_mark_done(tmp_path):
     assert "☐" not in content
 
 
-def test_mark_done_already_done(tmp_path):
-    """Already ☑ → no change, returns False."""
-    f = tmp_path / "cogstash.md"
-    f.write_text("- [2026-03-26 14:30] ☑ already done #todo\n", encoding="utf-8")
-
-    from cogstash.search import mark_done, parse_notes
-    notes = parse_notes(f)
-    result = mark_done(f, notes[0])
-
-    assert result is False
-    content = f.read_text(encoding="utf-8")
-    assert content.count("☑") == 1
-
-
 def test_note_line_span_single(tmp_path):
     """Single-line note spans exactly one line."""
     f = tmp_path / "cogstash.md"
@@ -191,24 +150,6 @@ def test_note_line_span_multiline(tmp_path):
     lines = f.read_text(encoding="utf-8").splitlines(keepends=True)
     start, end = _note_line_span(lines, notes[0].line_number)
     assert (start, end) == (0, 3)
-
-
-def test_edit_note_single_line(tmp_path):
-    """Edit replaces text, preserves timestamp."""
-    f = tmp_path / "cogstash.md"
-    f.write_text(
-        "- [2026-03-26 14:30] buy milk #todo\n"
-        "- [2026-03-26 15:00] meeting\n",
-        encoding="utf-8",
-    )
-    from cogstash.search import edit_note, parse_notes
-    notes = parse_notes(f)
-    result = edit_note(f, notes[0], "buy oat milk #todo")
-    assert result is True
-    content = f.read_text(encoding="utf-8")
-    assert "- [2026-03-26 14:30] buy oat milk #todo\n" in content
-    assert "buy milk" not in content
-    assert "- [2026-03-26 15:00] meeting\n" in content
 
 
 def test_edit_note_multiline(tmp_path):
