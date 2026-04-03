@@ -63,6 +63,7 @@ Expected ownership:
 - terminal formatting
 - color and stream detection
 - exit-code behavior
+- Windows console-preparation helpers needed only for terminal execution
 - the new dedicated CLI executable entrypoint
 
 `cli` may depend on `core`, but it must not import UI modules at import time. A terminal-only environment should be able to import and run `cogstash.cli` without desktop dependencies installed.
@@ -90,6 +91,15 @@ The migration rule should stay simple:
 
 If a module needs both terminal formatting and tkinter state, the boundary is wrong and should be reconsidered before moving more code.
 
+### 5. Existing helper ownership
+
+The current helper modules need explicit treatment during the split:
+
+- `_output.py` should move into `core` if it remains a shared safe-writing helper used by both terminal and desktop startup paths
+- `_windows.py` should not stay monolithic; CLI console-attachment behavior belongs in `cli`, while any GUI-instance or desktop-runtime behavior belongs in `ui`
+
+If `_windows.py` currently mixes both concerns, the implementation plan should split it rather than relocating it unchanged.
+
 ## Entrypoints and Product Shape
 
 This phase should end with two shipped executables:
@@ -110,6 +120,24 @@ Release automation should publish:
 
 This keeps the desktop product intact while giving terminal-first users a cleaner install/run story.
 
+### Build process changes
+
+The current `scripts/build.py` builds a single UI-oriented executable from `src/cogstash/__main__.py` and includes GUI-related hidden imports. This phase should make the build targets explicit rather than trying to infer the right artifact from one bootstrap path.
+
+Preferred direction:
+
+- keep one build helper, but teach it `--target ui|cli|both`
+- build the UI executable from a UI-only entrypoint
+- build the CLI executable from a CLI-only entrypoint
+- keep hidden imports/data files target-specific so the CLI build does not pull in tkinter, pystray, or Pillow packaging assumptions
+
+Expected naming:
+
+- UI artifact keeps the `CogStash` name
+- CLI artifact uses a distinct name such as `CogStash-CLI` in packaged outputs and installed files
+
+The release workflow should smoke-test both targets independently.
+
 ### Windows installer
 
 The Windows installer should:
@@ -117,7 +145,9 @@ The Windows installer should:
 - remain the installer for the desktop app
 - install both UI and CLI executables into the application directory
 - create shortcuts only for the UI application
-- leave the CLI executable available for PATH/manual shell use
+- leave the CLI executable available for manual shell use from the install directory
+
+For this phase, the installer should **not** silently modify PATH. PATH exposure can remain a separate explicit installer option or later follow-up, but this architecture split should not bundle a new environment-mutation decision into the refactor.
 
 This avoids a second installer surface and keeps Windows setup simple.
 
@@ -126,6 +156,7 @@ This avoids a second installer surface and keeps Windows setup simple.
 - no separate CLI installer in this phase
 - no extra Start Menu/Desktop shortcuts for the CLI executable by default
 - installer and release names must clearly distinguish UI and CLI artifacts
+- the installed CLI executable should use a stable versionless filename such as `CogStash-CLI.exe`
 
 ## Testing Strategy
 
@@ -144,6 +175,19 @@ Small end-to-end integration tests should remain around the real entrypoints so 
 - UI startup still exercises the expected desktop flows
 - packaged CLI and UI entrypoints resolve to the correct executables
 - installer/release tests verify both executable outputs and expected naming
+
+### Conftest and fixture split
+
+The current root `tests/conftest.py` initializes tkinter and applies defensive pystray/pynput stubs at session scope. That does not fit the long-term goal of keeping CLI tests independent from UI dependencies.
+
+The migration should therefore make test isolation explicit:
+
+- keep a small root `tests/conftest.py` only for fixtures that are safe for every layer
+- move Tk/shared-root fixtures and UI-only stubs into `tests/ui/conftest.py`
+- move CLI-only stream/output fixtures into `tests/cli/conftest.py` if that improves separation
+- add a CLI import smoke test that runs without tkinter initialization and without UI packages present
+
+To satisfy the "must not break existing tests" constraint, test reorganization should happen only after replacement fixtures exist for the destination directories. Existing tests can remain where they are temporarily during the migration, but no moved CLI test should still depend on root-level tkinter setup.
 
 ## Risks
 
@@ -167,7 +211,7 @@ If tests keep their old mixed structure, architectural regressions may become ha
 
 The safest execution order is:
 
-1. Define the public `core` surface first
+1. Define the public `core` surface first, including explicit exports for the first shared modules moved behind it
 2. Move CLI code to depend only on that surface
 3. Move UI code to depend on that same surface
 4. Add the dedicated CLI executable
@@ -175,6 +219,8 @@ The safest execution order is:
 6. Update build, release, and installer wiring after the code split is already passing
 
 This keeps the refactor incremental and reduces the chance of packaging work hiding architectural mistakes.
+
+After each move, the implementation should verify that the migrated behavior is imported from `core` rather than duplicated in `cli` or `ui`. Temporary wrappers are acceptable during the transition, but duplicate business logic is not.
 
 ## Components Expected to Move
 
@@ -184,11 +230,13 @@ This keeps the refactor incremental and reduces the chance of packaging work hid
 - config and path logic currently in `app.py`
 - shared note/tag helpers
 - shared domain models
+- `_output.py` if it remains shared by both entrypaths
 
 ### Likely into `cli`
 
 - current `cli.py`
 - terminal-formatting helpers and output policy specific to CLI execution
+- the CLI-specific portion of `_windows.py`
 
 ### Likely into `ui`
 
@@ -196,6 +244,7 @@ This keeps the refactor incremental and reduces the chance of packaging work hid
 - `browse.py`
 - `settings.py`
 - Windows GUI/runtime helpers that are only relevant to desktop startup
+- any UI-specific remainder of `_windows.py`
 
 ## Success Criteria
 
