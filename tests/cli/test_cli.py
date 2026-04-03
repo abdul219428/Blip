@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from conftest import CaptureStream, StrictEncodedStream
+from _helpers import CaptureStream, StrictEncodedStream
 
 
 def _make_notes_file(tmp_path):
@@ -122,8 +122,8 @@ def test_cmd_recent_default(tmp_path, capsys):
     lines = [line for line in output.strip().split("\n") if line.strip()]
 
     assert len(lines) == 5
-    assert "redesign dashboard" in lines[0]  # newest first
-    assert "old note" in lines[4]  # oldest last
+    assert "redesign dashboard" in lines[0]
+    assert "old note" in lines[4]
 
 
 def test_cmd_recent_limit(tmp_path, capsys):
@@ -145,7 +145,7 @@ def test_cmd_recent_limit(tmp_path, capsys):
 
 def test_cmd_recent_empty(tmp_path, capsys):
     """Empty/missing file shows 'No notes found.' message."""
-    f = tmp_path / "cogstash.md"  # does not exist
+    f = tmp_path / "cogstash.md"
     from types import SimpleNamespace
 
     from cogstash.cli import cmd_recent
@@ -197,9 +197,7 @@ def test_cmd_tags_counts(tmp_path, capsys):
     output = capsys.readouterr().out
     lines = [line for line in output.strip().split("\n") if line.strip()]
 
-    # 3 tags in fixture: #todo (1), #urgent (1), #important (1)
     assert len(lines) == 3
-    # All have count 1, sorted alphabetically as tiebreaker
     assert "#important" in lines[0]
     assert "#todo" in lines[1]
     assert "#urgent" in lines[2]
@@ -224,10 +222,10 @@ def test_hex_to_ansi():
     """hex_to_ansi maps hex colors to nearest ANSI codes."""
     from cogstash.cli import hex_to_ansi
 
-    assert hex_to_ansi("#ff0000") == "\033[31m"  # red
-    assert hex_to_ansi("#00ff00") == "\033[32m"  # green
-    assert hex_to_ansi("#0000ff") == "\033[34m"  # blue
-    assert hex_to_ansi("#ffff00") == "\033[33m"  # yellow
+    assert hex_to_ansi("#ff0000") == "\033[31m"
+    assert hex_to_ansi("#00ff00") == "\033[32m"
+    assert hex_to_ansi("#0000ff") == "\033[34m"
+    assert hex_to_ansi("#ffff00") == "\033[33m"
 
 
 def test_format_note_custom_tag(tmp_path):
@@ -245,7 +243,7 @@ def test_format_note_custom_tag(tmp_path):
     )
     ansi_map = {"work": "\033[34m"}
     result = format_note(note, use_color=True, ansi_tag=ansi_map)
-    assert "\033[34m" in result  # blue for #work
+    assert "\033[34m" in result
     assert "#work" in result
 
 
@@ -346,7 +344,7 @@ def test_cmd_add_multiline_stdin(tmp_path, monkeypatch):
     cmd_add(SimpleNamespace(text=[]), CogStashConfig(output_file=f))
     content = f.read_text(encoding="utf-8")
     assert "line one" in content
-    assert "  line two" in content  # continuation indent
+    assert "  line two" in content
 
 
 def test_cmd_add_empty(tmp_path, monkeypatch):
@@ -649,9 +647,8 @@ def test_cmd_stats_done_pending(tmp_path, capsys):
 
     cmd_stats(SimpleNamespace(), CogStashConfig(output_file=f))
     output = capsys.readouterr().out
-    # Fixture has 1 done (☑ fix login bug), 4 pending
-    assert "1" in output  # done count
-    assert "4" in output  # pending count
+    assert "1" in output
+    assert "4" in output
 
 
 def test_cmd_stats_handles_none_stdout(monkeypatch, tmp_path):
@@ -798,9 +795,8 @@ def test_cmd_config_set_invalid_theme(tmp_path, capsys):
 def test_cmd_config_wizard(tmp_path, monkeypatch, capsys):
     """Interactive wizard updates config file."""
     config_path = tmp_path / ".cogstash.json"
-    config_path.write_text('{}', encoding="utf-8")
+    config_path.write_text("{}", encoding="utf-8")
 
-    # Simulate user pressing Enter for all prompts (keeping defaults)
     monkeypatch.setattr("builtins.input", lambda _: "")
 
     from types import SimpleNamespace
@@ -820,7 +816,7 @@ def test_cmd_config_wizard(tmp_path, monkeypatch, capsys):
 def test_cmd_config_get_invalid_key(tmp_path, capsys):
     """cogstash config get with unknown key shows error."""
     config_path = tmp_path / ".cogstash.json"
-    config_path.write_text('{}', encoding="utf-8")
+    config_path.write_text("{}", encoding="utf-8")
     from types import SimpleNamespace
 
     import pytest
@@ -849,9 +845,6 @@ def test_version_flag(capsys):
     assert "cogstash" in captured.out.lower() or "0." in captured.out
 
 
-# Packaged Windows builds have previously lost CLI output when the runtime assumed
-# a normal console/TTY. Keep these flag-path tests close to the parser behavior
-# they protect so packaged --help/--version regressions stay visible.
 def test_version_flag_without_isatty(monkeypatch):
     """--version prints even when stdout has no isatty()."""
     import pytest

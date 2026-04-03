@@ -1,4 +1,4 @@
-"""UI pytest fixtures and defensive desktop runtime stubs."""
+"""UI-only pytest fixtures and defensive desktop runtime stubs."""
 
 from __future__ import annotations
 

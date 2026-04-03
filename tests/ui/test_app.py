@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 from unittest.mock import patch
 
-from conftest import StrictEncodedStream
+from _helpers import StrictEncodedStream
 
 from ui._support import needs_display
 

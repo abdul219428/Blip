@@ -69,7 +69,7 @@ def test_browse_tag_filter(tmp_path, tk_root):
     assert len(win._visible_cards) == 1
     assert win._visible_cards[0].tags == ["todo"]
 
-    win._on_tag_filter(None)  # "All" — clear filter
+    win._on_tag_filter(None)
     assert len(win._visible_cards) == 2
     win.window.destroy()
 

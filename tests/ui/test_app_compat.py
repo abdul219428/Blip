@@ -4,7 +4,8 @@ import re
 import sys
 from unittest.mock import patch
 
-from conftest import StrictEncodedStream
+from _helpers import StrictEncodedStream
+
 from ui._support import needs_display
 
 
@@ -129,7 +130,6 @@ def test_parse_tags_dedup():
     """Duplicate smart tags produce only one emoji prefix."""
     from cogstash.app import parse_smart_tags
     result = parse_smart_tags("do thing #todo and also #todo")
-    # Should have exactly one ☐, not two
     assert result.count("☐") == 1
 
 
@@ -137,7 +137,6 @@ def test_parse_tags_url_safe():
     """URL fragments are not matched as tags."""
     from cogstash.app import parse_smart_tags
     result = parse_smart_tags("see http://example.com#section for details")
-    # No emoji should be prepended — #section is not a standalone tag
     assert not result.startswith("☐")
     assert not result.startswith("🔴")
     assert not result.startswith("⭐")
@@ -193,7 +192,7 @@ def test_merge_tags_add_new():
     smart, colors = merge_tags(config)
     assert smart["work"] == "💼"
     assert colors["work"] == "#4A90D9"
-    assert "todo" in smart  # built-in still present
+    assert "todo" in smart
 
 
 def test_merge_tags_override_builtin():

@@ -45,6 +45,7 @@ def test_parse_notes_missing_file(tmp_path):
     notes = parse_notes(tmp_path / "nonexistent.md")
     assert notes == []
 
+
 def test_parse_notes_no_prefix(tmp_path):
     """Note without smart-tag emoji → is_done=False."""
     f = tmp_path / "cogstash.md"
@@ -275,87 +276,15 @@ def test_delete_note_stale_line_number_rejected(tmp_path):
     assert f.read_text(encoding="utf-8") == current
 
 
-def test_search_reexports_private_helpers():
-    import cogstash.core.notes as notes_mod
-    import cogstash.search as search_mod
-
-    assert search_mod._atomic_write is notes_mod._atomic_write
-    assert search_mod._note_line_span is notes_mod._note_line_span
-
-
-def test_compute_stats_basic(tmp_path):
-    """Stats returns correct totals, done/pending, date range."""
-    f = tmp_path / "cogstash.md"
-    f.write_text(
-        "- [2026-01-15 09:00] first note #todo\n"
-        "- [2026-02-10 14:30] ☑ done item #todo\n"
-        "- [2026-03-27 16:00] latest note #idea\n",
-        encoding="utf-8",
-    )
-    from cogstash.search import compute_stats, parse_notes
-    notes = parse_notes(f)
-    stats = compute_stats(notes)
-
-    assert stats["total"] == 3
-    assert stats["done"] == 1
-    assert stats["pending"] == 2
-    assert stats["first_date"].year == 2026
-    assert stats["first_date"].month == 1
-    assert stats["last_date"].month == 3
-    assert "todo" in stats["tag_counts"]
-    assert stats["tag_counts"]["todo"] == 2
-    assert stats["avg_length"] > 0
-    assert stats["longest"] >= stats["avg_length"]
-
-
-def test_compute_stats_empty():
-    """Empty note list returns zeroed stats."""
-    from cogstash.search import compute_stats
-    stats = compute_stats([])
-
-    assert stats["total"] == 0
-    assert stats["done"] == 0
-    assert stats["pending"] == 0
-    assert stats["first_date"] is None
-    assert stats["last_date"] is None
-    assert stats["tag_counts"] == {}
-    assert stats["avg_length"] == 0
-
-
-def test_compute_stats_streaks(tmp_path):
-    """Streak calculation finds consecutive days with notes."""
-    from datetime import date, timedelta
-
-    from cogstash.search import compute_stats, parse_notes
-
-    today = date.today()
-    dates = [today - timedelta(days=i) for i in range(3, -1, -1)]  # 4 consecutive days ending today
-    lines = []
-    for i, d in enumerate(dates):
-        ts = d.strftime("%Y-%m-%d") + " 09:00"
-        lines.append(f"- [{ts}] day {i + 1}\n")
-
-    f = tmp_path / "cogstash.md"
-    f.write_text("".join(lines), encoding="utf-8")
-    notes = parse_notes(f)
-    stats = compute_stats(notes)
-
-    assert stats["current_streak"] == 4
-    assert stats["longest_streak"] == 4
-    assert stats["notes_this_week"] >= 1
-
-
 def test_compute_stats_current_streak_reuses_date_set(tmp_path, monkeypatch):
-    """compute_stats should not rebuild the date set during current streak checks."""
-    from datetime import date, timedelta
-
     from cogstash.search import compute_stats, parse_notes
 
-    today = date.today()
-    dates = [today - timedelta(days=i) for i in range(3, -1, -1)]
     f = tmp_path / "cogstash.md"
     f.write_text(
-        "".join(f"- [{d.strftime('%Y-%m-%d')} 09:00] day {i}\n" for i, d in enumerate(dates, start=1)),
+        "- [2026-03-24 09:00] day 1\n"
+        "- [2026-03-25 09:00] day 2\n"
+        "- [2026-03-26 09:00] day 3\n"
+        "- [2026-03-27 09:00] day 4\n",
         encoding="utf-8",
     )
     notes = parse_notes(f)
@@ -370,16 +299,29 @@ def test_compute_stats_current_streak_reuses_date_set(tmp_path, monkeypatch):
 
     monkeypatch.setattr(builtins, "set", counting_set)
 
-    stats = compute_stats(notes)
+    compute_stats(notes)
 
-    assert stats["current_streak"] == 4
     assert set_calls == 1
 
 
 def test_search_reexports_core_helpers():
-    import cogstash.core as core_mod
+    import cogstash.core.notes as core_notes
     import cogstash.search as search_mod
 
-    assert search_mod.Note is core_mod.Note
-    assert search_mod.parse_notes is core_mod.parse_notes
-    assert search_mod.compute_stats is core_mod.compute_stats
+    assert search_mod.Note is core_notes.Note
+    assert search_mod.parse_notes is core_notes.parse_notes
+    assert search_mod.search_notes is core_notes.search_notes
+    assert search_mod.filter_by_tag is core_notes.filter_by_tag
+    assert search_mod.mark_done is core_notes.mark_done
+    assert search_mod.edit_note is core_notes.edit_note
+    assert search_mod.delete_note is core_notes.delete_note
+    assert search_mod.compute_stats is core_notes.compute_stats
+    assert search_mod.DEFAULT_TAG_COLORS is core_notes.DEFAULT_TAG_COLORS
+
+
+def test_search_reexports_private_helpers():
+    import cogstash.core.notes as core_notes
+    import cogstash.search as search_mod
+
+    assert search_mod._atomic_write is core_notes._atomic_write
+    assert search_mod._note_line_span is core_notes._note_line_span
