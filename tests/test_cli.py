@@ -19,6 +19,12 @@ def _make_notes_file(tmp_path):
     return f
 
 
+def test_cli_import_resolves_to_package():
+    import cogstash.cli as cli
+
+    assert cli.__spec__.submodule_search_locations is not None
+
+
 def test_format_note_color():
     """ANSI escape codes present when use_color=True."""
     from cogstash.cli import format_note
