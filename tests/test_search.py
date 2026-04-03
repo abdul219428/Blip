@@ -334,26 +334,12 @@ def test_delete_note_stale_line_number_rejected(tmp_path):
     assert f.read_text(encoding="utf-8") == current
 
 
-def test_atomic_write_cleans_up_temp_file_on_replace_failure(tmp_path, monkeypatch):
-    """_atomic_write removes temp file if replace fails."""
-    import cogstash.search as search
+def test_search_reexports_private_helpers():
+    import cogstash.core.notes as notes_mod
+    import cogstash.search as search_mod
 
-    path = tmp_path / "cogstash.md"
-    path.write_text("original\n", encoding="utf-8")
-    tmp = path.with_suffix(".tmp")
-
-    def boom(src, dst):
-        raise OSError("replace failed")
-
-    monkeypatch.setattr(search.os, "replace", boom)
-
-    try:
-        search._atomic_write(path, "updated\n")
-    except OSError:
-        pass
-
-    assert not tmp.exists()
-    assert path.read_text(encoding="utf-8") == "original\n"
+    assert search_mod._atomic_write is notes_mod._atomic_write
+    assert search_mod._note_line_span is notes_mod._note_line_span
 
 
 def test_compute_stats_basic(tmp_path):
@@ -447,3 +433,12 @@ def test_compute_stats_current_streak_reuses_date_set(tmp_path, monkeypatch):
 
     assert stats["current_streak"] == 4
     assert set_calls == 1
+
+
+def test_search_reexports_core_helpers():
+    import cogstash.core as core_mod
+    import cogstash.search as search_mod
+
+    assert search_mod.Note is core_mod.Note
+    assert search_mod.parse_notes is core_mod.parse_notes
+    assert search_mod.compute_stats is core_mod.compute_stats

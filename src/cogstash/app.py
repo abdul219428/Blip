@@ -7,22 +7,31 @@ Escape → hides window
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import queue
-import re
 import subprocess
 import sys
 import threading
 import tkinter as tk
-from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 from tkinter import messagebox
 from typing import Any
 
 from pynput import keyboard
+
+from cogstash.core import (
+    DEFAULT_SMART_TAGS,
+    CogStashConfig,
+    append_note_to_file,
+    get_default_config_path,
+    load_config,
+    merge_tags,
+    save_config,
+)
+from cogstash.core import parse_smart_tags as _parse_smart_tags
+
+parse_smart_tags = _parse_smart_tags
 
 # ── Data ──────────────────────────────────────────────────────────────────────
 THEMES = {
@@ -39,19 +48,7 @@ WINDOW_SIZES = {
     "wide":    {"width": 520, "lines": 4, "max_lines": 10},
 }
 
-DEFAULT_SMART_TAGS = {
-    "todo":      "☐",
-    "urgent":    "🔴",
-    "important": "⭐",
-    "idea":      "💡",
-}
-
-# ── Validation ────────────────────────────────────────────────────────────────
-_HEX_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
-
 # ── Config ────────────────────────────────────────────────────────────────────
-HOTKEY      = "<ctrl>+<shift>+<space>"
-OUTPUT_FILE = Path.home() / "cogstash.md"
 LOG_FILE    = Path.home() / "cogstash.log"
 
 logger = logging.getLogger("cogstash")
@@ -59,181 +56,6 @@ logger.setLevel(logging.WARNING)
 _handler = logging.FileHandler(LOG_FILE, encoding="utf-8")
 _handler.setFormatter(logging.Formatter("[%(asctime)s] %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M"))
 logger.addHandler(_handler)
-
-
-@dataclass
-class CogStashConfig:
-    hotkey: str = "<ctrl>+<shift>+<space>"
-    output_file: Path | None = None
-    log_file: Path | None = None
-    theme: str = "tokyo-night"
-    window_size: str = "default"
-    tags: dict[str, dict[str, str]] | None = None
-    launch_at_startup: bool = False
-    last_seen_version: str = ""
-
-    def __post_init__(self):
-        if self.output_file is None:
-            self.output_file = Path.home() / "cogstash.md"
-        if self.log_file is None:
-            self.log_file = Path.home() / "cogstash.log"
-
-
-def load_config(config_path: Path) -> CogStashConfig:
-    """Load config from JSON file, merging with defaults."""
-    defaults = {
-        "hotkey": "<ctrl>+<shift>+<space>",
-        "output_file": str(Path.home() / "cogstash.md"),
-        "log_file": str(Path.home() / "cogstash.log"),
-        "theme": "tokyo-night",
-        "window_size": "default",
-        "launch_at_startup": False,
-        "last_seen_version": "",
-    }
-
-    if not config_path.exists():
-        logger.warning("No config file found — creating %s with defaults", config_path)
-        try:
-            config_path.parent.mkdir(parents=True, exist_ok=True)
-            config_path.write_text(json.dumps(defaults, indent=2), encoding="utf-8")
-        except OSError:
-            logger.warning("Could not create config file %s", config_path, exc_info=True)
-        return CogStashConfig()
-
-    try:
-        data = json.loads(config_path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError) as e:
-        logger.warning("Bad config file %s: %s — using defaults", config_path, e)
-        return CogStashConfig()
-
-    merged = {**defaults, **data}
-
-    # Validate theme
-    if merged["theme"] not in THEMES:
-        logger.warning("Unknown theme '%s' — falling back to tokyo-night", merged["theme"])
-        merged["theme"] = "tokyo-night"
-
-    # Validate window_size
-    if merged["window_size"] not in WINDOW_SIZES:
-        logger.warning("Unknown window_size '%s' — falling back to default", merged["window_size"])
-        merged["window_size"] = "default"
-
-    # Expand ~ paths
-    output_file = Path(merged["output_file"]).expanduser()
-    log_file = Path(merged["log_file"]).expanduser()
-
-    # Parse and validate custom tags
-    raw_tags = data.get("tags", {})
-    valid_tags = {}
-    if isinstance(raw_tags, dict):
-        for name, props in raw_tags.items():
-            if not isinstance(props, dict):
-                logger.warning("Tag '%s': expected object, skipping", name)
-                continue
-            emoji = props.get("emoji")
-            color = props.get("color")
-            if not emoji:
-                logger.warning("Tag '%s': missing emoji, skipping", name)
-                continue
-            if not color or not _HEX_RE.match(color):
-                logger.warning("Tag '%s': missing or invalid color, skipping", name)
-                continue
-            valid_tags[name] = {"emoji": emoji, "color": color}
-    tags = valid_tags if valid_tags else None
-
-    return CogStashConfig(
-        hotkey=merged["hotkey"],
-        output_file=output_file,
-        log_file=log_file,
-        theme=merged["theme"],
-        window_size=merged["window_size"],
-        tags=tags,
-        launch_at_startup=bool(merged.get("launch_at_startup", False)),
-        last_seen_version=str(merged.get("last_seen_version", "")),
-    )
-
-
-def get_default_config_path() -> Path:
-    """Return the default config file path."""
-    return Path.home() / ".cogstash.json"
-
-
-def save_config(config: CogStashConfig, config_path: Path) -> None:
-    """Write config to JSON file."""
-    data: dict[str, object] = {
-        "hotkey": config.hotkey,
-        "output_file": str(config.output_file),
-        "log_file": str(config.log_file),
-        "theme": config.theme,
-        "window_size": config.window_size,
-        "launch_at_startup": config.launch_at_startup,
-        "last_seen_version": config.last_seen_version,
-    }
-    if config.tags:
-        data["tags"] = config.tags
-    try:
-        config_path.parent.mkdir(parents=True, exist_ok=True)
-        config_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-    except OSError:
-        logger.error("Failed to save config to %s", config_path, exc_info=True)
-
-
-def merge_tags(config: CogStashConfig) -> tuple[dict[str, str], dict[str, str]]:
-    """Merge built-in tags with user-defined tags. Returns (smart_tags, tag_colors)."""
-    from cogstash.search import DEFAULT_TAG_COLORS
-    smart_tags = dict(DEFAULT_SMART_TAGS)
-    tag_colors = dict(DEFAULT_TAG_COLORS)
-    if config.tags:
-        for name, props in config.tags.items():
-            smart_tags[name] = props["emoji"]
-            tag_colors[name] = props["color"]
-    return smart_tags, tag_colors
-
-
-_TAG_RE = re.compile(r"(?:^|\s)#(\w+)")
-
-
-def parse_smart_tags(text: str, smart_tags: dict[str, str] | None = None) -> str:
-    """Prepend smart-tag emojis to text. Tags stay inline for searchability."""
-    tags_dict = smart_tags if smart_tags is not None else DEFAULT_SMART_TAGS
-    matches = _TAG_RE.findall(text)
-    seen = []
-    for tag in matches:
-        tag_lower = tag.lower()
-        if tag_lower in tags_dict and tag_lower not in seen:
-            seen.append(tag_lower)
-    if not seen:
-        return text
-    prefix = " ".join(tags_dict[t] for t in seen)
-    return f"{prefix} {text}"
-
-
-def append_note_to_file(
-    text: str,
-    output_file: Path,
-    smart_tags: dict[str, str] | None = None,
-) -> bool:
-    """Append a timestamped note to the given file. Returns True on success."""
-    text = text.strip()
-    if not text:
-        return False
-    if len(text) > 10_000:
-        text = text[:10_000]
-
-    text = parse_smart_tags(text, smart_tags)
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-    lines = text.split("\n")
-    first = f"- [{timestamp}] {lines[0]}\n"
-    rest = "".join(f"  {line}\n" for line in lines[1:])
-
-    try:
-        output_file.parent.mkdir(parents=True, exist_ok=True)
-        with output_file.open("a", encoding="utf-8") as f:
-            f.write(first + rest)
-        return True
-    except OSError:
-        logger.error("Failed to write to %s", output_file, exc_info=True)
-        return False
 
 
 def platform_font() -> str:

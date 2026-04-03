@@ -74,7 +74,7 @@ def test_append_note_error_handling(tmp_path, tk_root):
 
     test_file = tmp_path / "cogstash.md"
     app = cogstash_mod.CogStash(tk_root, cogstash_mod.CogStashConfig(output_file=test_file))
-    with patch("cogstash.app.Path.open", side_effect=OSError("mock write failure")):
+    with patch("cogstash.core.notes.Path.open", side_effect=OSError("mock write failure")):
         result = app.append_note("should fail")
 
     assert result is False
@@ -505,3 +505,15 @@ def test_save_config(tmp_path):
     assert data["window_size"] == "wide"
     assert data["last_seen_version"] == "0.2.0"
     assert data["launch_at_startup"] is False
+
+
+def test_app_reexports_core_helpers():
+    import cogstash.app as app_mod
+    import cogstash.core as core_mod
+
+    assert app_mod.DEFAULT_SMART_TAGS is core_mod.DEFAULT_SMART_TAGS
+    assert app_mod.CogStashConfig is core_mod.CogStashConfig
+    assert app_mod.append_note_to_file is core_mod.append_note_to_file
+    assert app_mod.load_config is core_mod.load_config
+    assert app_mod.save_config is core_mod.save_config
+    assert app_mod.merge_tags is core_mod.merge_tags
