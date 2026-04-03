@@ -48,6 +48,9 @@ jobs:
         with:
           python-version: "3.13"
       - run: uv sync --extra dev
+      - name: Install Linux UI smoke-test dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y xvfb
       - name: Install Inno Setup
         if: matrix.os == 'windows-latest'
         run: choco install innosetup --no-progress -y
@@ -105,6 +108,33 @@ jobs:
             throw "Expected readable --version output from $($binary.FullName), got: [$version]"
           }
         shell: pwsh
+      - name: Smoke test UI onedir (Unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          binary=$(find dist -maxdepth 2 -path 'dist/CogStash-*-onedir/CogStash-*-onedir' -type f | head -1)
+          if [ -z "$binary" ]; then
+            echo "Could not find Unix onedir executable under dist/CogStash-*-onedir/CogStash-*-onedir"
+            exit 1
+          fi
+          chmod +x "$binary"
+          if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+            xvfb-run --auto-servernum "$binary" &
+          else
+            "$binary" &
+          fi
+          pid=$!
+          sleep 5
+          if kill -0 "$pid" 2>/dev/null; then
+            kill "$pid"
+            wait "$pid" || true
+          else
+            wait "$pid"
+            exit_code=$?
+            echo "UI onedir exited early with code $exit_code for $binary"
+            echo "UI onedir should remain running during smoke test: $binary"
+            exit 1
+          fi
+        shell: bash
       - name: Smoke test CLI onefile (Unix)
         if: matrix.os != 'windows-latest'
         run: |

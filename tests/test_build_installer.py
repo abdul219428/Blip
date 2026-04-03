@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import re
 import runpy
 import sys
 from pathlib import Path
@@ -265,11 +266,66 @@ def test_release_workflow_builds_and_uploads_windows_installer():
 
 
 def test_release_workflow_uploads_ui_and_cli_artifacts():
-    workflow = Path(".github/workflows/release.yml").read_text(encoding="utf-8")
-    assert "CogStash-CLI" in workflow
+    repo_root = Path(__file__).resolve().parents[1]
+    workflow_path = repo_root / ".github" / "workflows" / "release.yml"
+    workflow = workflow_path.read_text(encoding="utf-8")
+
+    upload_steps = {
+        match["step"]: {"name": match["artifact"], "path": match["path"].strip()}
+        for match in re.finditer(
+            r"- name: Upload (?P<step>UI|CLI) artifacts\r?\n"
+            r"[ \t]+uses: actions/upload-artifact@v\d+\r?\n"
+            r"[ \t]+with:\r?\n"
+            r"[ \t]+name: (?P<artifact>[^\r\n]+)\r?\n"
+            r"[ \t]+path: \|\r?\n"
+            r"[ \t]+(?P<path>[^\r\n]+)",
+            workflow,
+        )
+    }
+
+    assert set(upload_steps) == {"UI", "CLI"}
+    assert upload_steps["UI"]["name"] == "cogstash-${{ matrix.artifact_suffix }}-ui"
+    assert upload_steps["CLI"]["name"] == "cogstash-${{ matrix.artifact_suffix }}-cli"
+    assert upload_steps["UI"]["name"] != upload_steps["CLI"]["name"]
+    assert upload_steps["UI"]["path"] == "dist/CogStash-${{ github.ref_name }}-${{ matrix.artifact_suffix }}*"
+    assert upload_steps["CLI"]["path"] == "dist/CogStash-CLI-${{ github.ref_name }}-${{ matrix.artifact_suffix }}*"
+    assert "CLI" not in upload_steps["UI"]["path"]
+    assert "CLI" in upload_steps["CLI"]["path"]
+
+
+def test_release_workflow_smoke_tests_ui_and_cli_on_unix():
+    """Release workflow should smoke-test both entrypoints on macOS/Linux too."""
+    repo_root = Path(__file__).resolve().parents[1]
+    workflow_path = repo_root / ".github" / "workflows" / "release.yml"
+
+    content = workflow_path.read_text(encoding="utf-8")
+    ui_smoke_step = re.search(
+        r"- name: Smoke test UI onedir \(Unix\)\r?\n"
+        r"(?P<body>(?:[ \t]+.*(?:\r?\n|$))+?)"
+        r"[ \t]+shell: bash",
+        content,
+    )
+
+    assert "Install Linux UI smoke-test dependencies" in content
+    assert "sudo apt-get install -y xvfb" in content
+    assert "if: matrix.os == 'ubuntu-latest'" in content
+    assert ui_smoke_step is not None
+    ui_smoke_step_body = ui_smoke_step.group("body")
+    assert "if: matrix.os != 'windows-latest'" in ui_smoke_step_body
+    assert "find dist -maxdepth 2 -path 'dist/CogStash-*-onedir/CogStash-*-onedir'" in ui_smoke_step_body
+    assert 'xvfb-run --auto-servernum "$binary" &' in ui_smoke_step_body
+    assert any(line.strip() == '"$binary" &' for line in ui_smoke_step_body.splitlines())
+    assert 'kill -0 "$pid" 2>/dev/null' in ui_smoke_step_body
+    assert 'kill "$pid"' in ui_smoke_step_body
+    assert 'wait "$pid"' in ui_smoke_step_body
+    assert "exit 1" in ui_smoke_step_body
+    assert "Smoke test CLI onefile (Unix)" in content
 
 
 def test_installer_script_installs_cli_binary_without_shortcut():
-    iss = Path("installer/windows/CogStash.iss").read_text(encoding="utf-8")
+    repo_root = Path(__file__).resolve().parents[1]
+    iss_path = repo_root / "installer" / "windows" / "CogStash.iss"
+
+    iss = iss_path.read_text(encoding="utf-8")
     assert "CogStash-CLI.exe" in iss
     assert "CogStash CLI" not in iss
