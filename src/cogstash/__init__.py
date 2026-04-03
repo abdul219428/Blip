@@ -11,7 +11,7 @@ except Exception:
 
 
 def main() -> None:
-    """Entry point for the cogstash command."""
+    """Compatibility entry point for source and test execution."""
     import sys
 
     if len(sys.argv) > 1 and sys.argv[1] in ("--version", "-V"):

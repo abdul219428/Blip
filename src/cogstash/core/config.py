@@ -11,9 +11,9 @@ _DEFAULT_HOTKEY = "<ctrl>+<shift>+<space>"
 _DEFAULT_THEME = "tokyo-night"
 _DEFAULT_WINDOW_SIZE = "default"
 # Keep this in sync with THEMES in cogstash.app.
-_VALID_THEMES = {"tokyo-night", "light", "dracula", "gruvbox", "mono"}
+VALID_THEMES = {"tokyo-night", "light", "dracula", "gruvbox", "mono"}
 # Keep this in sync with WINDOW_SIZES in cogstash.app.
-_VALID_WINDOW_SIZES = {"compact", "default", "wide"}
+VALID_WINDOW_SIZES = {"compact", "default", "wide"}
 
 logger = logging.getLogger("cogstash")
 
@@ -70,11 +70,11 @@ def load_config(config_path: Path) -> CogStashConfig:
 
     merged = {**defaults, **data}
 
-    if merged["theme"] not in _VALID_THEMES:
+    if merged["theme"] not in VALID_THEMES:
         logger.warning("Unknown theme '%s' — falling back to %s", merged["theme"], _DEFAULT_THEME)
         merged["theme"] = _DEFAULT_THEME
 
-    if merged["window_size"] not in _VALID_WINDOW_SIZES:
+    if merged["window_size"] not in VALID_WINDOW_SIZES:
         logger.warning("Unknown window_size '%s' — falling back to %s", merged["window_size"], _DEFAULT_WINDOW_SIZE)
         merged["window_size"] = _DEFAULT_WINDOW_SIZE
 
@@ -125,3 +125,13 @@ def save_config(config: CogStashConfig, config_path: Path) -> None:
         config_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
     except OSError:
         logger.error("Failed to save config to %s", config_path, exc_info=True)
+
+
+__all__ = [
+    "CogStashConfig",
+    "VALID_THEMES",
+    "VALID_WINDOW_SIZES",
+    "get_default_config_path",
+    "load_config",
+    "save_config",
+]

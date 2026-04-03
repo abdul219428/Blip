@@ -114,8 +114,8 @@ def test_cmd_recent_default(tmp_path, capsys):
     f = _make_notes_file(tmp_path)
     from types import SimpleNamespace
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_recent
+    from cogstash.core import CogStashConfig
 
     cmd_recent(SimpleNamespace(limit=20), CogStashConfig(output_file=f))
     output = capsys.readouterr().out
@@ -131,8 +131,8 @@ def test_cmd_recent_limit(tmp_path, capsys):
     f = _make_notes_file(tmp_path)
     from types import SimpleNamespace
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_recent
+    from cogstash.core import CogStashConfig
 
     cmd_recent(SimpleNamespace(limit=2), CogStashConfig(output_file=f))
     output = capsys.readouterr().out
@@ -148,8 +148,8 @@ def test_cmd_recent_empty(tmp_path, capsys):
     f = tmp_path / "cogstash.md"  # does not exist
     from types import SimpleNamespace
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_recent
+    from cogstash.core import CogStashConfig
 
     cmd_recent(SimpleNamespace(limit=20), CogStashConfig(output_file=f))
     output = capsys.readouterr().out
@@ -161,8 +161,8 @@ def test_cmd_search_match(tmp_path, capsys):
     f = _make_notes_file(tmp_path)
     from types import SimpleNamespace
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_search
+    from cogstash.core import CogStashConfig
 
     cmd_search(SimpleNamespace(query="milk", limit=20), CogStashConfig(output_file=f))
     output = capsys.readouterr().out
@@ -177,8 +177,8 @@ def test_cmd_search_no_match(tmp_path, capsys):
     f = _make_notes_file(tmp_path)
     from types import SimpleNamespace
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_search
+    from cogstash.core import CogStashConfig
 
     cmd_search(SimpleNamespace(query="nonexistent xyz", limit=20), CogStashConfig(output_file=f))
     output = capsys.readouterr().out
@@ -190,8 +190,8 @@ def test_cmd_tags_counts(tmp_path, capsys):
     f = _make_notes_file(tmp_path)
     from types import SimpleNamespace
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_tags
+    from cogstash.core import CogStashConfig
 
     cmd_tags(SimpleNamespace(), CogStashConfig(output_file=f))
     output = capsys.readouterr().out
@@ -212,8 +212,8 @@ def test_cmd_tags_empty(tmp_path, capsys):
     f.write_text("", encoding="utf-8")
     from types import SimpleNamespace
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_tags
+    from cogstash.core import CogStashConfig
 
     cmd_tags(SimpleNamespace(), CogStashConfig(output_file=f))
     output = capsys.readouterr().out
@@ -253,8 +253,8 @@ def test_cmd_add_argument(tmp_path):
     """cogstash add 'text' saves note via argument."""
     from types import SimpleNamespace
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_add
+    from cogstash.core import CogStashConfig
 
     f = tmp_path / "cogstash.md"
     cmd_add(SimpleNamespace(text=["hello", "world"]), CogStashConfig(output_file=f))
@@ -268,8 +268,8 @@ def test_cmd_add_stdin(tmp_path, monkeypatch):
     import io
     from types import SimpleNamespace
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_add
+    from cogstash.core import CogStashConfig
 
     monkeypatch.setattr("sys.stdin", io.StringIO("from stdin"))
     f = tmp_path / "cogstash.md"
@@ -283,8 +283,8 @@ def test_cmd_add_interactive_stdin_shows_error(monkeypatch, tmp_path, capsys):
 
     import pytest
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_add
+    from cogstash.core import CogStashConfig
 
     class InteractiveStdin:
         def isatty(self):
@@ -305,8 +305,8 @@ def test_cmd_add_missing_stdin_none_shows_error(monkeypatch, tmp_path, capsys):
 
     import pytest
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_add
+    from cogstash.core import CogStashConfig
 
     config = CogStashConfig(output_file=tmp_path / "cogstash.md")
     monkeypatch.setattr("sys.stdin", None)
@@ -323,8 +323,8 @@ def test_cmd_add_smart_tags(tmp_path):
     """cogstash add applies smart tag emoji prefixes."""
     from types import SimpleNamespace
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_add
+    from cogstash.core import CogStashConfig
 
     f = tmp_path / "cogstash.md"
     cmd_add(SimpleNamespace(text=["buy", "milk", "#todo"]), CogStashConfig(output_file=f))
@@ -338,8 +338,8 @@ def test_cmd_add_multiline_stdin(tmp_path, monkeypatch):
     import io
     from types import SimpleNamespace
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_add
+    from cogstash.core import CogStashConfig
 
     monkeypatch.setattr("sys.stdin", io.StringIO("line one\nline two"))
     f = tmp_path / "cogstash.md"
@@ -356,8 +356,8 @@ def test_cmd_add_empty(tmp_path, monkeypatch):
 
     import pytest
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_add
+    from cogstash.core import CogStashConfig
 
     monkeypatch.setattr("sys.stdin", io.StringIO(""))
     f = tmp_path / "cogstash.md"
@@ -370,8 +370,8 @@ def test_cmd_edit_by_number(tmp_path, capsys):
     f = _make_notes_file(tmp_path)
     from types import SimpleNamespace
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_edit
+    from cogstash.core import CogStashConfig
 
     cmd_edit(SimpleNamespace(args=["3", "updated", "note"], search=None), CogStashConfig(output_file=f))
     content = f.read_text(encoding="utf-8")
@@ -386,8 +386,8 @@ def test_cmd_edit_by_search(tmp_path, capsys):
     f = _make_notes_file(tmp_path)
     from types import SimpleNamespace
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_edit
+    from cogstash.core import CogStashConfig
 
     cmd_edit(SimpleNamespace(args=["get", "oat", "milk"], search="buy milk"), CogStashConfig(output_file=f))
     content = f.read_text(encoding="utf-8")
@@ -401,8 +401,8 @@ def test_cmd_edit_not_found(tmp_path):
     f = _make_notes_file(tmp_path)
     from types import SimpleNamespace
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_edit
+    from cogstash.core import CogStashConfig
 
     with pytest.raises(SystemExit):
         cmd_edit(SimpleNamespace(args=["99", "nope"], search=None), CogStashConfig(output_file=f))
@@ -414,8 +414,8 @@ def test_cmd_edit_no_text(tmp_path):
     f = _make_notes_file(tmp_path)
     from types import SimpleNamespace
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_edit
+    from cogstash.core import CogStashConfig
 
     with pytest.raises(SystemExit):
         cmd_edit(SimpleNamespace(args=["1"], search=None), CogStashConfig(output_file=f))
@@ -427,8 +427,8 @@ def test_cmd_edit_search_multiple_matches(tmp_path, capsys):
     f = _make_notes_file(tmp_path)
     from types import SimpleNamespace
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_edit
+    from cogstash.core import CogStashConfig
 
     with pytest.raises(SystemExit):
         cmd_edit(SimpleNamespace(args=["new"], search="note"), CogStashConfig(output_file=f))
@@ -441,8 +441,8 @@ def test_cmd_delete_with_yes(tmp_path, capsys):
     f = _make_notes_file(tmp_path)
     from types import SimpleNamespace
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_delete
+    from cogstash.core import CogStashConfig
 
     cmd_delete(SimpleNamespace(number=3, yes=True, search=None), CogStashConfig(output_file=f))
     content = f.read_text(encoding="utf-8")
@@ -456,8 +456,8 @@ def test_cmd_delete_by_search(tmp_path, capsys):
     f = _make_notes_file(tmp_path)
     from types import SimpleNamespace
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_delete
+    from cogstash.core import CogStashConfig
 
     cmd_delete(SimpleNamespace(number=None, yes=True, search="buy milk"), CogStashConfig(output_file=f))
     content = f.read_text(encoding="utf-8")
@@ -471,8 +471,8 @@ def test_cmd_delete_confirm_yes(tmp_path, monkeypatch):
     f = _make_notes_file(tmp_path)
     from types import SimpleNamespace
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_delete
+    from cogstash.core import CogStashConfig
 
     monkeypatch.setattr("builtins.input", lambda _: "y")
     cmd_delete(SimpleNamespace(number=3, yes=False, search=None), CogStashConfig(output_file=f))
@@ -485,8 +485,8 @@ def test_cmd_delete_confirm_no(tmp_path, monkeypatch):
     f = _make_notes_file(tmp_path)
     from types import SimpleNamespace
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_delete
+    from cogstash.core import CogStashConfig
 
     monkeypatch.setattr("builtins.input", lambda _: "n")
     cmd_delete(SimpleNamespace(number=3, yes=False, search=None), CogStashConfig(output_file=f))
@@ -500,8 +500,8 @@ def test_cmd_delete_not_found(tmp_path):
     f = _make_notes_file(tmp_path)
     from types import SimpleNamespace
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_delete
+    from cogstash.core import CogStashConfig
 
     with pytest.raises(SystemExit):
         cmd_delete(SimpleNamespace(number=99, yes=True, search=None), CogStashConfig(output_file=f))
@@ -513,8 +513,8 @@ def test_cmd_export_json(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     from types import SimpleNamespace
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_export
+    from cogstash.core import CogStashConfig
 
     cmd_export(
         SimpleNamespace(format="json", output=None),
@@ -531,8 +531,8 @@ def test_cmd_export_json_content(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     from types import SimpleNamespace
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_export
+    from cogstash.core import CogStashConfig
 
     cmd_export(
         SimpleNamespace(format="json", output=None),
@@ -554,8 +554,8 @@ def test_cmd_export_csv(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     from types import SimpleNamespace
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_export
+    from cogstash.core import CogStashConfig
 
     cmd_export(
         SimpleNamespace(format="csv", output=None),
@@ -577,8 +577,8 @@ def test_cmd_export_md(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     from types import SimpleNamespace
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_export
+    from cogstash.core import CogStashConfig
 
     cmd_export(
         SimpleNamespace(format="md", output=None),
@@ -598,8 +598,8 @@ def test_cmd_export_custom_output(tmp_path, capsys):
     out_path = tmp_path / "custom.json"
     from types import SimpleNamespace
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_export
+    from cogstash.core import CogStashConfig
 
     cmd_export(
         SimpleNamespace(format="json", output=str(out_path)),
@@ -615,8 +615,8 @@ def test_cmd_stats_output(tmp_path, capsys):
     f = _make_notes_file(tmp_path)
     from types import SimpleNamespace
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_stats
+    from cogstash.core import CogStashConfig
 
     cmd_stats(SimpleNamespace(), CogStashConfig(output_file=f))
     output = capsys.readouterr().out
@@ -631,8 +631,8 @@ def test_cmd_stats_empty(tmp_path, capsys):
     f = tmp_path / "cogstash.md"
     from types import SimpleNamespace
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_stats
+    from cogstash.core import CogStashConfig
 
     cmd_stats(SimpleNamespace(), CogStashConfig(output_file=f))
     output = capsys.readouterr().out
@@ -644,8 +644,8 @@ def test_cmd_stats_done_pending(tmp_path, capsys):
     f = _make_notes_file(tmp_path)
     from types import SimpleNamespace
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_stats
+    from cogstash.core import CogStashConfig
 
     cmd_stats(SimpleNamespace(), CogStashConfig(output_file=f))
     output = capsys.readouterr().out
@@ -658,8 +658,8 @@ def test_cmd_stats_handles_none_stdout(monkeypatch, tmp_path):
     """Stats prints through sys.__stdout__ when sys.stdout is None."""
     from types import SimpleNamespace
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_stats
+    from cogstash.core import CogStashConfig
 
     capture = CaptureStream()
     f = _make_notes_file(tmp_path)
@@ -679,8 +679,8 @@ def test_cmd_search_plain_output_without_isatty(monkeypatch, tmp_path):
     """Search falls back to plain text when stdout lacks isatty()."""
     from types import SimpleNamespace
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_search
+    from cogstash.core import CogStashConfig
 
     capture = CaptureStream()
     f = _make_notes_file(tmp_path)
@@ -699,8 +699,8 @@ def test_cmd_stats_replaces_unencodable_chars(monkeypatch, tmp_path):
     """Stats stays readable when stdout encoding cannot emit emoji."""
     from types import SimpleNamespace
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_stats
+    from cogstash.core import CogStashConfig
 
     capture = StrictEncodedStream("cp1252")
     f = _make_notes_file(tmp_path)
@@ -720,8 +720,8 @@ def test_cmd_search_replaces_unencodable_note_chars(monkeypatch, tmp_path):
     """Search should not crash when note text contains characters outside stdout encoding."""
     from types import SimpleNamespace
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_search
+    from cogstash.core import CogStashConfig
 
     capture = StrictEncodedStream("cp1252")
     f = tmp_path / "cogstash.md"
@@ -743,8 +743,8 @@ def test_cmd_config_get(tmp_path, capsys):
     config_path.write_text('{"theme": "dracula"}', encoding="utf-8")
     from types import SimpleNamespace
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_config
+    from cogstash.core import CogStashConfig
 
     cmd_config(
         SimpleNamespace(action="get", key="theme", value=None),
@@ -762,8 +762,8 @@ def test_cmd_config_set(tmp_path, capsys):
     config_path.write_text('{"theme": "tokyo-night"}', encoding="utf-8")
     from types import SimpleNamespace
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_config
+    from cogstash.core import CogStashConfig
 
     cmd_config(
         SimpleNamespace(action="set", key="theme", value="dracula"),
@@ -784,8 +784,8 @@ def test_cmd_config_set_invalid_theme(tmp_path, capsys):
 
     import pytest
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_config
+    from cogstash.core import CogStashConfig
 
     with pytest.raises(SystemExit):
         cmd_config(
@@ -805,8 +805,8 @@ def test_cmd_config_wizard(tmp_path, monkeypatch, capsys):
 
     from types import SimpleNamespace
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_config
+    from cogstash.core import CogStashConfig
 
     cmd_config(
         SimpleNamespace(action=None, key=None, value=None),
@@ -825,8 +825,8 @@ def test_cmd_config_get_invalid_key(tmp_path, capsys):
 
     import pytest
 
-    from cogstash.app import CogStashConfig
     from cogstash.cli import cmd_config
+    from cogstash.core import CogStashConfig
 
     with pytest.raises(SystemExit):
         cmd_config(
@@ -986,22 +986,15 @@ def test_main_invalid_cli_arg_stays_in_cli_mode(monkeypatch):
 
 def test_module_main_prepares_windows_console_for_cli(monkeypatch):
     """Windows CLI launches should prepare console streams before running CLI handlers."""
-    import sys
-    import types
-
     import cogstash.__main__ as main_mod
+    import cogstash.cli
+    import cogstash.cli.windows
 
     calls = []
-    windows_mod = types.ModuleType("cogstash._windows")
-    windows_mod.prepare_windows_cli_console = lambda: calls.append("prepare")
-
-    cli_mod = types.ModuleType("cogstash.cli")
-    cli_mod.cli_main = lambda argv: calls.append(("cli", argv))
-
     monkeypatch.setattr(main_mod.sys, "platform", "win32")
     monkeypatch.setattr(main_mod.sys, "argv", ["cogstash", "stats"])
-    monkeypatch.setitem(sys.modules, "cogstash._windows", windows_mod)
-    monkeypatch.setitem(sys.modules, "cogstash.cli", cli_mod)
+    monkeypatch.setattr(cogstash.cli.windows, "prepare_windows_cli_console", lambda: calls.append("prepare"))
+    monkeypatch.setattr(cogstash.cli, "cli_main", lambda argv: calls.append(("cli", argv)))
 
     main_mod.main()
 

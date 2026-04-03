@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
-from .config import CogStashConfig, get_default_config_path, load_config, save_config
+from .config import (
+    VALID_THEMES,
+    VALID_WINDOW_SIZES,
+    CogStashConfig,
+    get_default_config_path,
+    load_config,
+    save_config,
+)
 from .notes import (
     DEFAULT_SMART_TAGS,
     DEFAULT_TAG_COLORS,
@@ -18,12 +25,15 @@ from .notes import (
     parse_smart_tags,
     search_notes,
 )
+from .output import safe_print, stream_is_interactive, stream_supports_color
 
 __all__ = [
     "CogStashConfig",
     "DEFAULT_SMART_TAGS",
     "DEFAULT_TAG_COLORS",
     "Note",
+    "VALID_THEMES",
+    "VALID_WINDOW_SIZES",
     "append_note_to_file",
     "compute_stats",
     "delete_note",
@@ -37,4 +47,7 @@ __all__ = [
     "parse_smart_tags",
     "save_config",
     "search_notes",
+    "safe_print",
+    "stream_is_interactive",
+    "stream_supports_color",
 ]
