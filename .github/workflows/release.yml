@@ -73,8 +73,8 @@ jobs:
           $process = Start-Process -FilePath $binary.FullName -PassThru
           Start-Sleep -Seconds 5
           $process.Refresh()
-          if ($process.HasExited -and $process.ExitCode -ne 0) {
-            throw "UI onedir process exited with code $($process.ExitCode) for $($binary.FullName)"
+          if ($process.HasExited) {
+            throw "UI onedir exited early with code $($process.ExitCode) for $($binary.FullName)"
           }
           if (-not $process.HasExited) {
             Stop-Process -Id $process.Id
