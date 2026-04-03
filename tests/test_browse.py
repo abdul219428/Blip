@@ -5,7 +5,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from conftest import needs_display
+from ui._support import needs_display
 
 
 @needs_display
@@ -141,7 +141,7 @@ def test_browse_context_menu_releases_grab_after_popup(tmp_path, tk_root):
 
     event = SimpleNamespace(x_root=10, y_root=10)
     note = win._all_notes[0]
-    with patch("cogstash.browse.tk.Menu", FakeMenu):
+    with patch("cogstash.ui.browse.tk.Menu", FakeMenu):
         win._show_context_menu(event, note)
 
     assert FakeMenu.last_instance is not None
@@ -193,7 +193,7 @@ def test_browse_context_menu_commands_remain_callable_after_popup(tmp_path, tk_r
     event = SimpleNamespace(x_root=10, y_root=10)
     note = win._all_notes[0]
 
-    with patch("cogstash.browse.tk.Menu", FakeMenu):
+    with patch("cogstash.ui.browse.tk.Menu", FakeMenu):
         with (
             patch.object(win, "_on_edit") as edit_mock,
             patch.object(win, "_on_delete") as delete_mock,
@@ -263,7 +263,7 @@ def test_browse_edit_empty_text_shows_error(tmp_path, tk_root):
     win = BrowseWindow(tk_root, config)
     note = win._all_notes[0]
 
-    with patch("cogstash.browse.edit_note") as edit_mock, patch("tkinter.messagebox.showerror") as error_mock:
+    with patch("cogstash.ui.browse.edit_note") as edit_mock, patch("tkinter.messagebox.showerror") as error_mock:
         win._on_edit(note)
         dialog = next(child for child in win.window.winfo_children() if child.winfo_class() == "Toplevel")
         text_widget = next(child for child in dialog.winfo_children() if child.winfo_class() == "Text")
@@ -393,7 +393,7 @@ def test_browse_stale_edit_reloads_and_shows_notice(tmp_path, tk_root):
     note = win._all_notes[0]
 
     with (
-        patch("cogstash.browse.edit_note", return_value=False),
+        patch("cogstash.ui.browse.edit_note", return_value=False),
         patch.object(win, "_load_notes") as reload_mock,
         patch.object(win, "_show_notice") as notice_mock,
         patch("tkinter.messagebox.showerror") as error_mock,

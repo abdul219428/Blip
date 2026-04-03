@@ -6,7 +6,7 @@ import sys
 from unittest.mock import patch
 
 import pytest
-from conftest import needs_display
+from ui._support import needs_display
 
 
 @needs_display
@@ -290,7 +290,7 @@ def test_app_open_settings_uses_shared_config_path(tk_root, tmp_path):
             created.append((parent, config, passed_config_path, on_config_changed))
             self.win = None
 
-    with patch("cogstash.settings.SettingsWindow", DummySettingsWindow):
+    with patch("cogstash.ui.settings.SettingsWindow", DummySettingsWindow):
         app._open_settings()
 
     assert created[0][2] == config_path

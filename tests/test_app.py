@@ -4,7 +4,8 @@ import re
 import sys
 from unittest.mock import patch
 
-from conftest import StrictEncodedStream, needs_display
+from conftest import StrictEncodedStream
+from ui._support import needs_display
 
 
 def test_platform_font_windows():
@@ -289,7 +290,7 @@ def test_app_main_startup_output_is_cp1252_safe(monkeypatch, tmp_path):
     import types
 
     import cogstash
-    import cogstash.app as app_mod
+    import cogstash.ui.app as app_mod
 
     class FakeRoot:
         def wait_window(self, _win):
@@ -323,7 +324,7 @@ def test_app_main_startup_output_is_cp1252_safe(monkeypatch, tmp_path):
         last_seen_version=cogstash.__version__,
     )
     capture = StrictEncodedStream("cp1252")
-    windows_mod = types.ModuleType("cogstash._windows")
+    windows_mod = types.ModuleType("cogstash.ui.windows")
     windows_mod.WINDOWS_MUTEX_NAME = "Local\\CogStash.Test"
     windows_mod.acquire_single_instance = lambda _name: FakeGuard()
 
@@ -338,7 +339,7 @@ def test_app_main_startup_output_is_cp1252_safe(monkeypatch, tmp_path):
         "showinfo",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("startup test should not show duplicate-instance dialog")),
     )
-    monkeypatch.setitem(sys.modules, "cogstash._windows", windows_mod)
+    monkeypatch.setitem(sys.modules, "cogstash.ui.windows", windows_mod)
     monkeypatch.setattr("sys.stdout", capture)
 
     original_handlers = app_mod.logger.handlers[:]
@@ -366,7 +367,7 @@ def test_app_main_refuses_duplicate_instance_before_startup(monkeypatch, tmp_pat
     import types
 
     import cogstash
-    import cogstash.app as app_mod
+    import cogstash.ui.app as app_mod
 
     config = app_mod.CogStashConfig(
         output_file=tmp_path / "notes.md",
@@ -374,18 +375,18 @@ def test_app_main_refuses_duplicate_instance_before_startup(monkeypatch, tmp_pat
         last_seen_version=cogstash.__version__,
     )
 
-    windows_mod = types.ModuleType("cogstash._windows")
+    windows_mod = types.ModuleType("cogstash.ui.windows")
     windows_mod.WINDOWS_MUTEX_NAME = "Local\\CogStash.Test"
     windows_mod.acquire_single_instance = lambda _name: None
 
     monkeypatch.setattr(app_mod, "load_config", lambda _path: config)
     monkeypatch.setattr(app_mod, "configure_dpi", lambda: None)
     monkeypatch.setattr(app_mod.tk, "Tk", lambda: (_ for _ in ()).throw(AssertionError("should not create root")))
-    monkeypatch.setitem(sys.modules, "cogstash._windows", windows_mod)
+    monkeypatch.setitem(sys.modules, "cogstash.ui.windows", windows_mod)
 
     original_handlers = app_mod.logger.handlers[:]
     try:
-        with patch("cogstash.app.messagebox.showinfo"):
+        with patch("cogstash.ui.app.messagebox.showinfo"):
             app_mod.main()
     finally:
         for handler in [h for h in app_mod.logger.handlers[:] if h not in original_handlers]:
