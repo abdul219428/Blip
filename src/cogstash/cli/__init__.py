@@ -16,7 +16,6 @@ from .formatting import (
 )
 from .main import (
     VALID_CONFIG_KEYS,
-    _find_note,
     build_parser,
     cli_main,
     cmd_add,
@@ -37,7 +36,6 @@ __all__ = [
     "ANSI_STRIKE_DIM",
     "DEFAULT_ANSI_TAG",
     "VALID_CONFIG_KEYS",
-    "_find_note",
     "build_ansi_tag_map",
     "build_parser",
     "cli_main",

@@ -532,7 +532,6 @@ def cli_main(argv: list[str]) -> None:
 
 __all__ = [
     "VALID_CONFIG_KEYS",
-    "_find_note",
     "build_parser",
     "cli_main",
     "cmd_add",
