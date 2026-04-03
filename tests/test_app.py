@@ -357,6 +357,8 @@ def test_main_dispatches_version_with_cp1252_stdout(monkeypatch):
 
 def test_app_main_startup_output_is_cp1252_safe(monkeypatch, tmp_path):
     """Startup status output should not crash on a cp1252-packaged console."""
+    import types
+
     import cogstash
     import cogstash.app as app_mod
 
@@ -382,12 +384,19 @@ def test_app_main_startup_output_is_cp1252_safe(monkeypatch, tmp_path):
         def __init__(self, _root, _config):
             self.queue = object()
 
+    class FakeGuard:
+        def close(self):
+            return None
+
     config = app_mod.CogStashConfig(
         output_file=tmp_path / "notes.md",
         log_file=tmp_path / "cogstash.log",
         last_seen_version=cogstash.__version__,
     )
     capture = StrictEncodedStream("cp1252")
+    windows_mod = types.ModuleType("cogstash._windows")
+    windows_mod.WINDOWS_MUTEX_NAME = "Local\\CogStash.Test"
+    windows_mod.acquire_single_instance = lambda _name: FakeGuard()
 
     monkeypatch.setattr(app_mod, "load_config", lambda _path: config)
     monkeypatch.setattr(app_mod, "configure_dpi", lambda: None)
@@ -395,6 +404,12 @@ def test_app_main_startup_output_is_cp1252_safe(monkeypatch, tmp_path):
     monkeypatch.setattr(app_mod, "CogStash", FakeApp)
     monkeypatch.setattr(app_mod, "create_tray_icon", lambda _queue, _config: None)
     monkeypatch.setattr(app_mod.keyboard, "GlobalHotKeys", FakeListener)
+    monkeypatch.setattr(
+        app_mod.messagebox,
+        "showinfo",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("startup test should not show duplicate-instance dialog")),
+    )
+    monkeypatch.setitem(sys.modules, "cogstash._windows", windows_mod)
     monkeypatch.setattr("sys.stdout", capture)
 
     original_handlers = app_mod.logger.handlers[:]
