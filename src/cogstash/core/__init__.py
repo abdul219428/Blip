@@ -25,7 +25,7 @@ from .notes import (
     parse_smart_tags,
     search_notes,
 )
-from .output import safe_print, stream_is_interactive, stream_supports_color
+from .output import safe_print
 
 __all__ = [
     "CogStashConfig",
@@ -48,6 +48,4 @@ __all__ = [
     "save_config",
     "search_notes",
     "safe_print",
-    "stream_is_interactive",
-    "stream_supports_color",
 ]

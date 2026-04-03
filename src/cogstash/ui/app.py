@@ -491,7 +491,7 @@ class CogStash:
 
 
 def main():
-    from cogstash._output import safe_print
+    from cogstash.core.output import safe_print
     from cogstash.ui.windows import WINDOWS_MUTEX_NAME, acquire_single_instance
 
     config_path = get_default_config_path()

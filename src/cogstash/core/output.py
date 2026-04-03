@@ -3,24 +3,6 @@ from __future__ import annotations
 import sys
 
 
-def stream_supports_color(stream: object | None) -> bool:
-    """Return True when a stream safely reports interactive TTY support."""
-    if stream is None:
-        return False
-    isatty = getattr(stream, "isatty", None)
-    if not callable(isatty):
-        return False
-    try:
-        return bool(isatty())
-    except Exception:
-        return False
-
-
-def stream_is_interactive(stream: object | None) -> bool:
-    """Return True when stdin-like streams can be treated as interactive."""
-    return stream_supports_color(stream)
-
-
 def safe_print(*args: object, sep: str = " ", end: str = "\n", file: object | None = None) -> None:
     """Print text while degrading unencodable characters instead of crashing."""
     stream = sys.stdout if file is None else file
@@ -47,4 +29,4 @@ def safe_print(*args: object, sep: str = " ", end: str = "\n", file: object | No
         flush()
 
 
-__all__ = ["safe_print", "stream_is_interactive", "stream_supports_color"]
+__all__ = ["safe_print"]

@@ -26,7 +26,7 @@ class _WindowsMutexGuard:
 
 
 def acquire_single_instance(name: str = WINDOWS_MUTEX_NAME):
-    """Return a guard for the current GUI instance, or None if one already exists."""
+    """Return a GUI instance guard, or None when another CogStash UI owns the mutex."""
     if sys.platform != "win32":
         return _NullInstanceGuard()
 

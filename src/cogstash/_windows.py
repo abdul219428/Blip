@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from cogstash.cli.windows import prepare_windows_cli_console as _prepare_windows_cli_console
-from cogstash.ui import windows as _ui_windows
+from cogstash.cli.windows import prepare_windows_cli_console
+from cogstash.ui.windows import WINDOWS_MUTEX_NAME, acquire_single_instance
 
-prepare_windows_cli_console = _prepare_windows_cli_console
-WINDOWS_MUTEX_NAME = _ui_windows.WINDOWS_MUTEX_NAME
-acquire_single_instance = _ui_windows.acquire_single_instance
+__all__ = ["prepare_windows_cli_console", "WINDOWS_MUTEX_NAME", "acquire_single_instance"]

@@ -1,6 +1,24 @@
 from __future__ import annotations
 
-from cogstash.core import Note, stream_is_interactive, stream_supports_color
+from cogstash.core import Note
+
+
+def stream_supports_color(stream: object | None) -> bool:
+    """Return True when a stream safely reports interactive TTY support."""
+    if stream is None:
+        return False
+    isatty = getattr(stream, "isatty", None)
+    if not callable(isatty):
+        return False
+    try:
+        return bool(isatty())
+    except Exception:
+        return False
+
+
+def stream_is_interactive(stream: object | None) -> bool:
+    """Return True when stdin-like streams can be treated as interactive."""
+    return stream_supports_color(stream)
 
 ANSI_RESET = "\033[0m"
 ANSI_BOLD = "\033[1m"

@@ -12,7 +12,7 @@ def _open_console_stream(name: str, mode: str) -> TextIO:
 
 
 def prepare_windows_cli_console() -> None:
-    """Attach a GUI-subsystem Windows process to the parent console for CLI mode."""
+    """Attach a Windows CLI process to the parent console when stdio is missing."""
     if sys.platform != "win32":
         return
     if sys.stdin is not None and sys.stdout is not None and sys.stderr is not None:
