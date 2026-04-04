@@ -32,15 +32,12 @@ jobs:
           - os: windows-latest
             artifact_suffix: windows
             exe_ext: .exe
-            shell: pwsh
           - os: macos-latest
             artifact_suffix: macos
             exe_ext: ""
-            shell: bash
           - os: ubuntu-latest
             artifact_suffix: linux
             exe_ext: ""
-            shell: bash
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
@@ -51,12 +48,15 @@ jobs:
         with:
           python-version: "3.13"
       - run: uv sync --extra dev
+      - name: Install Linux UI smoke-test dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y xvfb
       - name: Install Inno Setup
         if: matrix.os == 'windows-latest'
         run: choco install innosetup --no-progress -y
         shell: pwsh
-      - name: Build executables
-        run: uv run python scripts/build.py
+      - name: Build UI and CLI executables
+        run: uv run python scripts/build.py --target both
       - name: Build Windows installer
         if: matrix.os == 'windows-latest'
         run: |
@@ -69,6 +69,23 @@ jobs:
           $binary = Get-ChildItem 'dist\CogStash-*-onedir\CogStash-*-onedir.exe' -File | Select-Object -First 1
           if (-not $binary) {
             throw "Could not find Windows onedir executable under dist\\CogStash-*-onedir\\CogStash-*-onedir.exe"
+          }
+          $process = Start-Process -FilePath $binary.FullName -PassThru
+          Start-Sleep -Seconds 5
+          $process.Refresh()
+          if ($process.HasExited) {
+            throw "UI onedir exited early with code $($process.ExitCode) for $($binary.FullName)"
+          }
+          if (-not $process.HasExited) {
+            Stop-Process -Id $process.Id
+          }
+        shell: pwsh
+      - name: Smoke test CLI onefile (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          $binary = Get-ChildItem 'dist\CogStash-CLI-*.exe' -File | Select-Object -First 1
+          if (-not $binary) {
+            throw "Could not find Windows CLI executable under dist\\CogStash-CLI-*.exe"
           }
           $help = (& $binary.FullName --help 2>&1 | Out-String).Trim()
           if ($LASTEXITCODE -ne 0) {
@@ -91,12 +108,56 @@ jobs:
             throw "Expected readable --version output from $($binary.FullName), got: [$version]"
           }
         shell: pwsh
-      - name: Smoke test onefile (Unix)
+      - name: Smoke test UI onedir (Unix)
         if: matrix.os != 'windows-latest'
         run: |
-          binary=$(find dist -maxdepth 1 -name 'CogStash-*' -type f ! -name '*onedir*' ! -name '*.tar.gz' ! -name '*.zip' | head -1)
+          binary=$(find dist -maxdepth 2 -path 'dist/CogStash-*-onedir/CogStash-*-onedir' -type f | head -1)
+          if [ -z "$binary" ]; then
+            echo "Could not find Unix onedir executable under dist/CogStash-*-onedir/CogStash-*-onedir"
+            exit 1
+          fi
           chmod +x "$binary"
-          "$binary" --version
+          if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+            xvfb-run --auto-servernum "$binary" &
+          else
+            "$binary" &
+          fi
+          pid=$!
+          sleep 5
+          if kill -0 "$pid" 2>/dev/null; then
+            kill "$pid"
+            wait "$pid" || true
+          else
+            wait "$pid"
+            exit_code=$?
+            echo "UI onedir exited early with code $exit_code for $binary"
+            echo "UI onedir should remain running during smoke test: $binary"
+            exit 1
+          fi
+        shell: bash
+      - name: Smoke test CLI onefile (Unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          binary=$(find dist -maxdepth 1 -name 'CogStash-CLI-*' -type f | head -1)
+          if [ -z "$binary" ]; then
+            echo "Could not find CLI executable under dist/CogStash-CLI-*"
+            exit 1
+          fi
+          chmod +x "$binary"
+          help_output=$("$binary" --help 2>&1)
+          case "$help_output" in
+            *Traceback*)
+              echo "--help output unexpectedly contained Traceback: [$help_output]"
+              exit 1
+              ;;
+          esac
+          version_output=$("$binary" --version 2>&1)
+          case "$version_output" in
+            *Traceback*)
+              echo "--version output unexpectedly contained Traceback: [$version_output]"
+              exit 1
+              ;;
+          esac
         shell: bash
       - name: Archive onedir bundle (Windows)
         if: matrix.os == 'windows-latest'
@@ -110,25 +171,43 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: cd dist && tar -czf CogStash-${{ github.ref_name }}-linux.tar.gz CogStash-*-onedir
         shell: bash
-      - name: Rename onefile for clarity
+      - name: Rename onefile artifacts
         run: |
-          import glob, os
-          version = os.environ.get("GITHUB_REF_NAME", "unknown")
+          import glob
+          import os
+          from pathlib import Path
+
           suffix = "${{ matrix.artifact_suffix }}"
           ext = "${{ matrix.exe_ext }}"
-          pattern = f"dist/CogStash-*{ext}"
-          for f in glob.glob(pattern):
-              if "onedir" not in f and "setup" not in f and not f.endswith((".zip", ".tar.gz")):
-                  target = f"dist/CogStash-{version}-{suffix}{ext}"
-                  os.rename(f, target)
-                  break
+          version = os.environ["GITHUB_REF_NAME"]
+          dist_dir = Path("dist")
+
+          ui_candidates = sorted(
+              path for path in dist_dir.glob(f"CogStash-*{ext}") if "onedir" not in path.name and "setup" not in path.name and "CLI" not in path.name
+          )
+          cli_candidates = sorted(dist_dir.glob(f"CogStash-CLI-*{ext}"))
+          if not ui_candidates:
+              raise SystemExit("Could not find UI onefile artifact to rename")
+          if not cli_candidates:
+              raise SystemExit("Could not find CLI onefile artifact to rename")
+
+          ui_target = dist_dir / f"CogStash-{version}-{suffix}{ext}"
+          cli_target = dist_dir / f"CogStash-CLI-{version}-{suffix}{ext}"
+          ui_candidates[0].replace(ui_target)
+          cli_candidates[0].replace(cli_target)
         shell: python
-      - name: Upload artifacts
+      - name: Upload UI artifacts
         uses: actions/upload-artifact@v6
         with:
-          name: cogstash-${{ matrix.artifact_suffix }}
+          name: cogstash-${{ matrix.artifact_suffix }}-ui
           path: |
-            dist/CogStash-*-${{ matrix.artifact_suffix }}*
+            dist/CogStash-${{ github.ref_name }}-${{ matrix.artifact_suffix }}*
+      - name: Upload CLI artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: cogstash-${{ matrix.artifact_suffix }}-cli
+          path: |
+            dist/CogStash-CLI-${{ github.ref_name }}-${{ matrix.artifact_suffix }}*
       - name: Upload Windows installer
         if: matrix.os == 'windows-latest'
         uses: actions/upload-artifact@v6

@@ -39,37 +39,11 @@ def test_parse_notes_multiline(tmp_path):
     assert notes[0].text == "first line\nsecond line\nthird line"
 
 
-def test_parse_notes_empty_file(tmp_path):
-    """Empty file returns empty list."""
-    f = tmp_path / "cogstash.md"
-    f.write_text("", encoding="utf-8")
-
-    from cogstash.search import parse_notes
-    notes = parse_notes(f)
-    assert notes == []
-
-
 def test_parse_notes_missing_file(tmp_path):
     """Missing file returns empty list."""
     from cogstash.search import parse_notes
     notes = parse_notes(tmp_path / "nonexistent.md")
     assert notes == []
-
-
-def test_parse_notes_done_status(tmp_path):
-    """☐ → is_done=False, ☑ → is_done=True."""
-    f = tmp_path / "cogstash.md"
-    f.write_text(
-        "- [2026-03-26 14:30] ☐ open item #todo\n"
-        "- [2026-03-26 15:00] ☑ done item #todo\n",
-        encoding="utf-8",
-    )
-
-    from cogstash.search import parse_notes
-    notes = parse_notes(f)
-
-    assert notes[0].is_done is False
-    assert notes[1].is_done is True
 
 
 def test_parse_notes_no_prefix(tmp_path):
@@ -147,20 +121,6 @@ def test_mark_done(tmp_path):
     assert "☐" not in content
 
 
-def test_mark_done_already_done(tmp_path):
-    """Already ☑ → no change, returns False."""
-    f = tmp_path / "cogstash.md"
-    f.write_text("- [2026-03-26 14:30] ☑ already done #todo\n", encoding="utf-8")
-
-    from cogstash.search import mark_done, parse_notes
-    notes = parse_notes(f)
-    result = mark_done(f, notes[0])
-
-    assert result is False
-    content = f.read_text(encoding="utf-8")
-    assert content.count("☑") == 1
-
-
 def test_note_line_span_single(tmp_path):
     """Single-line note spans exactly one line."""
     f = tmp_path / "cogstash.md"
@@ -191,24 +151,6 @@ def test_note_line_span_multiline(tmp_path):
     lines = f.read_text(encoding="utf-8").splitlines(keepends=True)
     start, end = _note_line_span(lines, notes[0].line_number)
     assert (start, end) == (0, 3)
-
-
-def test_edit_note_single_line(tmp_path):
-    """Edit replaces text, preserves timestamp."""
-    f = tmp_path / "cogstash.md"
-    f.write_text(
-        "- [2026-03-26 14:30] buy milk #todo\n"
-        "- [2026-03-26 15:00] meeting\n",
-        encoding="utf-8",
-    )
-    from cogstash.search import edit_note, parse_notes
-    notes = parse_notes(f)
-    result = edit_note(f, notes[0], "buy oat milk #todo")
-    assert result is True
-    content = f.read_text(encoding="utf-8")
-    assert "- [2026-03-26 14:30] buy oat milk #todo\n" in content
-    assert "buy milk" not in content
-    assert "- [2026-03-26 15:00] meeting\n" in content
 
 
 def test_edit_note_multiline(tmp_path):
@@ -334,101 +276,15 @@ def test_delete_note_stale_line_number_rejected(tmp_path):
     assert f.read_text(encoding="utf-8") == current
 
 
-def test_atomic_write_cleans_up_temp_file_on_replace_failure(tmp_path, monkeypatch):
-    """_atomic_write removes temp file if replace fails."""
-    import cogstash.search as search
-
-    path = tmp_path / "cogstash.md"
-    path.write_text("original\n", encoding="utf-8")
-    tmp = path.with_suffix(".tmp")
-
-    def boom(src, dst):
-        raise OSError("replace failed")
-
-    monkeypatch.setattr(search.os, "replace", boom)
-
-    try:
-        search._atomic_write(path, "updated\n")
-    except OSError:
-        pass
-
-    assert not tmp.exists()
-    assert path.read_text(encoding="utf-8") == "original\n"
-
-
-def test_compute_stats_basic(tmp_path):
-    """Stats returns correct totals, done/pending, date range."""
-    f = tmp_path / "cogstash.md"
-    f.write_text(
-        "- [2026-01-15 09:00] first note #todo\n"
-        "- [2026-02-10 14:30] ☑ done item #todo\n"
-        "- [2026-03-27 16:00] latest note #idea\n",
-        encoding="utf-8",
-    )
-    from cogstash.search import compute_stats, parse_notes
-    notes = parse_notes(f)
-    stats = compute_stats(notes)
-
-    assert stats["total"] == 3
-    assert stats["done"] == 1
-    assert stats["pending"] == 2
-    assert stats["first_date"].year == 2026
-    assert stats["first_date"].month == 1
-    assert stats["last_date"].month == 3
-    assert "todo" in stats["tag_counts"]
-    assert stats["tag_counts"]["todo"] == 2
-    assert stats["avg_length"] > 0
-    assert stats["longest"] >= stats["avg_length"]
-
-
-def test_compute_stats_empty():
-    """Empty note list returns zeroed stats."""
-    from cogstash.search import compute_stats
-    stats = compute_stats([])
-
-    assert stats["total"] == 0
-    assert stats["done"] == 0
-    assert stats["pending"] == 0
-    assert stats["first_date"] is None
-    assert stats["last_date"] is None
-    assert stats["tag_counts"] == {}
-    assert stats["avg_length"] == 0
-
-
-def test_compute_stats_streaks(tmp_path):
-    """Streak calculation finds consecutive days with notes."""
-    from datetime import date, timedelta
-
-    from cogstash.search import compute_stats, parse_notes
-
-    today = date.today()
-    dates = [today - timedelta(days=i) for i in range(3, -1, -1)]  # 4 consecutive days ending today
-    lines = []
-    for i, d in enumerate(dates):
-        ts = d.strftime("%Y-%m-%d") + " 09:00"
-        lines.append(f"- [{ts}] day {i + 1}\n")
-
-    f = tmp_path / "cogstash.md"
-    f.write_text("".join(lines), encoding="utf-8")
-    notes = parse_notes(f)
-    stats = compute_stats(notes)
-
-    assert stats["current_streak"] == 4
-    assert stats["longest_streak"] == 4
-    assert stats["notes_this_week"] >= 1
-
-
 def test_compute_stats_current_streak_reuses_date_set(tmp_path, monkeypatch):
-    """compute_stats should not rebuild the date set during current streak checks."""
-    from datetime import date, timedelta
-
     from cogstash.search import compute_stats, parse_notes
 
-    today = date.today()
-    dates = [today - timedelta(days=i) for i in range(3, -1, -1)]
     f = tmp_path / "cogstash.md"
     f.write_text(
-        "".join(f"- [{d.strftime('%Y-%m-%d')} 09:00] day {i}\n" for i, d in enumerate(dates, start=1)),
+        "- [2026-03-24 09:00] day 1\n"
+        "- [2026-03-25 09:00] day 2\n"
+        "- [2026-03-26 09:00] day 3\n"
+        "- [2026-03-27 09:00] day 4\n",
         encoding="utf-8",
     )
     notes = parse_notes(f)
@@ -443,7 +299,29 @@ def test_compute_stats_current_streak_reuses_date_set(tmp_path, monkeypatch):
 
     monkeypatch.setattr(builtins, "set", counting_set)
 
-    stats = compute_stats(notes)
+    compute_stats(notes)
 
-    assert stats["current_streak"] == 4
     assert set_calls == 1
+
+
+def test_search_reexports_core_helpers():
+    import cogstash.core.notes as core_notes
+    import cogstash.search as search_mod
+
+    assert search_mod.Note is core_notes.Note
+    assert search_mod.parse_notes is core_notes.parse_notes
+    assert search_mod.search_notes is core_notes.search_notes
+    assert search_mod.filter_by_tag is core_notes.filter_by_tag
+    assert search_mod.mark_done is core_notes.mark_done
+    assert search_mod.edit_note is core_notes.edit_note
+    assert search_mod.delete_note is core_notes.delete_note
+    assert search_mod.compute_stats is core_notes.compute_stats
+    assert search_mod.DEFAULT_TAG_COLORS is core_notes.DEFAULT_TAG_COLORS
+
+
+def test_search_reexports_private_helpers():
+    import cogstash.core.notes as core_notes
+    import cogstash.search as search_mod
+
+    assert search_mod._atomic_write is core_notes._atomic_write
+    assert search_mod._note_line_span is core_notes._note_line_span

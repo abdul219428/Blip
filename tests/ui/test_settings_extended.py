@@ -6,7 +6,8 @@ import sys
 from unittest.mock import patch
 
 import pytest
-from conftest import needs_display
+
+from ui._support import needs_display
 
 
 @needs_display
@@ -17,7 +18,6 @@ def test_settings_queue_message(tk_root):
     config = CogStashConfig()
     app = CogStash(tk_root, config)
     app.queue.put("SETTINGS")
-    # Process one round of poll_queue
     opened = []
     app._open_settings = lambda: opened.append(True)
     app.poll_queue()
@@ -117,7 +117,7 @@ def test_settings_tags_tab(tk_root, tmp_path):
     from cogstash.settings import SettingsWindow
     config = CogStashConfig()
     sw = SettingsWindow(tk_root, config, tmp_path / "test.json")
-    sw._show_tab(2)  # Tags tab
+    sw._show_tab(2)
     assert hasattr(sw, "tag_list_frame")
     sw.win.destroy()
 
@@ -129,7 +129,7 @@ def test_settings_about_tab(tk_root, tmp_path):
     from cogstash.settings import SettingsWindow
     config = CogStashConfig()
     sw = SettingsWindow(tk_root, config, tmp_path / "test.json")
-    sw._show_tab(3)  # About tab
+    sw._show_tab(3)
     assert hasattr(sw, "version_label")
     sw.win.destroy()
 
@@ -290,8 +290,7 @@ def test_app_open_settings_uses_shared_config_path(tk_root, tmp_path):
             created.append((parent, config, passed_config_path, on_config_changed))
             self.win = None
 
-    with patch("cogstash.settings.SettingsWindow", DummySettingsWindow):
+    with patch("cogstash.ui.settings.SettingsWindow", DummySettingsWindow):
         app._open_settings()
 
     assert created[0][2] == config_path
-

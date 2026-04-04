@@ -35,3 +35,30 @@ jobs:
       - run: uv sync --extra dev
       - name: Run tests
         run: xvfb-run uv run pytest tests/ -v --timeout=30
+
+  packaging-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - run: uv sync --extra dev
+      - name: Build CLI artifact
+        run: uv run python scripts/build.py --target cli
+      - name: Smoke test CLI artifact
+        run: |
+          binary=$(find dist -maxdepth 1 -name 'CogStash-CLI-*' -type f | head -1)
+          if [ -z "$binary" ]; then
+            echo "Could not find CLI executable under dist/CogStash-CLI-*"
+            exit 1
+          fi
+          chmod +x "$binary"
+          help_output=$("$binary" --help 2>&1)
+          case "$help_output" in
+            *Traceback*)
+              echo "--help output unexpectedly contained Traceback: [$help_output]"
+              exit 1
+              ;;
+          esac

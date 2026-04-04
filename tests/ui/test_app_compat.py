@@ -1,11 +1,12 @@
 """Tests for cogstash.py."""
 
-import json
 import re
 import sys
 from unittest.mock import patch
 
-from conftest import StrictEncodedStream, needs_display
+from _helpers import StrictEncodedStream
+
+from ui._support import needs_display
 
 
 def test_platform_font_windows():
@@ -74,7 +75,7 @@ def test_append_note_error_handling(tmp_path, tk_root):
 
     test_file = tmp_path / "cogstash.md"
     app = cogstash_mod.CogStash(tk_root, cogstash_mod.CogStashConfig(output_file=test_file))
-    with patch("cogstash.app.Path.open", side_effect=OSError("mock write failure")):
+    with patch("cogstash.core.notes.Path.open", side_effect=OSError("mock write failure")):
         result = app.append_note("should fail")
 
     assert result is False
@@ -117,46 +118,6 @@ def test_window_size_presets():
         assert size["lines"] <= size["max_lines"], f"Size '{name}' lines > max_lines"
 
 
-def test_load_config_defaults(tmp_path):
-    """No config file → returns default CogStashConfig."""
-    from cogstash.app import CogStashConfig, load_config
-    config = load_config(tmp_path / "nonexistent.json")
-    assert isinstance(config, CogStashConfig)
-    assert config.hotkey == "<ctrl>+<shift>+<space>"
-    assert config.theme == "tokyo-night"
-    assert config.window_size == "default"
-    # Config file should be created with defaults
-    assert (tmp_path / "nonexistent.json").exists()
-
-
-def test_load_config_partial(tmp_path):
-    """Partial JSON → missing keys filled from defaults."""
-    from cogstash.app import load_config
-    cfg_file = tmp_path / "cogstash.json"
-    cfg_file.write_text(json.dumps({"theme": "dracula"}), encoding="utf-8")
-    config = load_config(cfg_file)
-    assert config.theme == "dracula"
-    assert config.hotkey == "<ctrl>+<shift>+<space>"  # filled from default
-
-
-def test_load_config_malformed(tmp_path):
-    """Bad JSON → warning logged, defaults returned."""
-    from cogstash.app import load_config
-    cfg_file = tmp_path / "cogstash.json"
-    cfg_file.write_text("{bad json!!!", encoding="utf-8")
-    config = load_config(cfg_file)
-    assert config.theme == "tokyo-night"  # all defaults
-
-
-def test_load_config_unknown_theme(tmp_path):
-    """Unknown theme → falls back to tokyo-night."""
-    from cogstash.app import load_config
-    cfg_file = tmp_path / "cogstash.json"
-    cfg_file.write_text(json.dumps({"theme": "nonexistent"}), encoding="utf-8")
-    config = load_config(cfg_file)
-    assert config.theme == "tokyo-night"
-
-
 def test_parse_tags_smart():
     """Smart tags get emoji prefixes prepended to text."""
     from cogstash.app import parse_smart_tags
@@ -169,7 +130,6 @@ def test_parse_tags_dedup():
     """Duplicate smart tags produce only one emoji prefix."""
     from cogstash.app import parse_smart_tags
     result = parse_smart_tags("do thing #todo and also #todo")
-    # Should have exactly one ☐, not two
     assert result.count("☐") == 1
 
 
@@ -177,7 +137,6 @@ def test_parse_tags_url_safe():
     """URL fragments are not matched as tags."""
     from cogstash.app import parse_smart_tags
     result = parse_smart_tags("see http://example.com#section for details")
-    # No emoji should be prepended — #section is not a standalone tag
     assert not result.startswith("☐")
     assert not result.startswith("🔴")
     assert not result.startswith("⭐")
@@ -233,7 +192,7 @@ def test_merge_tags_add_new():
     smart, colors = merge_tags(config)
     assert smart["work"] == "💼"
     assert colors["work"] == "#4A90D9"
-    assert "todo" in smart  # built-in still present
+    assert "todo" in smart
 
 
 def test_merge_tags_override_builtin():
@@ -243,36 +202,6 @@ def test_merge_tags_override_builtin():
     smart, colors = merge_tags(config)
     assert smart["todo"] == "✅"
     assert colors["todo"] == "#00FF00"
-
-
-def test_load_config_custom_tags(tmp_path):
-    """Config with tags key loads custom tags into CogStashConfig."""
-    from cogstash.app import load_config
-    cfg_path = tmp_path / "cogstash.json"
-    cfg_path.write_text(json.dumps({
-        "tags": {"work": {"emoji": "💼", "color": "#4A90D9"}}
-    }), encoding="utf-8")
-    config = load_config(cfg_path)
-    assert config.tags == {"work": {"emoji": "💼", "color": "#4A90D9"}}
-
-
-def test_load_config_invalid_tag_skipped(tmp_path):
-    """Tags missing emoji or color are skipped."""
-    from cogstash.app import load_config
-    cfg_path = tmp_path / "cogstash.json"
-    cfg_path.write_text(json.dumps({
-        "tags": {
-            "good": {"emoji": "✅", "color": "#00FF00"},
-            "bad_no_emoji": {"color": "#FF0000"},
-            "bad_no_color": {"emoji": "❌"},
-            "bad_hex": {"emoji": "❌", "color": "not-hex"},
-        }
-    }), encoding="utf-8")
-    config = load_config(cfg_path)
-    assert "good" in config.tags
-    assert "bad_no_emoji" not in config.tags
-    assert "bad_no_color" not in config.tags
-    assert "bad_hex" not in config.tags
 
 
 def test_parse_smart_tags_custom():
@@ -357,8 +286,10 @@ def test_main_dispatches_version_with_cp1252_stdout(monkeypatch):
 
 def test_app_main_startup_output_is_cp1252_safe(monkeypatch, tmp_path):
     """Startup status output should not crash on a cp1252-packaged console."""
+    import types
+
     import cogstash
-    import cogstash.app as app_mod
+    import cogstash.ui.app as app_mod
 
     class FakeRoot:
         def wait_window(self, _win):
@@ -382,12 +313,19 @@ def test_app_main_startup_output_is_cp1252_safe(monkeypatch, tmp_path):
         def __init__(self, _root, _config):
             self.queue = object()
 
+    class FakeGuard:
+        def close(self):
+            return None
+
     config = app_mod.CogStashConfig(
         output_file=tmp_path / "notes.md",
         log_file=tmp_path / "cogstash.log",
         last_seen_version=cogstash.__version__,
     )
     capture = StrictEncodedStream("cp1252")
+    windows_mod = types.ModuleType("cogstash.ui.windows")
+    windows_mod.WINDOWS_MUTEX_NAME = "Local\\CogStash.Test"
+    windows_mod.acquire_single_instance = lambda _name: FakeGuard()
 
     monkeypatch.setattr(app_mod, "load_config", lambda _path: config)
     monkeypatch.setattr(app_mod, "configure_dpi", lambda: None)
@@ -395,6 +333,12 @@ def test_app_main_startup_output_is_cp1252_safe(monkeypatch, tmp_path):
     monkeypatch.setattr(app_mod, "CogStash", FakeApp)
     monkeypatch.setattr(app_mod, "create_tray_icon", lambda _queue, _config: None)
     monkeypatch.setattr(app_mod.keyboard, "GlobalHotKeys", FakeListener)
+    monkeypatch.setattr(
+        app_mod.messagebox,
+        "showinfo",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("startup test should not show duplicate-instance dialog")),
+    )
+    monkeypatch.setitem(sys.modules, "cogstash.ui.windows", windows_mod)
     monkeypatch.setattr("sys.stdout", capture)
 
     original_handlers = app_mod.logger.handlers[:]
@@ -422,7 +366,7 @@ def test_app_main_refuses_duplicate_instance_before_startup(monkeypatch, tmp_pat
     import types
 
     import cogstash
-    import cogstash.app as app_mod
+    import cogstash.ui.app as app_mod
 
     config = app_mod.CogStashConfig(
         output_file=tmp_path / "notes.md",
@@ -430,18 +374,18 @@ def test_app_main_refuses_duplicate_instance_before_startup(monkeypatch, tmp_pat
         last_seen_version=cogstash.__version__,
     )
 
-    windows_mod = types.ModuleType("cogstash._windows")
+    windows_mod = types.ModuleType("cogstash.ui.windows")
     windows_mod.WINDOWS_MUTEX_NAME = "Local\\CogStash.Test"
     windows_mod.acquire_single_instance = lambda _name: None
 
     monkeypatch.setattr(app_mod, "load_config", lambda _path: config)
     monkeypatch.setattr(app_mod, "configure_dpi", lambda: None)
     monkeypatch.setattr(app_mod.tk, "Tk", lambda: (_ for _ in ()).throw(AssertionError("should not create root")))
-    monkeypatch.setitem(sys.modules, "cogstash._windows", windows_mod)
+    monkeypatch.setitem(sys.modules, "cogstash.ui.windows", windows_mod)
 
     original_handlers = app_mod.logger.handlers[:]
     try:
-        with patch("cogstash.app.messagebox.showinfo"):
+        with patch("cogstash.ui.app.messagebox.showinfo"):
             app_mod.main()
     finally:
         for handler in [h for h in app_mod.logger.handlers[:] if h not in original_handlers]:
@@ -455,38 +399,14 @@ def test_app_main_refuses_duplicate_instance_before_startup(monkeypatch, tmp_pat
                 app_mod.logger.addHandler(handler)
 
 
-def test_config_new_fields_defaults(tmp_path):
-    """Fresh config has launch_at_startup=False and last_seen_version=''."""
-    from cogstash.app import load_config
-    config = load_config(tmp_path / ".cogstash.json")
-    assert config.launch_at_startup is False
-    assert config.last_seen_version == ""
+def test_app_reexports_core_helpers():
+    import cogstash.app as app_mod
+    import cogstash.core as core_mod
 
-
-def test_config_new_fields_roundtrip(tmp_path):
-    """New fields survive write-read cycle."""
-    import json
-    config_path = tmp_path / ".cogstash.json"
-    data = {"launch_at_startup": True, "last_seen_version": "0.1.0", "theme": "dracula"}
-    config_path.write_text(json.dumps(data), encoding="utf-8")
-    from cogstash.app import load_config
-    config = load_config(config_path)
-    assert config.launch_at_startup is True
-    assert config.last_seen_version == "0.1.0"
-    assert config.theme == "dracula"
-
-
-def test_save_config(tmp_path):
-    """save_config writes config to JSON file."""
-    import json
-
-    from cogstash.app import CogStashConfig, save_config
-
-    config = CogStashConfig(theme="dracula", window_size="wide", last_seen_version="0.2.0")
-    config_path = tmp_path / ".cogstash.json"
-    save_config(config, config_path)
-    data = json.loads(config_path.read_text(encoding="utf-8"))
-    assert data["theme"] == "dracula"
-    assert data["window_size"] == "wide"
-    assert data["last_seen_version"] == "0.2.0"
-    assert data["launch_at_startup"] is False
+    assert app_mod.DEFAULT_SMART_TAGS is core_mod.DEFAULT_SMART_TAGS
+    assert app_mod.CogStashConfig is core_mod.CogStashConfig
+    assert app_mod.append_note_to_file is core_mod.append_note_to_file
+    assert app_mod.get_default_config_path is core_mod.get_default_config_path
+    assert app_mod.load_config is core_mod.load_config
+    assert app_mod.save_config is core_mod.save_config
+    assert app_mod.merge_tags is core_mod.merge_tags
