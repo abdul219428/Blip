@@ -53,9 +53,20 @@ LOG_FILE    = Path.home() / "cogstash.log"
 
 logger = logging.getLogger("cogstash")
 logger.setLevel(logging.WARNING)
-_handler = logging.FileHandler(LOG_FILE, encoding="utf-8")
-_handler.setFormatter(logging.Formatter("[%(asctime)s] %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M"))
-logger.addHandler(_handler)
+
+
+def _create_log_handler(log_file: Path) -> logging.Handler:
+    """Create a file-backed log handler, falling back safely when the path is unavailable."""
+    try:
+        handler: logging.Handler = logging.FileHandler(log_file, encoding="utf-8")
+    except OSError:
+        handler = logging.NullHandler()
+    else:
+        handler.setFormatter(logging.Formatter("[%(asctime)s] %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M"))
+    return handler
+
+
+logger.addHandler(_create_log_handler(LOG_FILE))
 
 
 def platform_font() -> str:
@@ -500,9 +511,8 @@ def main():
     # Reconfigure logger to use config's log_file
     for h in logger.handlers[:]:
         logger.removeHandler(h)
-    _handler = logging.FileHandler(config.log_file, encoding="utf-8")
-    _handler.setFormatter(logging.Formatter("[%(asctime)s] %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M"))
-    logger.addHandler(_handler)
+        h.close()
+    logger.addHandler(_create_log_handler(config.log_file))
 
     instance_guard = acquire_single_instance(WINDOWS_MUTEX_NAME)
     if instance_guard is None:

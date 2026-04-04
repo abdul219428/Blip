@@ -10,9 +10,9 @@ _HEX_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 _DEFAULT_HOTKEY = "<ctrl>+<shift>+<space>"
 _DEFAULT_THEME = "tokyo-night"
 _DEFAULT_WINDOW_SIZE = "default"
-# Keep this in sync with THEMES in cogstash.app.
+# Keep this in sync with THEMES in cogstash.ui.app. tests/core/test_config.py guards the key set.
 VALID_THEMES = {"tokyo-night", "light", "dracula", "gruvbox", "mono"}
-# Keep this in sync with WINDOW_SIZES in cogstash.app.
+# Keep this in sync with WINDOW_SIZES in cogstash.ui.app. tests/core/test_config.py guards the key set.
 VALID_WINDOW_SIZES = {"compact", "default", "wide"}
 
 logger = logging.getLogger("cogstash")

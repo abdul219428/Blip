@@ -161,3 +161,11 @@ def test_save_config(tmp_path):
     assert data["last_seen_version"] == "0.2.0"
     assert data["launch_at_startup"] is False
     assert Path(data["output_file"]) == tmp_path / "notes.md"
+
+
+def test_valid_theme_and_window_size_sets_match_ui_runtime():
+    import cogstash.core.config as config_mod
+    import cogstash.ui.app as app_mod
+
+    assert config_mod.VALID_THEMES == set(app_mod.THEMES)
+    assert config_mod.VALID_WINDOW_SIZES == set(app_mod.WINDOW_SIZES)

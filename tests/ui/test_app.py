@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import importlib
+import logging
 import sys
 from unittest.mock import patch
 
@@ -137,3 +139,70 @@ def test_app_main_refuses_duplicate_instance_before_startup(monkeypatch, tmp_pat
         for handler in original_handlers:
             if handler not in app_mod.logger.handlers:
                 app_mod.logger.addHandler(handler)
+
+
+def test_ui_app_import_falls_back_to_null_handler_when_file_handler_fails(monkeypatch):
+    """Importing the UI app should not fail when the default log file is unavailable."""
+    import cogstash.ui.app as app_mod
+
+    def fake_file_handler(*_args, **_kwargs):
+        raise PermissionError("read-only filesystem")
+
+    monkeypatch.setattr(logging, "FileHandler", fake_file_handler)
+
+    real_reload = importlib.reload
+    reloaded = real_reload(app_mod)
+    try:
+        assert any(isinstance(handler, logging.NullHandler) for handler in reloaded.logger.handlers)
+    finally:
+        real_reload(app_mod)
+
+
+def test_app_main_closes_removed_handlers(monkeypatch, tmp_path):
+    """main() should close replaced handlers before installing a new configured one."""
+    import types
+
+    import cogstash
+    import cogstash.ui.app as app_mod
+
+    class FakeOldHandler(logging.Handler):
+        def __init__(self):
+            super().__init__()
+            self.closed_flag = False
+
+        def emit(self, _record):
+            return None
+
+        def close(self):
+            self.closed_flag = True
+            super().close()
+
+    class FakeNewHandler(logging.Handler):
+        def emit(self, _record):
+            return None
+
+    old_handler = FakeOldHandler()
+    app_mod.logger.handlers[:] = [old_handler]
+
+    config = app_mod.CogStashConfig(
+        output_file=tmp_path / "notes.md",
+        log_file=tmp_path / "cogstash.log",
+        last_seen_version=cogstash.__version__,
+    )
+    windows_mod = types.ModuleType("cogstash.ui.windows")
+    windows_mod.WINDOWS_MUTEX_NAME = "Local\\CogStash.Test"
+    windows_mod.acquire_single_instance = lambda _name: None
+
+    monkeypatch.setattr(app_mod, "load_config", lambda _path: config)
+    monkeypatch.setattr(app_mod.logging, "FileHandler", lambda *_args, **_kwargs: FakeNewHandler())
+    monkeypatch.setitem(sys.modules, "cogstash.ui.windows", windows_mod)
+    monkeypatch.setattr(app_mod.messagebox, "showinfo", lambda *_args, **_kwargs: None)
+
+    try:
+        app_mod.main()
+    finally:
+        for handler in app_mod.logger.handlers[:]:
+            app_mod.logger.removeHandler(handler)
+            handler.close()
+
+    assert old_handler.closed_flag is True
