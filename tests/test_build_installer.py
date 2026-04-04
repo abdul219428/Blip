@@ -58,33 +58,28 @@ def test_inno_setup_script_supports_optional_startup_task():
     assert 'Type: files; Name: "{userstartup}\\CogStash.bat"' in content
 
 
-def test_inno_setup_script_does_not_offer_path_task():
-    """Installer should no longer offer PATH mutation tasks."""
+def test_inno_setup_script_offers_optional_path_task_with_correct_description():
+    """Installer script should offer an optional PATH task with the correct CLI description."""
     repo_root = Path(__file__).resolve().parents[1]
     iss_path = repo_root / "installer" / "windows" / "CogStash.iss"
 
     content = iss_path.read_text(encoding="utf-8")
 
-    assert 'Name: "addtopath"; Description: "Add CogStash to PATH' not in content
-    assert "EnvAddPath" not in content
-    assert "EnvRemovePath" not in content
-    assert "ChangesEnvironment=yes" not in content
+    assert 'Name: "addtopath"; Description: "Add CogStash CLI to PATH"' in content
+    assert "ChangesEnvironment=yes" in content
+    assert "ExpandConstant('{app}')" in content
 
 
-def test_inno_setup_script_does_not_track_path_ownership():
-    """Installer should not include PATH ownership or cleanup code."""
+def test_inno_setup_script_manages_installer_owned_path():
+    """Installer script should add PATH and track ownership for safe removal on uninstall."""
     repo_root = Path(__file__).resolve().parents[1]
     iss_path = repo_root / "installer" / "windows" / "CogStash.iss"
 
     content = iss_path.read_text(encoding="utf-8")
 
-    assert "PathOwnershipMarkerPath" not in content
-    assert "PathOwnershipMarkerExists" not in content
-    assert "WritePathOwnershipMarker" not in content
-    assert "RemovePathOwnershipMarker" not in content
-    assert "AddPathEntry" not in content
-    assert "RemovePathEntry" not in content
-    assert "RegWriteExpandStringValue" not in content
+    assert "RegWriteExpandStringValue" in content
+    assert "RegDeleteValue" in content
+    assert "PathOwnershipKey" in content
 
 
 def test_inno_setup_script_offers_optional_path_task():
@@ -358,4 +353,6 @@ def test_installer_script_installs_cli_binary_without_shortcut():
 
     iss = iss_path.read_text(encoding="utf-8")
     assert "CogStash-CLI.exe" in iss
-    assert "CogStash CLI" not in iss
+    # No Start Menu or Desktop shortcut entries for CogStash CLI
+    assert 'Name: "{group}\\CogStash CLI"' not in iss
+    assert 'Name: "{autodesktop}\\CogStash CLI"' not in iss
