@@ -104,11 +104,12 @@ def test_inno_setup_script_coordinates_with_running_app_on_uninstall():
     assert "CloseApplications" in content or "AppMutex" in content
 
 
-def test_installer_docs_or_script_record_startup_state_contract():
-    """Installer docs or script should record startup/config sync contract (regression lock)."""
+def test_inno_setup_script_records_startup_state_contract():
+    """Installer script should record the startup/config sync contract (regression lock)."""
     repo_root = Path(__file__).resolve().parents[1]
     iss_path = repo_root / "installer" / "windows" / "CogStash.iss"
     content = iss_path.read_text(encoding="utf-8")
+    assert "CogStash.bat" in content
     assert "launch_at_startup" in content or "installer-state" in content
 
 
