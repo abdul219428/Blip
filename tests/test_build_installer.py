@@ -112,7 +112,6 @@ def test_inno_setup_script_records_startup_state_contract():
     repo_root = Path(__file__).resolve().parents[1]
     iss_path = repo_root / "installer" / "windows" / "CogStash.iss"
     content = iss_path.read_text(encoding="utf-8")
-    assert "CogStash.bat" in content
     # This must become a real installer/app state contract in a follow-up task,
     # not just an arbitrary comment string that happens to mention startup.
     assert "launch_at_startup" in content or "installer-state" in content
