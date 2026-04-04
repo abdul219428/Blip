@@ -87,6 +87,31 @@ def test_inno_setup_script_does_not_track_path_ownership():
     assert "RegWriteExpandStringValue" not in content
 
 
+def test_inno_setup_script_offers_optional_path_task():
+    """Installer script should offer an optional PATH integration task (regression lock)."""
+    repo_root = Path(__file__).resolve().parents[1]
+    iss_path = repo_root / "installer" / "windows" / "CogStash.iss"
+    content = iss_path.read_text(encoding="utf-8")
+    assert 'Name: "addtopath"' in content
+    assert "ChangesEnvironment=yes" in content
+
+
+def test_inno_setup_script_coordinates_with_running_app_on_uninstall():
+    """Installer script should coordinate with running app on uninstall (regression lock)."""
+    repo_root = Path(__file__).resolve().parents[1]
+    iss_path = repo_root / "installer" / "windows" / "CogStash.iss"
+    content = iss_path.read_text(encoding="utf-8")
+    assert "CloseApplications" in content or "AppMutex" in content
+
+
+def test_installer_docs_or_script_record_startup_state_contract():
+    """Installer docs or script should record startup/config sync contract (regression lock)."""
+    repo_root = Path(__file__).resolve().parents[1]
+    iss_path = repo_root / "installer" / "windows" / "CogStash.iss"
+    content = iss_path.read_text(encoding="utf-8")
+    assert "launch_at_startup" in content or "installer-state" in content
+
+
 def test_stage_windows_payload_copies_bundle_and_renames_exe(tmp_path):
     """Stage helper should normalize app names and include the CLI executable."""
     module = _load_build_installer_module()
