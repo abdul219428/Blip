@@ -94,6 +94,40 @@ begin
   end;
 end;
 
+{ Returns PathStr with every exact (case-insensitive) semicolon-delimited
+  segment equal to Segment removed.  All other segments are preserved unchanged. }
+function RemoveExactPathSegment(const PathStr, Segment: String): String;
+var
+  Remaining, Part, NewPath, Sep: String;
+  SemiPos: Integer;
+  SegLower: String;
+begin
+  SegLower := LowerCase(Segment);
+  Remaining := PathStr;
+  NewPath := '';
+  Sep := '';
+  while Remaining <> '' do
+  begin
+    SemiPos := Pos(';', Remaining);
+    if SemiPos > 0 then
+    begin
+      Part := Copy(Remaining, 1, SemiPos - 1);
+      Remaining := Copy(Remaining, SemiPos + 1, Length(Remaining));
+    end
+    else
+    begin
+      Part := Remaining;
+      Remaining := '';
+    end;
+    if LowerCase(Part) <> SegLower then
+    begin
+      NewPath := NewPath + Sep + Part;
+      Sep := ';';
+    end;
+  end;
+  Result := NewPath;
+end;
+
 procedure RemoveInstallerOwnedPath();
 var
   OwnedPath, CurrentPath, NewPath: String;
@@ -102,11 +136,7 @@ begin
     Exit;
   if RegQueryStringValue(HKEY_CURRENT_USER, 'Environment', 'Path', CurrentPath) then
   begin
-    NewPath := StringReplace(CurrentPath, ';' + OwnedPath, '', [rfIgnoreCase]);
-    if NewPath = CurrentPath then
-      NewPath := StringReplace(CurrentPath, OwnedPath + ';', '', [rfIgnoreCase]);
-    if NewPath = CurrentPath then
-      NewPath := StringReplace(CurrentPath, OwnedPath, '', [rfIgnoreCase]);
+    NewPath := RemoveExactPathSegment(CurrentPath, OwnedPath);
     if NewPath <> CurrentPath then
       RegWriteExpandStringValue(HKEY_CURRENT_USER, 'Environment', 'Path', NewPath);
   end;

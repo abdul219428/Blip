@@ -77,9 +77,22 @@ def test_inno_setup_script_manages_installer_owned_path():
 
     content = iss_path.read_text(encoding="utf-8")
 
+    # Ownership registry key and write/delete operations must be present.
+    assert "PathOwnershipKey" in content
     assert "RegWriteExpandStringValue" in content
     assert "RegDeleteValue" in content
-    assert "PathOwnershipKey" in content
+
+    # Must use a segment-safe helper rather than raw StringReplace.
+    assert "RemoveExactPathSegment" in content
+    assert "StringReplace" not in content
+
+    # Helper must split on semicolons — the delimiter for PATH segments.
+    assert "Pos(';', " in content or "SemiPos" in content
+
+    # Uninstall hook must call the removal procedure at the right step.
+    assert "CurUninstallStepChanged" in content
+    assert "usPostUninstall" in content
+    assert "RemoveInstallerOwnedPath()" in content
 
 
 def test_inno_setup_script_offers_optional_path_task():
