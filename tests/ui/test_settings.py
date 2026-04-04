@@ -70,3 +70,21 @@ def test_startup_shortcut_path():
     path = get_startup_shortcut_path()
     assert "Startup" in str(path) or "startup" in str(path)
     assert str(path).endswith(".bat")
+
+
+@needs_display
+def test_settings_startup_script_state_reflects_disk(tk_root, tmp_path, monkeypatch):
+    """Startup checkbox must reflect actual on-disk script presence, not just config value."""
+    import cogstash.ui.install_state as state_mod
+    from cogstash.ui.app import CogStashConfig
+    from cogstash.ui.settings import SettingsWindow
+
+    # Disk has the startup script but config says False (e.g. installer created .bat, config not yet synced)
+    monkeypatch.setattr(state_mod, "startup_script_exists", lambda: True)
+    monkeypatch.setattr("sys.platform", "win32")
+
+    config = CogStashConfig(launch_at_startup=False)
+    sw = SettingsWindow(tk_root, config, tmp_path / "test.json")
+
+    assert sw.launch_var.get() is True, "checkbox should reflect disk state (True), not config (False)"
+    sw.win.destroy()

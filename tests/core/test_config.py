@@ -169,3 +169,54 @@ def test_valid_theme_and_window_size_sets_match_ui_runtime():
 
     assert config_mod.VALID_THEMES == set(app_mod.THEMES)
     assert config_mod.VALID_WINDOW_SIZES == set(app_mod.WINDOW_SIZES)
+
+
+# ── Installer-onboarding state ────────────────────────────────────────────────
+
+
+def test_config_installer_onboarding_not_shown_for_new_user():
+    """should_show_installer_welcome returns False when no version recorded (first-run case)."""
+    from unittest.mock import patch
+
+    from cogstash.core.config import CogStashConfig
+    from cogstash.ui.install_state import should_show_installer_welcome
+
+    config = CogStashConfig(last_seen_version="")
+    with patch("cogstash.ui.install_state.is_installed_windows_run", return_value=True):
+        assert should_show_installer_welcome(config, "0.4.0") is False
+
+
+def test_config_installer_onboarding_shown_for_installed_upgrade():
+    """should_show_installer_welcome returns True for installed run with a stale version."""
+    from unittest.mock import patch
+
+    from cogstash.core.config import CogStashConfig
+    from cogstash.ui.install_state import should_show_installer_welcome
+
+    config = CogStashConfig(last_seen_version="0.3.0")
+    with patch("cogstash.ui.install_state.is_installed_windows_run", return_value=True):
+        assert should_show_installer_welcome(config, "0.4.0") is True
+
+
+def test_config_installer_onboarding_not_shown_when_version_matches():
+    """should_show_installer_welcome returns False when already up to date."""
+    from unittest.mock import patch
+
+    from cogstash.core.config import CogStashConfig
+    from cogstash.ui.install_state import should_show_installer_welcome
+
+    config = CogStashConfig(last_seen_version="0.4.0")
+    with patch("cogstash.ui.install_state.is_installed_windows_run", return_value=True):
+        assert should_show_installer_welcome(config, "0.4.0") is False
+
+
+def test_config_installer_onboarding_not_shown_for_non_installed_run():
+    """should_show_installer_welcome returns False when not running as installed app."""
+    from unittest.mock import patch
+
+    from cogstash.core.config import CogStashConfig
+    from cogstash.ui.install_state import should_show_installer_welcome
+
+    config = CogStashConfig(last_seen_version="0.3.0")
+    with patch("cogstash.ui.install_state.is_installed_windows_run", return_value=False):
+        assert should_show_installer_welcome(config, "0.4.0") is False

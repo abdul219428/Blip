@@ -165,7 +165,14 @@ class SettingsWindow:
         # Section: Launch at Startup
         tk.Label(frame, text="Startup", bg=t["bg"], fg=t["fg"],
                  font=(platform_font(), 11, "bold")).pack(anchor="w", pady=(16, 4))
-        self.launch_var = tk.BooleanVar(value=self.config.launch_at_startup)
+        # Reflect actual on-disk state so installer-created scripts are visible immediately.
+        if sys.platform == "win32":
+            from cogstash.ui.install_state import startup_script_exists  # lazy — keeps install_state optional
+
+            startup_state = startup_script_exists()
+        else:
+            startup_state = self.config.launch_at_startup
+        self.launch_var = tk.BooleanVar(value=startup_state)
         tk.Checkbutton(frame, text="Launch CogStash at system startup",
                        variable=self.launch_var, bg=t["bg"], fg=t["fg"],
                        selectcolor=t["entry_bg"], activebackground=t["bg"],
@@ -776,3 +783,65 @@ class WhatsNewDialog:
         tk.Button(self.win, text="Got it", command=self.win.destroy, bg=t["accent"], fg=t["bg"],
                   relief="flat", font=(platform_font(), 10, "bold"), padx=24, pady=6,
                   cursor="hand2").pack(pady=(16, 20))
+
+
+class InstallerWelcomeDialog:
+    """Lightweight welcome dialog shown once after an installed-Windows upgrade with existing config.
+
+    Informs the user they are now running the installed CogStash, highlights
+    installer-specific features (startup at boot, CLI/PATH), and does NOT
+    force the full first-run wizard.
+    """
+
+    def __init__(self, parent: tk.Tk, config: CogStashConfig, config_path: Path, version: str):
+        self.parent = parent
+        self.config = config
+        self.config_path = config_path
+        self.version = version
+        self.theme = THEMES[config.theme]
+        t = self.theme
+
+        self.win = tk.Toplevel(parent)
+        self.win.title("CogStash Updated")
+        self.win.geometry("420x340")
+        self.win.resizable(False, False)
+        self.win.configure(bg=t["bg"])
+        self.win.transient(parent)
+        self.win.focus_force()
+        self.win.bind("<Escape>", lambda e: self.win.destroy())
+
+        tk.Label(
+            self.win, text="⚡ CogStash Updated", bg=t["bg"], fg=t["fg"],
+            font=(platform_font(), 14, "bold"),
+        ).pack(pady=(20, 4))
+        tk.Label(
+            self.win, text=f"v{version} — installed edition",
+            bg=t["bg"], fg=t["muted"], font=(platform_font(), 10),
+        ).pack(pady=(0, 16))
+
+        info_frame = tk.Frame(self.win, bg=t["entry_bg"], padx=16, pady=12)
+        info_frame.pack(fill="x", padx=24)
+
+        bullets = [
+            ("⚡", "Hotkey capture is ready — press it anywhere"),
+            ("🖥️", "Startup at boot — configured during installation"),
+            ("💻", "CLI available if you chose the PATH option in the installer"),
+        ]
+        for emoji, text in bullets:
+            row = tk.Frame(info_frame, bg=t["entry_bg"])
+            row.pack(fill="x", pady=3)
+            tk.Label(row, text=emoji, bg=t["entry_bg"], fg=t["fg"],
+                     font=(platform_font(), 11), width=3).pack(side="left")
+            tk.Label(row, text=text, bg=t["entry_bg"], fg=t["fg"],
+                     font=(platform_font(), 9), anchor="w").pack(side="left", fill="x", expand=True)
+
+        tk.Label(
+            self.win, text="Startup and PATH settings can be changed in Settings → General.",
+            bg=t["bg"], fg=t["muted"], font=(platform_font(), 8), wraplength=370,
+        ).pack(pady=(12, 0), padx=24)
+
+        tk.Button(
+            self.win, text="Got it", command=self.win.destroy,
+            bg=t["accent"], fg=t["bg"], relief="flat",
+            font=(platform_font(), 10, "bold"), padx=24, pady=6, cursor="hand2",
+        ).pack(pady=(16, 20))

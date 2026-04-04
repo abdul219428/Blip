@@ -535,7 +535,14 @@ def main():
         config = load_config(config_path)
     else:
         from cogstash import __version__
-        if config.last_seen_version != __version__:
+        from cogstash.ui.install_state import should_show_installer_welcome
+
+        if should_show_installer_welcome(config, __version__):
+            from cogstash.ui.settings import InstallerWelcomeDialog
+            InstallerWelcomeDialog(root, config, config_path, __version__)
+            config.last_seen_version = __version__
+            save_config(config, config_path)
+        elif config.last_seen_version != __version__:
             from cogstash.ui.settings import WhatsNewDialog
             WhatsNewDialog(root, config, config_path, __version__)
             config.last_seen_version = __version__

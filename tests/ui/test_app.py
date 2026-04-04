@@ -206,3 +206,73 @@ def test_app_main_closes_removed_handlers(monkeypatch, tmp_path):
             handler.close()
 
     assert old_handler.closed_flag is True
+
+
+def test_app_main_installer_welcome_shown_for_installed_upgrade(monkeypatch, tmp_path):
+    """When running as an installed app with a stale version, show the installer welcome dialog."""
+    import types
+
+    import cogstash.ui.app as app_mod
+    import cogstash.ui.install_state as install_state_mod
+    import cogstash.ui.settings as settings_mod
+
+    welcome_calls: list = []
+
+    config = app_mod.CogStashConfig(
+        output_file=tmp_path / "notes.md",
+        log_file=tmp_path / "cogstash.log",
+        last_seen_version="0.3.0",
+    )
+
+    class FakeRoot:
+        def mainloop(self):
+            return None
+
+    class FakeApp:
+        def __init__(self, _root, _config):
+            self.queue = object()
+
+    class FakeGuard:
+        def close(self):
+            return None
+
+    class FakeListener:
+        def __init__(self, _mapping):
+            pass
+
+        def start(self):
+            pass
+
+        def stop(self):
+            pass
+
+    windows_mod = types.ModuleType("cogstash.ui.windows")
+    windows_mod.WINDOWS_MUTEX_NAME = "Local\\CogStash.Test"
+    windows_mod.acquire_single_instance = lambda _name: FakeGuard()
+
+    monkeypatch.setattr(app_mod, "load_config", lambda _path: config)
+    monkeypatch.setattr(app_mod, "configure_dpi", lambda: None)
+    monkeypatch.setattr(app_mod.tk, "Tk", lambda: FakeRoot())
+    monkeypatch.setattr(app_mod, "CogStash", FakeApp)
+    monkeypatch.setattr(app_mod, "create_tray_icon", lambda _queue, _config: None)
+    monkeypatch.setattr(app_mod.keyboard, "GlobalHotKeys", FakeListener)
+    monkeypatch.setattr(app_mod, "save_config", lambda _c, _p: None)
+    monkeypatch.setattr(install_state_mod, "is_installed_windows_run", lambda: True)
+    monkeypatch.setattr(settings_mod, "InstallerWelcomeDialog", lambda *a, **kw: welcome_calls.append(a), raising=False)
+    monkeypatch.setitem(sys.modules, "cogstash.ui.windows", windows_mod)
+
+    original_handlers = app_mod.logger.handlers[:]
+    try:
+        app_mod.main()
+    finally:
+        for handler in [h for h in app_mod.logger.handlers[:] if h not in original_handlers]:
+            app_mod.logger.removeHandler(handler)
+            try:
+                handler.close()
+            except Exception:
+                pass
+        for handler in original_handlers:
+            if handler not in app_mod.logger.handlers:
+                app_mod.logger.addHandler(handler)
+
+    assert len(welcome_calls) == 1, "InstallerWelcomeDialog should have been shown exactly once"
