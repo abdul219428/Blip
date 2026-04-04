@@ -52,16 +52,14 @@ Grab the latest release from the [**Releases page**](https://github.com/abdul219
 
 On Windows you can now choose between:
 
-- `CogStash-vX.Y.Z-setup.exe` — installs `CogStash.exe` and `CogStash-CLI.exe` to `%LocalAppData%\Programs\CogStash`, adds an Apps & Features entry, creates Start Menu/Desktop shortcuts only for the UI app, and can optionally enable launch at sign-in during setup.
+- `CogStash-vX.Y.Z-setup.exe` — installs `CogStash.exe` and `CogStash-CLI.exe` to `%LocalAppData%\Programs\CogStash`, adds an Apps & Features entry, creates Start Menu/Desktop shortcuts only for the UI app, and can optionally enable launch at sign-in plus add the installed CLI directory to `PATH` during setup.
 - `CogStash-vX.Y.Z-windows.exe` — portable onefile executable; download and run without installing.
 - `CogStash-CLI-vX.Y.Z-windows.exe` — portable CLI executable for shell-only usage.
 
 > **Tip:** The `.zip` / `.tar.gz` files are UI onedir bundles (a folder with all files).
 > They start slightly faster but aren't a single portable file.
 
-> **Uninstall note (Windows installer):** uninstall removes the installed app, shortcuts,
-> uninstall entry, and installer-managed startup entry, but keeps your personal notes,
-> config, and log files by default.
+> **Uninstall note (Windows installer):** uninstall removes the installed app, installer-managed `PATH` and startup entries, shortcuts, and uninstall entry. If CogStash is still running, the installer prompts you to close it first. Your personal notes, config, and log files are kept by default.
 
 ### Option 2: From source (with uv)
 
@@ -91,7 +89,8 @@ uv sync
 
 # If using the Windows installer:
 # Launch CogStash from the Start Menu after setup
-# Or run %LocalAppData%\Programs\CogStash\CogStash-CLI.exe from a shell
+# Or, if you selected the PATH option during setup, run: CogStash-CLI.exe --help
+# Otherwise run %LocalAppData%\Programs\CogStash\CogStash-CLI.exe from a shell
 
 # If installed from source with uv:
 uv run cogstash
