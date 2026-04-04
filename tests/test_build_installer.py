@@ -109,10 +109,7 @@ def test_inno_setup_script_coordinates_with_running_app_on_uninstall():
     repo_root = Path(__file__).resolve().parents[1]
     iss_path = repo_root / "installer" / "windows" / "CogStash.iss"
     content = iss_path.read_text(encoding="utf-8")
-    # Task 1 keeps this broad so the next green implementation can choose either
-    # installer-close coordination or explicit mutex-based protection, but the
-    # eventual Task 2 fix must cover uninstall of a still-running tray app.
-    assert "CloseApplications" in content or "AppMutex" in content
+    assert "CloseApplications=yes" in content
 
 
 def test_inno_setup_script_records_startup_state_contract():
