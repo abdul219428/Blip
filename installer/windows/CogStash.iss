@@ -145,8 +145,6 @@ end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
-  { installer-state: The startup script is the source of truth for launch_at_startup.
-    CogStash reads startup_script_exists() when Settings opens to sync config.launch_at_startup. }
   if (CurStep = ssPostInstall) and WizardIsTaskSelected('startup') then
     SaveStringToFile(ExpandConstant('{userstartup}\CogStash.bat'), StartupBatchContents(), False);
   if (CurStep = ssPostInstall) and WizardIsTaskSelected('addtopath') then

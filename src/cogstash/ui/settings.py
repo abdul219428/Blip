@@ -172,6 +172,8 @@ class SettingsWindow:
             startup_state = startup_script_exists()
         else:
             startup_state = self.config.launch_at_startup
+        if self.config.launch_at_startup != startup_state:
+            self.config.launch_at_startup = startup_state
         self.launch_var = tk.BooleanVar(value=startup_state)
         tk.Checkbutton(frame, text="Launch CogStash at system startup",
                        variable=self.launch_var, bg=t["bg"], fg=t["fg"],
@@ -704,10 +706,13 @@ class WizardWindow:
     def _finish(self):
         """Save config and close wizard."""
         from cogstash import __version__
+        from cogstash.ui.install_state import is_installed_windows_run
         self.config.output_file = Path(self.notes_file_var.get()).expanduser()
         self.config.theme = self.selected_theme.get()
         self.config.window_size = self.selected_size.get()
         self.config.last_seen_version = __version__
+        if is_installed_windows_run():
+            self.config.last_seen_installer_version = __version__
         save_config(self.config, self.config_path)
         self._close()
 

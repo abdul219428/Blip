@@ -541,6 +541,7 @@ def main():
             from cogstash.ui.settings import InstallerWelcomeDialog
             InstallerWelcomeDialog(root, config, config_path, __version__)
             config.last_seen_version = __version__
+            config.last_seen_installer_version = __version__
             save_config(config, config_path)
         elif config.last_seen_version != __version__:
             from cogstash.ui.settings import WhatsNewDialog

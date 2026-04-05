@@ -23,14 +23,15 @@ def should_show_installer_welcome(config: CogStashConfig, version: str) -> bool:
     - Running as the installed Windows app (frozen exe).
     - An existing config exists, i.e. ``last_seen_version`` is non-empty
       (new users with no config see the full first-run wizard instead).
-    - The recorded version differs from *version* (an upgrade or fresh install
-      over an existing config from a previous installation or portable run).
+    - The installer-specific recorded version differs from *version* (covers
+      both upgrades and a first installed launch over an existing config from
+      a previous portable/source run).
     """
     if not is_installed_windows_run():
         return False
     if config.last_seen_version == "":
         return False
-    return config.last_seen_version != version
+    return config.last_seen_installer_version != version
 
 
 def startup_script_exists() -> bool:

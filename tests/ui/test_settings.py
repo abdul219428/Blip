@@ -87,4 +87,26 @@ def test_settings_startup_script_state_reflects_disk(tk_root, tmp_path, monkeypa
     sw = SettingsWindow(tk_root, config, tmp_path / "test.json")
 
     assert sw.launch_var.get() is True, "checkbox should reflect disk state (True), not config (False)"
+    assert config.launch_at_startup is True, "config should self-heal to the on-disk startup state"
     sw.win.destroy()
+
+
+@needs_display
+def test_wizard_records_installed_version_for_installed_runs(tk_root, tmp_path, monkeypatch):
+    """Completing the full wizard on an installed build should also record the installed version marker."""
+    import cogstash
+    import cogstash.ui.install_state as state_mod
+    from cogstash.ui.app import CogStashConfig
+    from cogstash.ui.settings import WizardWindow
+
+    monkeypatch.setattr(state_mod, "is_installed_windows_run", lambda: True)
+
+    config = CogStashConfig()
+    config_path = tmp_path / ".cogstash.json"
+    wiz = WizardWindow(tk_root, config, config_path)
+    wiz._finish()
+
+    data = json.loads(config_path.read_text(encoding="utf-8"))
+    assert data["last_seen_version"] == cogstash.__version__
+    assert data["last_seen_installer_version"] == cogstash.__version__
+    wiz.win.destroy()

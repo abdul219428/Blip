@@ -276,3 +276,77 @@ def test_app_main_installer_welcome_shown_for_installed_upgrade(monkeypatch, tmp
                 app_mod.logger.addHandler(handler)
 
     assert len(welcome_calls) == 1, "InstallerWelcomeDialog should have been shown exactly once"
+
+
+def test_app_main_installer_welcome_shown_for_first_installed_launch(monkeypatch, tmp_path):
+    """An installed launch over an existing same-version config should still show the installer welcome once."""
+    import types
+
+    import cogstash
+    import cogstash.ui.app as app_mod
+    import cogstash.ui.install_state as install_state_mod
+    import cogstash.ui.settings as settings_mod
+
+    welcome_calls: list = []
+    saved_configs: list = []
+
+    config = app_mod.CogStashConfig(
+        output_file=tmp_path / "notes.md",
+        log_file=tmp_path / "cogstash.log",
+        last_seen_version=cogstash.__version__,
+        last_seen_installer_version="",
+    )
+
+    class FakeRoot:
+        def mainloop(self):
+            return None
+
+    class FakeApp:
+        def __init__(self, _root, _config):
+            self.queue = object()
+
+    class FakeGuard:
+        def close(self):
+            return None
+
+    class FakeListener:
+        def __init__(self, _mapping):
+            pass
+
+        def start(self):
+            pass
+
+        def stop(self):
+            pass
+
+    windows_mod = types.ModuleType("cogstash.ui.windows")
+    windows_mod.WINDOWS_MUTEX_NAME = "Local\\CogStash.Test"
+    windows_mod.acquire_single_instance = lambda _name: FakeGuard()
+
+    monkeypatch.setattr(app_mod, "load_config", lambda _path: config)
+    monkeypatch.setattr(app_mod, "configure_dpi", lambda: None)
+    monkeypatch.setattr(app_mod.tk, "Tk", lambda: FakeRoot())
+    monkeypatch.setattr(app_mod, "CogStash", FakeApp)
+    monkeypatch.setattr(app_mod, "create_tray_icon", lambda _queue, _config: None)
+    monkeypatch.setattr(app_mod.keyboard, "GlobalHotKeys", FakeListener)
+    monkeypatch.setattr(app_mod, "save_config", lambda c, _p: saved_configs.append(c.last_seen_installer_version))
+    monkeypatch.setattr(install_state_mod, "is_installed_windows_run", lambda: True)
+    monkeypatch.setattr(settings_mod, "InstallerWelcomeDialog", lambda *a, **kw: welcome_calls.append(a), raising=False)
+    monkeypatch.setitem(sys.modules, "cogstash.ui.windows", windows_mod)
+
+    original_handlers = app_mod.logger.handlers[:]
+    try:
+        app_mod.main()
+    finally:
+        for handler in [h for h in app_mod.logger.handlers[:] if h not in original_handlers]:
+            app_mod.logger.removeHandler(handler)
+            try:
+                handler.close()
+            except Exception:
+                pass
+        for handler in original_handlers:
+            if handler not in app_mod.logger.handlers:
+                app_mod.logger.addHandler(handler)
+
+    assert len(welcome_calls) == 1
+    assert saved_configs == [cogstash.__version__]

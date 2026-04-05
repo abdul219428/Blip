@@ -112,14 +112,18 @@ def test_inno_setup_script_coordinates_with_running_app_on_uninstall():
     assert "CloseApplications=yes" in content
 
 
-def test_inno_setup_script_records_startup_state_contract():
-    """Installer script should record the startup/config sync contract (regression lock)."""
+def test_installed_startup_state_contract_is_implemented_in_config_and_ui():
+    """Installed startup/config sync should be backed by config + UI code, not an installer comment marker."""
     repo_root = Path(__file__).resolve().parents[1]
-    iss_path = repo_root / "installer" / "windows" / "CogStash.iss"
-    content = iss_path.read_text(encoding="utf-8")
-    # This must become a real installer/app state contract in a follow-up task,
-    # not just an arbitrary comment string that happens to mention startup.
-    assert "launch_at_startup" in content or "installer-state" in content
+    config_path = repo_root / "src" / "cogstash" / "core" / "config.py"
+    settings_path = repo_root / "src" / "cogstash" / "ui" / "settings.py"
+
+    config_content = config_path.read_text(encoding="utf-8")
+    settings_content = settings_path.read_text(encoding="utf-8")
+
+    assert "last_seen_installer_version" in config_content
+    assert "startup_script_exists" in settings_content
+    assert "self.config.launch_at_startup = startup_state" in settings_content
 
 
 def test_stage_windows_payload_copies_bundle_and_renames_exe(tmp_path):

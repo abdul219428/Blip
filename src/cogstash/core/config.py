@@ -28,6 +28,7 @@ class CogStashConfig:
     tags: dict[str, dict[str, str]] | None = None
     launch_at_startup: bool = False
     last_seen_version: str = ""
+    last_seen_installer_version: str = ""
 
     def __post_init__(self) -> None:
         if self.output_file is None:
@@ -51,6 +52,7 @@ def load_config(config_path: Path) -> CogStashConfig:
         "window_size": _DEFAULT_WINDOW_SIZE,
         "launch_at_startup": False,
         "last_seen_version": "",
+        "last_seen_installer_version": "",
     }
 
     if not config_path.exists():
@@ -104,6 +106,7 @@ def load_config(config_path: Path) -> CogStashConfig:
         tags=valid_tags if valid_tags else None,
         launch_at_startup=bool(merged.get("launch_at_startup", False)),
         last_seen_version=str(merged.get("last_seen_version", "")),
+        last_seen_installer_version=str(merged.get("last_seen_installer_version", "")),
     )
 
 
@@ -117,6 +120,7 @@ def save_config(config: CogStashConfig, config_path: Path) -> None:
         "window_size": config.window_size,
         "launch_at_startup": config.launch_at_startup,
         "last_seen_version": config.last_seen_version,
+        "last_seen_installer_version": config.last_seen_installer_version,
     }
     if config.tags:
         data["tags"] = config.tags
