@@ -17,7 +17,7 @@ a card-based UI, or query from the command line.
 - 🏷️ **Smart tags** — `#todo`, `#urgent`, `#important`, `#idea` with emoji prefixes
 - 🔤 **Autocomplete** — type `#` and pick a tag from the popup
 - ✨ **Guided onboarding** — first-run wizard for new users plus lightweight installed-build welcome/upgrade flow
-- ⚙️ **Settings window** — hotkey, theme, window size, startup, and custom tag management from the UI
+- ⚙️ **Settings window** — theme, window size, startup, and custom tag management from the UI, with hotkey shown for reference
 - 🎨 **Themes** — 5 built-in color schemes (tokyo-night, light, dracula, gruvbox, mono)
 - 🗂️ **Browse window** — card view with live search, tag filtering, and mark-done
 - 💻 **CLI commands** — `recent`, `search`, `tags`, `add`, `edit`, `delete`, `export`, `stats`, and `config`
@@ -61,7 +61,7 @@ On Windows you can now choose between:
 > **Tip:** The `.zip` / `.tar.gz` files are UI onedir bundles (a folder with all files).
 > They start slightly faster but aren't a single portable file.
 
-> **Uninstall note (Windows installer):** uninstall removes the installed app, installer-managed `PATH` and startup entries, shortcuts, and uninstall entry. If CogStash is still running, the installer prompts you to close it first. Your personal notes, config, and log files are kept by default.
+> **Uninstall note (Windows installer):** uninstall removes the installed app, installer-managed `PATH` entry, the CogStash startup script if present, shortcuts, and uninstall entry. If CogStash is still running, the installer prompts you to close it first. Your personal notes, config, and log files are kept by default.
 >
 > **Installed-launch note:** new users still get the full first-run wizard. The installed Windows app shows a lightweight installer welcome for installed-app upgrades and for a first installed launch over an existing config from a portable or source run.
 
@@ -127,7 +127,7 @@ Multi-line notes use 2-space indented continuation lines.
 New users see the first-run wizard on their first launch. After that, use the tray icon to open:
 
 - **Browse Notes** for searching, filtering, editing, and marking notes done
-- **Settings** for hotkey, theme, window size, startup, and tag preferences
+- **Settings** for theme, window size, startup, and tag preferences, with the current hotkey shown for reference
 
 ---
 
