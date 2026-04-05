@@ -174,6 +174,7 @@ class SettingsWindow:
             startup_state = self.config.launch_at_startup
         if self.config.launch_at_startup != startup_state:
             self.config.launch_at_startup = startup_state
+            save_config(self.config, self.config_path)
         self.launch_var = tk.BooleanVar(value=startup_state)
         tk.Checkbutton(frame, text="Launch CogStash at system startup",
                        variable=self.launch_var, bg=t["bg"], fg=t["fg"],
@@ -841,7 +842,7 @@ class InstallerWelcomeDialog:
                      font=(platform_font(), 9), anchor="w").pack(side="left", fill="x", expand=True)
 
         tk.Label(
-            self.win, text="Startup and PATH settings can be changed in Settings → General.",
+            self.win, text="Startup can be changed in Settings → General. PATH can be changed by re-running the installer.",
             bg=t["bg"], fg=t["muted"], font=(platform_font(), 8), wraplength=370,
         ).pack(pady=(12, 0), padx=24)
 

@@ -84,10 +84,13 @@ def test_settings_startup_script_state_reflects_disk(tk_root, tmp_path, monkeypa
     monkeypatch.setattr("sys.platform", "win32")
 
     config = CogStashConfig(launch_at_startup=False)
-    sw = SettingsWindow(tk_root, config, tmp_path / "test.json")
+    config_path = tmp_path / "test.json"
+    sw = SettingsWindow(tk_root, config, config_path)
 
     assert sw.launch_var.get() is True, "checkbox should reflect disk state (True), not config (False)"
     assert config.launch_at_startup is True, "config should self-heal to the on-disk startup state"
+    data = json.loads(config_path.read_text(encoding="utf-8"))
+    assert data["launch_at_startup"] is True, "self-healed startup state should be persisted to config"
     sw.win.destroy()
 
 
@@ -110,3 +113,18 @@ def test_wizard_records_installed_version_for_installed_runs(tk_root, tmp_path, 
     assert data["last_seen_version"] == cogstash.__version__
     assert data["last_seen_installer_version"] == cogstash.__version__
     wiz.win.destroy()
+
+
+@needs_display
+def test_installer_welcome_dialog_does_not_claim_path_is_changeable_in_settings(tk_root, tmp_path):
+    """Installer welcome copy should not imply PATH can be changed from Settings."""
+    from cogstash.ui.app import CogStashConfig
+    from cogstash.ui.settings import InstallerWelcomeDialog
+
+    dialog = InstallerWelcomeDialog(tk_root, CogStashConfig(), tmp_path / ".cogstash.json", "0.4.0")
+    labels = [child.cget("text") for child in dialog.win.winfo_children() if child.winfo_class() == "Label"]
+
+    assert any("PATH can be changed by re-running the installer" in text for text in labels)
+    assert not any("Startup and PATH settings can be changed in Settings" in text for text in labels)
+
+    dialog.win.destroy()
