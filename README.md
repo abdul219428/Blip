@@ -63,7 +63,7 @@ On Windows you can now choose between:
 
 > **Uninstall note (Windows installer):** uninstall removes the installed app, installer-managed `PATH` and startup entries, shortcuts, and uninstall entry. If CogStash is still running, the installer prompts you to close it first. Your personal notes, config, and log files are kept by default.
 >
-> **Installed-launch note:** new users still get the full first-run wizard. If you already have a CogStash config from a portable or source run, the installed Windows app shows a lightweight installer welcome instead of restarting full onboarding.
+> **Installed-launch note:** new users still get the full first-run wizard. The installed Windows app shows a lightweight installer welcome for installed-app upgrades and for a first installed launch over an existing config from a portable or source run.
 
 ### Option 2: From source (with uv)
 
@@ -206,7 +206,7 @@ Example output:
 
 ### `cogstash add`
 
-Add a note directly from the shell.
+Add a note directly from the shell. If you omit the note text, pipe it through stdin.
 
 ```bash
 cogstash add "Ship the installer follow-up" # direct text
@@ -233,7 +233,7 @@ cogstash delete --search "installer" --yes
 
 ### `cogstash export`
 
-Export all notes to JSON, CSV, or Markdown.
+Export all notes to JSON, CSV, or Markdown. Without `--output`, CogStash writes an auto-named export file in the current working directory.
 
 ```bash
 cogstash export --format json
@@ -322,16 +322,20 @@ Example config:
 {
   "hotkey": "<ctrl>+<shift>+<space>",
   "theme": "dracula",
-  "window_size": "wide",
-  "launch_at_startup": true
+  "window_size": "wide"
 }
 ```
 
 Only include the keys you want to override — missing keys use defaults.
 
-> **Note:** `cogstash config get|set` supports `hotkey`, `theme`, `window_size`,
-> `output_file`, `log_file`, and `tags`. The installer/onboarding keys are
-> maintained by the app and installer.
+> **Note:** `cogstash config get` supports `hotkey`, `theme`, `window_size`,
+> `output_file`, `log_file`, and `tags`. `cogstash config set` supports
+> `hotkey`, `theme`, `window_size`, `output_file`, and `log_file`. The
+> installer/onboarding keys are maintained by the app and installer.
+>
+> On Windows, launch-at-startup is managed by the installer/UI startup entry as
+> well as config state, so changing JSON alone is not the recommended way to
+> control it.
 
 ---
 
