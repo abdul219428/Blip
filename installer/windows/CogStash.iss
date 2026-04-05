@@ -66,6 +66,7 @@ Filename: "{app}\CogStash.exe"; Description: "Launch CogStash"; Flags: nowait po
 
 [UninstallDelete]
 Type: files; Name: "{userstartup}\CogStash.bat"
+Type: files; Name: "{app}\.cogstash-installed"
 
 [Code]
 const
@@ -145,6 +146,8 @@ end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
+  if CurStep = ssPostInstall then
+    SaveStringToFile(ExpandConstant('{app}\.cogstash-installed'), 'installed', False);
   if (CurStep = ssPostInstall) and WizardIsTaskSelected('startup') then
     SaveStringToFile(ExpandConstant('{userstartup}\CogStash.bat'), StartupBatchContents(), False);
   if (CurStep = ssPostInstall) and WizardIsTaskSelected('addtopath') then

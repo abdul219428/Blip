@@ -231,3 +231,34 @@ def test_config_installer_onboarding_not_shown_for_non_installed_run():
     config = CogStashConfig(last_seen_version="0.3.0", last_seen_installer_version="")
     with patch("cogstash.ui.install_state.is_installed_windows_run", return_value=False):
         assert should_show_installer_welcome(config, "0.4.0") is False
+
+
+def test_is_installed_windows_run_requires_marker(monkeypatch, tmp_path):
+    import cogstash.ui.install_state as state_mod
+
+    exe_dir = tmp_path / "portable"
+    exe_dir.mkdir()
+    exe_path = exe_dir / "CogStash.exe"
+    exe_path.write_text("exe", encoding="utf-8")
+
+    monkeypatch.setattr(state_mod.sys, "platform", "win32")
+    monkeypatch.setattr(state_mod.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(state_mod.sys, "executable", str(exe_path))
+
+    assert state_mod.is_installed_windows_run() is False
+
+
+def test_is_installed_windows_run_true_with_marker(monkeypatch, tmp_path):
+    import cogstash.ui.install_state as state_mod
+
+    exe_dir = tmp_path / "installed"
+    exe_dir.mkdir()
+    exe_path = exe_dir / "CogStash.exe"
+    exe_path.write_text("exe", encoding="utf-8")
+    (exe_dir / ".cogstash-installed").write_text("installed", encoding="utf-8")
+
+    monkeypatch.setattr(state_mod.sys, "platform", "win32")
+    monkeypatch.setattr(state_mod.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(state_mod.sys, "executable", str(exe_path))
+
+    assert state_mod.is_installed_windows_run() is True

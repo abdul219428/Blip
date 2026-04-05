@@ -7,13 +7,21 @@ keeps startup-script state accessible without polluting app.py or settings.py.
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
 from cogstash.core.config import CogStashConfig
+
+INSTALL_MARKER_NAME = ".cogstash-installed"
+
+
+def _install_marker_path() -> Path:
+    """Return the installer marker path next to the running executable."""
+    return Path(sys.executable).resolve().parent / INSTALL_MARKER_NAME
 
 
 def is_installed_windows_run() -> bool:
     """Return True when running as a frozen (PyInstaller) Windows installed build."""
-    return sys.platform == "win32" and bool(getattr(sys, "frozen", False))
+    return sys.platform == "win32" and bool(getattr(sys, "frozen", False)) and _install_marker_path().exists()
 
 
 def should_show_installer_welcome(config: CogStashConfig, version: str) -> bool:

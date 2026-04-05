@@ -117,13 +117,19 @@ def test_installed_startup_state_contract_is_implemented_in_config_and_ui():
     repo_root = Path(__file__).resolve().parents[1]
     config_path = repo_root / "src" / "cogstash" / "core" / "config.py"
     settings_path = repo_root / "src" / "cogstash" / "ui" / "settings.py"
+    install_state_path = repo_root / "src" / "cogstash" / "ui" / "install_state.py"
+    iss_path = repo_root / "installer" / "windows" / "CogStash.iss"
 
     config_content = config_path.read_text(encoding="utf-8")
     settings_content = settings_path.read_text(encoding="utf-8")
+    install_state_content = install_state_path.read_text(encoding="utf-8")
+    iss_content = iss_path.read_text(encoding="utf-8")
 
     assert "last_seen_installer_version" in config_content
     assert "startup_script_exists" in settings_content
     assert "self.config.launch_at_startup = startup_state" in settings_content
+    assert "INSTALL_MARKER_NAME" in install_state_content
+    assert ".cogstash-installed" in iss_content
 
 
 def test_stage_windows_payload_copies_bundle_and_renames_exe(tmp_path):

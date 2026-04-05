@@ -830,8 +830,8 @@ class InstallerWelcomeDialog:
 
         bullets = [
             ("⚡", "Hotkey capture is ready — press it anywhere"),
-            ("🖥️", "Startup at boot — configured during installation"),
-            ("💻", "CLI available if you chose the PATH option in the installer"),
+            ("🖥️", "Startup at boot — optional during installation or later in Settings"),
+            ("💻", "CLI available if you chose the PATH option during installation"),
         ]
         for emoji, text in bullets:
             row = tk.Frame(info_frame, bg=t["entry_bg"])
