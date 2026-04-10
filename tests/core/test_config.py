@@ -123,6 +123,7 @@ def test_config_new_fields_defaults(tmp_path):
 
     assert config.launch_at_startup is False
     assert config.last_seen_version == ""
+    assert config.last_seen_installer_version == ""
 
 
 def test_config_new_fields_roundtrip(tmp_path):
@@ -130,7 +131,14 @@ def test_config_new_fields_roundtrip(tmp_path):
 
     config_path = tmp_path / ".cogstash.json"
     config_path.write_text(
-        json.dumps({"launch_at_startup": True, "last_seen_version": "0.1.0", "theme": "dracula"}),
+        json.dumps(
+            {
+                "launch_at_startup": True,
+                "last_seen_version": "0.1.0",
+                "last_seen_installer_version": "0.1.0",
+                "theme": "dracula",
+            }
+        ),
         encoding="utf-8",
     )
 
@@ -138,6 +146,7 @@ def test_config_new_fields_roundtrip(tmp_path):
 
     assert config.launch_at_startup is True
     assert config.last_seen_version == "0.1.0"
+    assert config.last_seen_installer_version == "0.1.0"
     assert config.theme == "dracula"
 
 
@@ -150,6 +159,7 @@ def test_save_config(tmp_path):
         theme="dracula",
         window_size="wide",
         last_seen_version="0.2.0",
+        last_seen_installer_version="0.2.0",
     )
     config_path = tmp_path / ".cogstash.json"
 
@@ -159,6 +169,7 @@ def test_save_config(tmp_path):
     assert data["theme"] == "dracula"
     assert data["window_size"] == "wide"
     assert data["last_seen_version"] == "0.2.0"
+    assert data["last_seen_installer_version"] == "0.2.0"
     assert data["launch_at_startup"] is False
     assert Path(data["output_file"]) == tmp_path / "notes.md"
 
@@ -169,3 +180,85 @@ def test_valid_theme_and_window_size_sets_match_ui_runtime():
 
     assert config_mod.VALID_THEMES == set(app_mod.THEMES)
     assert config_mod.VALID_WINDOW_SIZES == set(app_mod.WINDOW_SIZES)
+
+
+# ── Installer-onboarding state ────────────────────────────────────────────────
+
+
+def test_config_installer_onboarding_not_shown_for_new_user():
+    """should_show_installer_welcome returns False when no version recorded (first-run case)."""
+    from unittest.mock import patch
+
+    from cogstash.core.config import CogStashConfig
+    from cogstash.ui.install_state import should_show_installer_welcome
+
+    config = CogStashConfig(last_seen_version="", last_seen_installer_version="")
+    with patch("cogstash.ui.install_state.is_installed_windows_run", return_value=True):
+        assert should_show_installer_welcome(config, "0.4.0") is False
+
+
+def test_config_installer_onboarding_shown_for_first_installed_launch():
+    """should_show_installer_welcome returns True when an existing config has never seen the installed build."""
+    from unittest.mock import patch
+
+    from cogstash.core.config import CogStashConfig
+    from cogstash.ui.install_state import should_show_installer_welcome
+
+    config = CogStashConfig(last_seen_version="0.4.0", last_seen_installer_version="")
+    with patch("cogstash.ui.install_state.is_installed_windows_run", return_value=True):
+        assert should_show_installer_welcome(config, "0.4.0") is True
+
+
+def test_config_installer_onboarding_not_shown_when_version_matches():
+    """should_show_installer_welcome returns False when already up to date."""
+    from unittest.mock import patch
+
+    from cogstash.core.config import CogStashConfig
+    from cogstash.ui.install_state import should_show_installer_welcome
+
+    config = CogStashConfig(last_seen_version="0.4.0", last_seen_installer_version="0.4.0")
+    with patch("cogstash.ui.install_state.is_installed_windows_run", return_value=True):
+        assert should_show_installer_welcome(config, "0.4.0") is False
+
+
+def test_config_installer_onboarding_not_shown_for_non_installed_run():
+    """should_show_installer_welcome returns False when not running as installed app."""
+    from unittest.mock import patch
+
+    from cogstash.core.config import CogStashConfig
+    from cogstash.ui.install_state import should_show_installer_welcome
+
+    config = CogStashConfig(last_seen_version="0.3.0", last_seen_installer_version="")
+    with patch("cogstash.ui.install_state.is_installed_windows_run", return_value=False):
+        assert should_show_installer_welcome(config, "0.4.0") is False
+
+
+def test_is_installed_windows_run_requires_marker(monkeypatch, tmp_path):
+    import cogstash.ui.install_state as state_mod
+
+    exe_dir = tmp_path / "portable"
+    exe_dir.mkdir()
+    exe_path = exe_dir / "CogStash.exe"
+    exe_path.write_text("exe", encoding="utf-8")
+
+    monkeypatch.setattr(state_mod.sys, "platform", "win32")
+    monkeypatch.setattr(state_mod.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(state_mod.sys, "executable", str(exe_path))
+
+    assert state_mod.is_installed_windows_run() is False
+
+
+def test_is_installed_windows_run_true_with_marker(monkeypatch, tmp_path):
+    import cogstash.ui.install_state as state_mod
+
+    exe_dir = tmp_path / "installed"
+    exe_dir.mkdir()
+    exe_path = exe_dir / "CogStash.exe"
+    exe_path.write_text("exe", encoding="utf-8")
+    (exe_dir / ".cogstash-installed").write_text("installed", encoding="utf-8")
+
+    monkeypatch.setattr(state_mod.sys, "platform", "win32")
+    monkeypatch.setattr(state_mod.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(state_mod.sys, "executable", str(exe_path))
+
+    assert state_mod.is_installed_windows_run() is True

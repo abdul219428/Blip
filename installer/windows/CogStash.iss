@@ -41,6 +41,8 @@ Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
 UninstallDisplayIcon={app}\{#AppExeName}
+ChangesEnvironment=yes
+CloseApplications=yes
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -48,6 +50,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 [Tasks]
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Additional shortcuts:"
 Name: "startup"; Description: "Launch CogStash when I sign in"; GroupDescription: "Additional tasks:"
+Name: "addtopath"; Description: "Add CogStash CLI to PATH"; GroupDescription: "Additional tasks:"
 
 [Files]
 Source: "{#SourceDir}\{#AppExeName}"; DestDir: "{app}"; Flags: ignoreversion
@@ -63,17 +66,96 @@ Filename: "{app}\CogStash.exe"; Description: "Launch CogStash"; Flags: nowait po
 
 [UninstallDelete]
 Type: files; Name: "{userstartup}\CogStash.bat"
+Type: files; Name: "{app}\.cogstash-installed"
 
 [Code]
+const
+  PathOwnershipKey = 'Software\CogStash\Installer';
+  PathOwnershipValue = 'ManagedPath';
+
 function StartupBatchContents(): String;
 begin
   Result := '@echo off' + #13#10 + 'start "" "' + ExpandConstant('{app}\CogStash.exe') + '"' + #13#10;
 end;
 
+procedure AddAppToUserPath();
+var
+  OldPath, AppDir: String;
+begin
+  AppDir := ExpandConstant('{app}');
+  if not RegQueryStringValue(HKEY_CURRENT_USER, 'Environment', 'Path', OldPath) then
+    OldPath := '';
+  if Pos(LowerCase(AppDir + ';'), LowerCase(OldPath + ';')) = 0 then
+  begin
+    if OldPath = '' then
+      RegWriteExpandStringValue(HKEY_CURRENT_USER, 'Environment', 'Path', AppDir)
+    else
+      RegWriteExpandStringValue(HKEY_CURRENT_USER, 'Environment', 'Path', OldPath + ';' + AppDir);
+    RegWriteStringValue(HKEY_CURRENT_USER, PathOwnershipKey, PathOwnershipValue, AppDir);
+  end;
+end;
+
+{ Returns PathStr with every exact (case-insensitive) semicolon-delimited
+  segment equal to Segment removed.  All other segments are preserved unchanged. }
+function RemoveExactPathSegment(const PathStr, Segment: String): String;
+var
+  Remaining, Part, NewPath, Sep: String;
+  SemiPos: Integer;
+  SegLower: String;
+begin
+  SegLower := LowerCase(Segment);
+  Remaining := PathStr;
+  NewPath := '';
+  Sep := '';
+  while Remaining <> '' do
+  begin
+    SemiPos := Pos(';', Remaining);
+    if SemiPos > 0 then
+    begin
+      Part := Copy(Remaining, 1, SemiPos - 1);
+      Remaining := Copy(Remaining, SemiPos + 1, Length(Remaining));
+    end
+    else
+    begin
+      Part := Remaining;
+      Remaining := '';
+    end;
+    if LowerCase(Part) <> SegLower then
+    begin
+      NewPath := NewPath + Sep + Part;
+      Sep := ';';
+    end;
+  end;
+  Result := NewPath;
+end;
+
+procedure RemoveInstallerOwnedPath();
+var
+  OwnedPath, CurrentPath, NewPath: String;
+begin
+  if not RegQueryStringValue(HKEY_CURRENT_USER, PathOwnershipKey, PathOwnershipValue, OwnedPath) then
+    Exit;
+  if RegQueryStringValue(HKEY_CURRENT_USER, 'Environment', 'Path', CurrentPath) then
+  begin
+    NewPath := RemoveExactPathSegment(CurrentPath, OwnedPath);
+    if NewPath <> CurrentPath then
+      RegWriteExpandStringValue(HKEY_CURRENT_USER, 'Environment', 'Path', NewPath);
+  end;
+  RegDeleteValue(HKEY_CURRENT_USER, PathOwnershipKey, PathOwnershipValue);
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
+  if CurStep = ssPostInstall then
+    SaveStringToFile(ExpandConstant('{app}\.cogstash-installed'), 'installed', False);
   if (CurStep = ssPostInstall) and WizardIsTaskSelected('startup') then
-  begin
     SaveStringToFile(ExpandConstant('{userstartup}\CogStash.bat'), StartupBatchContents(), False);
-  end;
+  if (CurStep = ssPostInstall) and WizardIsTaskSelected('addtopath') then
+    AddAppToUserPath();
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+  if CurUninstallStep = usPostUninstall then
+    RemoveInstallerOwnedPath();
 end;

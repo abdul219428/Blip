@@ -16,9 +16,11 @@ a card-based UI, or query from the command line.
 - ⌨️ **Global hotkey** — capture thoughts from any app without switching windows
 - 🏷️ **Smart tags** — `#todo`, `#urgent`, `#important`, `#idea` with emoji prefixes
 - 🔤 **Autocomplete** — type `#` and pick a tag from the popup
+- ✨ **Guided onboarding** — first-run wizard for new users plus lightweight installed-build welcome/upgrade flow
+- ⚙️ **Settings window** — theme, window size, startup, and custom tag management from the UI, with hotkey shown for reference
 - 🎨 **Themes** — 5 built-in color schemes (tokyo-night, light, dracula, gruvbox, mono)
 - 🗂️ **Browse window** — card view with live search, tag filtering, and mark-done
-- 💻 **CLI commands** — `recent`, `search`, `tags` with ANSI-colored output
+- 💻 **CLI commands** — `recent`, `search`, `tags`, `add`, `edit`, `delete`, `export`, `stats`, and `config`
 - 🖥️ **System tray** — runs quietly in the background with a tray icon menu
 - 🌍 **Cross-platform** — Windows, macOS, and Linux
 
@@ -52,16 +54,16 @@ Grab the latest release from the [**Releases page**](https://github.com/abdul219
 
 On Windows you can now choose between:
 
-- `CogStash-vX.Y.Z-setup.exe` — installs `CogStash.exe` and `CogStash-CLI.exe` to `%LocalAppData%\Programs\CogStash`, adds an Apps & Features entry, creates Start Menu/Desktop shortcuts only for the UI app, and can optionally enable launch at sign-in during setup.
+- `CogStash-vX.Y.Z-setup.exe` — installs `CogStash.exe` and `CogStash-CLI.exe` to `%LocalAppData%\Programs\CogStash`, adds an Apps & Features entry, creates Start Menu/Desktop shortcuts only for the UI app, and can optionally enable launch at sign-in plus add the installed CLI directory to `PATH` during setup.
 - `CogStash-vX.Y.Z-windows.exe` — portable onefile executable; download and run without installing.
 - `CogStash-CLI-vX.Y.Z-windows.exe` — portable CLI executable for shell-only usage.
 
 > **Tip:** The `.zip` / `.tar.gz` files are UI onedir bundles (a folder with all files).
 > They start slightly faster but aren't a single portable file.
 
-> **Uninstall note (Windows installer):** uninstall removes the installed app, shortcuts,
-> uninstall entry, and installer-managed startup entry, but keeps your personal notes,
-> config, and log files by default.
+> **Uninstall note (Windows installer):** uninstall removes the installed app, installer-managed `PATH` entry, the CogStash startup script if present, shortcuts, and uninstall entry. If CogStash is still running, the installer prompts you to close it first. Your personal notes, config, and log files are kept by default.
+>
+> **Installed-launch note:** new users still get the full first-run wizard. The installed Windows app shows a lightweight installer welcome for installed-app upgrades and for a first installed launch over an existing config from a portable or source run.
 
 ### Option 2: From source (with uv)
 
@@ -91,10 +93,14 @@ uv sync
 
 # If using the Windows installer:
 # Launch CogStash from the Start Menu after setup
-# Or run %LocalAppData%\Programs\CogStash\CogStash-CLI.exe from a shell
+# Or, if you selected the PATH option during setup, run: CogStash-CLI.exe --help
+# Otherwise run %LocalAppData%\Programs\CogStash\CogStash-CLI.exe from a shell
 
 # If installed from source with uv:
 uv run cogstash
+
+# CLI dispatch also works through the package module:
+python -m cogstash --help
 ```
 
 CogStash starts in the system tray. Press the hotkey to capture a note:
@@ -118,6 +124,11 @@ Notes are written to `~/cogstash.md` in this format:
 
 Multi-line notes use 2-space indented continuation lines.
 
+New users see the first-run wizard on their first launch. After that, use the tray icon to open:
+
+- **Browse Notes** for searching, filtering, editing, and marking notes done
+- **Settings** for theme, window size, startup, and tag preferences, with the current hotkey shown for reference
+
 ---
 
 ## Smart Tags
@@ -140,6 +151,20 @@ Tags can appear anywhere in the note text. Multiple tags per note are supported.
 
 CogStash includes a command-line interface for querying notes without opening
 the GUI. Release builds ship it as `CogStash-CLI` alongside the UI app.
+Examples below use `cogstash`; when using packaged binaries, replace that with
+`CogStash-CLI.exe` on Windows or the platform-specific CLI binary from the release.
+
+| Command | Purpose |
+|---------|---------|
+| `recent` | Show recent notes |
+| `search` | Full-text search |
+| `tags` | List tags with counts |
+| `add` | Add a note from arguments or piped stdin |
+| `edit` | Edit a note by number or `--search` |
+| `delete` | Delete a note by number or `--search` |
+| `export` | Export all notes as JSON, CSV, or Markdown |
+| `stats` | Show note and tag statistics |
+| `config` | Launch the config wizard or get/set supported config keys |
 
 ### `cogstash recent`
 
@@ -178,6 +203,61 @@ Example output:
 
 > **Note:** Output is ANSI-colored when writing to a terminal. Colors are
 > automatically disabled when piping to a file or another command.
+
+### `cogstash add`
+
+Add a note directly from the shell. If you omit the note text, pipe it through stdin.
+
+```bash
+cogstash add "Ship the installer follow-up" # direct text
+echo "Follow up with portable users" | cogstash add
+```
+
+### `cogstash edit`
+
+Edit a note by note number, or resolve it from a search query.
+
+```bash
+cogstash edit 42 "Updated note text"
+cogstash edit --search "installer" "Updated note text"
+```
+
+### `cogstash delete`
+
+Delete a note by note number or search query.
+
+```bash
+cogstash delete 42
+cogstash delete --search "installer" --yes
+```
+
+### `cogstash export`
+
+Export all notes to JSON, CSV, or Markdown. Without `--output`, CogStash writes an auto-named export file in the current working directory.
+
+```bash
+cogstash export --format json
+cogstash export --format csv --output notes.csv
+cogstash export --format md --output notes.md
+```
+
+### `cogstash stats`
+
+Show totals, streaks, tag counts, and related note statistics.
+
+```bash
+cogstash stats
+```
+
+### `cogstash config`
+
+Launch the interactive config wizard, or read/write individual supported keys.
+
+```bash
+cogstash config
+cogstash config get theme
+cogstash config set window_size wide
+```
 
 ---
 
@@ -232,6 +312,9 @@ automatically on first run with default values.
 | `log_file` | `~/cogstash.log` | Path to the log file |
 | `theme` | `tokyo-night` | Color theme |
 | `window_size` | `default` | Capture window size preset |
+| `launch_at_startup` | `false` | UI-managed Windows startup preference |
+| `last_seen_version` | `""` | Internal UI state for first-run / What's New flow |
+| `last_seen_installer_version` | `""` | Internal installer-onboarding state |
 
 Example config:
 
@@ -244,6 +327,15 @@ Example config:
 ```
 
 Only include the keys you want to override — missing keys use defaults.
+
+> **Note:** `cogstash config get` supports `hotkey`, `theme`, `window_size`,
+> `output_file`, `log_file`, and `tags`. `cogstash config set` supports
+> `hotkey`, `theme`, `window_size`, `output_file`, and `log_file`. The
+> installer/onboarding keys are maintained by the app and installer.
+>
+> On Windows, launch-at-startup is managed by the installer/UI startup entry as
+> well as config state, so changing JSON alone is not the recommended way to
+> control it.
 
 ---
 
