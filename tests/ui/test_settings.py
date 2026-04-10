@@ -65,7 +65,7 @@ def test_wizard_saves_config(tk_root, tmp_path):
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows only")
 def test_startup_shortcut_path():
     """get_startup_shortcut_path returns valid Windows startup path."""
-    from cogstash.ui.settings import get_startup_shortcut_path
+    from cogstash.ui.install_state import get_startup_shortcut_path
 
     path = get_startup_shortcut_path()
     assert "Startup" in str(path) or "startup" in str(path)
@@ -124,7 +124,8 @@ def test_installer_welcome_dialog_does_not_claim_path_is_changeable_in_settings(
     dialog = InstallerWelcomeDialog(tk_root, CogStashConfig(), tmp_path / ".cogstash.json", "0.4.0")
     labels = [child.cget("text") for child in dialog.win.winfo_children() if child.winfo_class() == "Label"]
 
-    assert any("PATH can be changed by re-running the installer" in text for text in labels)
+    assert any("PATH option is available during installation." in text for text in labels)
+    assert not any("PATH can be changed by re-running the installer" in text for text in labels)
     assert not any("Startup and PATH settings can be changed in Settings" in text for text in labels)
 
     dialog.win.destroy()

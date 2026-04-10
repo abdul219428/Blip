@@ -16,13 +16,7 @@ from cogstash.ui.app import (
     platform_font,
     save_config,
 )
-
-
-def get_startup_shortcut_path() -> Path:
-    """Get the path where the startup shortcut/script should be placed (Windows)."""
-    import os
-    startup_dir = Path(os.environ.get("APPDATA", "")) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup"
-    return startup_dir / "CogStash.bat"
+from cogstash.ui.install_state import get_startup_shortcut_path
 
 
 def set_launch_at_startup(enable: bool) -> None:
@@ -842,7 +836,7 @@ class InstallerWelcomeDialog:
                      font=(platform_font(), 9), anchor="w").pack(side="left", fill="x", expand=True)
 
         tk.Label(
-            self.win, text="Startup can be changed in Settings → General. PATH can be changed by re-running the installer.",
+            self.win, text="Startup can be changed in Settings → General. The PATH option is available during installation.",
             bg=t["bg"], fg=t["muted"], font=(platform_font(), 8), wraplength=370,
         ).pack(pady=(12, 0), padx=24)
 

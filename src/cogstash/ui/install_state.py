@@ -6,6 +6,7 @@ keeps startup-script state accessible without polluting app.py or settings.py.
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -17,6 +18,12 @@ INSTALL_MARKER_NAME = ".cogstash-installed"
 def _install_marker_path() -> Path:
     """Return the installer marker path next to the running executable."""
     return Path(sys.executable).resolve().parent / INSTALL_MARKER_NAME
+
+
+def get_startup_shortcut_path() -> Path:
+    """Return the Windows startup script path used by CogStash."""
+    startup_dir = Path(os.environ.get("APPDATA", "")) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup"
+    return startup_dir / "CogStash.bat"
 
 
 def is_installed_windows_run() -> bool:
@@ -46,12 +53,11 @@ def startup_script_exists() -> bool:
     """Return True if the installer-managed startup batch script is present on disk."""
     if sys.platform != "win32":
         return False
-    from cogstash.ui.settings import get_startup_shortcut_path  # lazy — avoids circular import
-
     return get_startup_shortcut_path().exists()
 
 
 __all__ = [
+    "get_startup_shortcut_path",
     "is_installed_windows_run",
     "should_show_installer_welcome",
     "startup_script_exists",
