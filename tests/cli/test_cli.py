@@ -854,7 +854,7 @@ def test_config_help_includes_wizard_examples_and_restrictions(capsys):
     assert re.search(r"(?m)^\s*cogstash config\s*$", output)
     assert "cogstash config get theme" in output
     assert "cogstash config set window_size wide" in output
-    assert "tags" in lowered and ("get-only" in lowered or "read-only" in lowered or "not writable" in lowered)
+    assert "tags are not writable via config set" in lowered
     assert "launch_at_startup" not in output
     assert "last_seen_version" not in output
     assert "last_seen_installer_version" not in output
