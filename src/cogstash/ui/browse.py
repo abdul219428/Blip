@@ -238,23 +238,29 @@ class BrowseWindow:
             else:
                 pill.configure(bg=t["bg"], fg=t["fg"], font=(fnt, 9))
 
-    def _update_filter_summary(self):
-        """Show or hide the active-filter summary bar."""
-        if self._filter_summary_frame is None or self._filter_summary_label is None:
-            return
-
+    def _format_filter_summary(self) -> str | None:
+        """Return the active-filter summary text without the prefix."""
         query = self.search_var.get().strip()
         summary_parts: list[str] = []
         if query:
             summary_parts.append(f'Search: "{query}"')
         if self._active_tag:
             summary_parts.append(f"Tag: {self._active_tag}")
-
         if not summary_parts:
+            return None
+        return " · ".join(summary_parts)
+
+    def _update_filter_summary(self):
+        """Show or hide the active-filter summary bar."""
+        if self._filter_summary_frame is None or self._filter_summary_label is None:
+            return
+
+        summary_text = self._format_filter_summary()
+        if summary_text is None:
             self._filter_summary_frame.pack_forget()
             return
 
-        self._filter_summary_label.configure(text=f'Filters active: {" · ".join(summary_parts)}')
+        self._filter_summary_label.configure(text=f"Filters active: {summary_text}")
         if not self._filter_summary_frame.winfo_manager():
             pack_kwargs = {"fill": "x"}
             if self._cards_container is not None:
@@ -294,6 +300,47 @@ class BrowseWindow:
         today = datetime.now().date()
         yesterday = today - timedelta(days=1)
         current_date = None
+
+        if not notes:
+            summary_text = self._format_filter_summary()
+            if summary_text is not None:
+                empty_state = tk.Frame(self.cards_frame, bg=t["bg"], padx=24, pady=32)
+                empty_state.pack(fill="both", expand=True)
+
+                tk.Label(
+                    empty_state,
+                    text="No notes match the current filters.",
+                    bg=t["bg"],
+                    fg=t["fg"],
+                    font=(fnt, 11, "bold"),
+                    anchor="center",
+                    justify="center",
+                ).pack()
+                tk.Label(
+                    empty_state,
+                    text=f"Filters active: {summary_text}",
+                    bg=t["bg"],
+                    fg=t["muted"],
+                    font=(fnt, 9),
+                    anchor="center",
+                    justify="center",
+                ).pack(pady=(6, 12))
+                tk.Button(
+                    empty_state,
+                    text="Clear filters",
+                    command=self._clear_filters,
+                    bg=t["accent"],
+                    fg=t["bg"],
+                    activebackground=t["accent"],
+                    activeforeground=t["bg"],
+                    font=(fnt, 9, "bold"),
+                    relief="flat",
+                    bd=0,
+                    padx=10,
+                    pady=4,
+                    cursor="hand2",
+                    highlightthickness=0,
+                ).pack()
 
         for note in reversed(notes):  # newest first
             note_date = note.timestamp.date()
