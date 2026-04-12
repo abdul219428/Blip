@@ -144,6 +144,31 @@ class SettingsWindow:
                  font=(platform_font(), 10), padx=8, pady=4).pack(anchor="w", padx=(8, 0))
         tk.Label(frame, text="Edit in ~/.cogstash.json to change", bg=t["bg"], fg=t["muted"],
                  font=(platform_font(), 8)).pack(anchor="w", padx=(8, 0), pady=(2, 0))
+        if self.hotkey_warning:
+            warning_frame = tk.Frame(
+                frame,
+                bg=t["entry_bg"],
+                highlightbackground=t["error"],
+                highlightcolor=t["error"],
+                highlightthickness=1,
+            )
+            warning_frame.pack(fill="x", padx=(8, 0), pady=(10, 0))
+            tk.Label(
+                warning_frame,
+                text="⚠ Hotkey Warning",
+                bg=t["entry_bg"],
+                fg=t["error"],
+                font=(platform_font(), 10, "bold"),
+            ).pack(anchor="w", padx=10, pady=(10, 4))
+            tk.Label(
+                warning_frame,
+                text=self.hotkey_warning,
+                bg=t["entry_bg"],
+                fg=t["fg"],
+                justify="left",
+                wraplength=420,
+                font=(platform_font(), 9),
+            ).pack(anchor="w", padx=10, pady=(0, 10))
 
         # Section: Notes File
         tk.Label(frame, text="Notes File", bg=t["bg"], fg=t["fg"],
