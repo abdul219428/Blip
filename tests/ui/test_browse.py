@@ -282,9 +282,12 @@ def test_browse_clear_filters_resets_search_tag_and_full_list(tmp_path, tk_root)
         win._on_tag_filter("todo")
         win.window.update_idletasks()
 
+        summary_frame = getattr(win, "_filter_summary_frame", None)
         clear_filters_button = getattr(win, "_clear_filters_button", None)
 
         assert len(win._visible_cards) == 1
+        assert summary_frame is not None
+        assert summary_frame.winfo_ismapped()
         assert clear_filters_button is not None
 
         clear_filters_button.invoke()
