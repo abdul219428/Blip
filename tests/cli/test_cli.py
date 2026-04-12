@@ -894,7 +894,6 @@ def test_delete_help_includes_yes_and_examples(capsys):
 
     output = capsys.readouterr().out
     assert exc.value.code == 0
-    assert "--yes" in output
     assert 'cogstash delete 42' in output
     assert 'cogstash delete --search "installer" --yes' in output
 
