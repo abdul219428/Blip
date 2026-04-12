@@ -215,7 +215,9 @@ echo "Follow up with portable users" | cogstash add
 
 ### `cogstash edit`
 
-Edit a note by note number, or resolve it from a search query.
+Edit a note's text.
+
+Use a note number or `--search` to target the note. When using `--search`, the replacement text follows the search term.
 
 ```bash
 cogstash edit 42 "Updated note text"
@@ -224,7 +226,9 @@ cogstash edit --search "installer" "Updated note text"
 
 ### `cogstash delete`
 
-Delete a note by note number or search query.
+Delete a note.
+
+Use a note number or `--search` to target the note. The command asks for confirmation unless `--yes` is provided.
 
 ```bash
 cogstash delete 42
@@ -251,13 +255,22 @@ cogstash stats
 
 ### `cogstash config`
 
-Launch the interactive config wizard, or read/write individual supported keys.
+View configuration values, update supported keys, or launch the interactive wizard.
+
+`cogstash config` with no action starts the interactive wizard. Press Enter to keep current value.
 
 ```bash
 cogstash config
 cogstash config get theme
 cogstash config set window_size wide
 ```
+
+> **Note:** `cogstash config get` supports `hotkey`, `theme`, `window_size`,
+> `output_file`, `log_file`, and `tags`. `cogstash config set` supports
+> `hotkey`, `theme`, `window_size`, `output_file`, and `log_file`. Tags are
+> not writable via `config set`.
+>
+> Internal bookkeeping keys are not exposed through this command.
 
 ---
 
