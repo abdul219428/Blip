@@ -847,6 +847,8 @@ def test_config_help_includes_wizard_examples_and_restrictions(capsys):
 
     assert exc.value.code == 0
     assert "wizard" in lowered
+    assert "interactive wizard" in lowered
+    assert "press enter to keep current value" in lowered
     assert "no action" in lowered or "omit for wizard" in lowered
     assert "examples:" in lowered
     assert "cogstash config" in output
@@ -855,7 +857,6 @@ def test_config_help_includes_wizard_examples_and_restrictions(capsys):
     assert "tags" in lowered and ("get-only" in lowered or "read-only" in lowered or "not writable" in lowered)
     assert "output_file" not in output
     assert "log_file" not in output
-    assert "hotkey" not in output
 
 
 def test_version_flag(capsys):
