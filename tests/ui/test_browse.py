@@ -21,6 +21,34 @@ def _make_browse_window(tmp_path, tk_root, contents: str):
     return BrowseWindow(tk_root, CogStashConfig(output_file=_make_notes_file(tmp_path, contents)))
 
 
+def _iter_descendant_widgets(widget):
+    yield widget
+    for child in widget.winfo_children():
+        yield from _iter_descendant_widgets(child)
+
+
+def _collect_widget_texts(widget):
+    texts = []
+    for child in _iter_descendant_widgets(widget):
+        try:
+            text = child.cget("text")
+        except Exception:
+            continue
+        if isinstance(text, str) and text:
+            texts.append(text)
+    return texts
+
+
+def _find_button_with_text(widget, text: str):
+    for child in _iter_descendant_widgets(widget):
+        try:
+            if child.winfo_class() == "Button" and child.cget("text") == text:
+                return child
+        except Exception:
+            continue
+    return None
+
+
 @needs_display
 def test_browse_window_creates(tmp_path, tk_root):
     """BrowseWindow opens without error."""
@@ -372,5 +400,87 @@ def test_browse_clear_filters_cancels_pending_search_before_refresh(tmp_path, tk
             win._clear_filters()
 
         assert cancelled_ids == ["search-before-clear", "search-triggered-by-clear"]
+    finally:
+        win.window.destroy()
+
+
+@needs_display
+def test_browse_filter_empty_state_shows_message_filters_and_clear_action(tmp_path, tk_root):
+    """Zero-result filtered views should render a filter-aware empty state in the cards area."""
+    win = _make_browse_window(
+        tmp_path,
+        tk_root,
+        "- [2026-03-26 14:30] install update #todo\n"
+        "- [2026-03-26 11:20] planning notes #idea\n",
+    )
+
+    try:
+        win.search_var.set("install")
+        win._on_search()
+        win._on_tag_filter("idea")
+        win.window.update_idletasks()
+
+        empty_state_texts = _collect_widget_texts(win.cards_frame)
+        empty_state_clear_button = _find_button_with_text(win.cards_frame, "Clear filters")
+        expected_summary = 'Filters active: Search: "install" · Tag: idea'
+
+        assert len(win._visible_cards) == 0
+        assert win._filter_summary_label is not None
+        assert win._filter_summary_label.cget("text") == expected_summary
+        assert "No notes match the current filters." in empty_state_texts
+        assert expected_summary in empty_state_texts
+        assert empty_state_clear_button is not None
+    finally:
+        win.window.destroy()
+
+
+@needs_display
+def test_browse_filter_empty_state_stays_distinct_from_unfiltered_empty_state(tmp_path, tk_root):
+    """The filtered empty-state wording should not appear when Browse has no notes and no filters."""
+    win = _make_browse_window(tmp_path, tk_root, "")
+
+    try:
+        win.window.update_idletasks()
+
+        cards_texts = _collect_widget_texts(win.cards_frame)
+        summary_frame = getattr(win, "_filter_summary_frame", None)
+
+        assert len(win._visible_cards) == 0
+        assert summary_frame is not None
+        assert not summary_frame.winfo_manager()
+        assert "No notes match the current filters." not in cards_texts
+        assert not any(text.startswith("Filters active:") for text in cards_texts)
+    finally:
+        win.window.destroy()
+
+
+@needs_display
+def test_browse_filter_empty_state_clear_action_restores_full_list(tmp_path, tk_root):
+    """Clearing filters from the empty state should restore the unfiltered list."""
+    win = _make_browse_window(
+        tmp_path,
+        tk_root,
+        "- [2026-03-26 14:30] install update #todo\n"
+        "- [2026-03-26 11:20] planning notes #idea\n",
+    )
+
+    try:
+        win.search_var.set("install")
+        win._on_search()
+        win._on_tag_filter("idea")
+        win.window.update_idletasks()
+
+        empty_state_clear_button = _find_button_with_text(win.cards_frame, "Clear filters")
+
+        assert len(win._visible_cards) == 0
+        assert empty_state_clear_button is not None
+
+        empty_state_clear_button.invoke()
+        win.window.update_idletasks()
+
+        assert win.search_var.get() == ""
+        assert win._active_tag is None
+        assert len(win._visible_cards) == 2
+        assert "No notes match the current filters." not in _collect_widget_texts(win.cards_frame)
     finally:
         win.window.destroy()
