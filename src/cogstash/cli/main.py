@@ -34,6 +34,8 @@ from .formatting import (
 )
 
 VALID_CONFIG_KEYS = {"hotkey", "theme", "window_size", "output_file", "log_file", "tags"}
+CONFIG_GET_KEYS = tuple(sorted(VALID_CONFIG_KEYS))
+CONFIG_SET_KEYS = tuple(key for key in CONFIG_GET_KEYS if key != "tags")
 
 
 class _MultilineHelpFormatter(argparse.RawDescriptionHelpFormatter):
@@ -539,7 +541,26 @@ def build_parser() -> argparse.ArgumentParser:
     p_stats = sub.add_parser("stats", help="Show note statistics")
     p_stats.set_defaults(func=cmd_stats)
 
-    p_config = sub.add_parser("config", help="View or set configuration")
+    p_config = sub.add_parser(
+        "config",
+        help="View or set configuration",
+        description=(
+            "View configuration values, update supported keys, or launch the interactive wizard.\n\n"
+            "CogStash config with no action starts the interactive wizard.\n"
+            "Press Enter to keep current value.\n"
+            f"Readable keys: {', '.join(CONFIG_GET_KEYS)}\n"
+            f"Writable via config set: {', '.join(CONFIG_SET_KEYS)}\n"
+            "Tags are not writable via config set.\n"
+            "Internal bookkeeping keys are not exposed through this command."
+        ),
+        epilog=(
+            "Examples:\n"
+            "  cogstash config\n"
+            "  cogstash config get theme\n"
+            "  cogstash config set window_size wide"
+        ),
+        formatter_class=_MultilineHelpFormatter,
+    )
     p_config.add_argument("action", nargs="?", choices=["get", "set"], default=None, help="Action: get or set (omit for wizard)")
     p_config.add_argument("key", nargs="?", help="Config key")
     p_config.add_argument("value", nargs="?", help="New value (for set)")
