@@ -872,12 +872,12 @@ def test_edit_help_includes_note_number_and_search_examples(capsys):
     from cogstash.cli import build_parser
 
     parser = build_parser()
-    with pytest.raises(SystemExit):
+    with pytest.raises(SystemExit) as exc:
         parser.parse_args(["edit", "--help"])
 
     output = capsys.readouterr().out
-    assert "note number" in output.lower()
-    assert "--search" in output
+    assert exc.value.code == 0
+    assert "note number or --search" in output.lower()
     assert 'cogstash edit 42 "Updated note text"' in output
     assert 'cogstash edit --search "installer" "Updated note text"' in output
 
@@ -889,10 +889,11 @@ def test_delete_help_includes_yes_and_examples(capsys):
     from cogstash.cli import build_parser
 
     parser = build_parser()
-    with pytest.raises(SystemExit):
+    with pytest.raises(SystemExit) as exc:
         parser.parse_args(["delete", "--help"])
 
     output = capsys.readouterr().out
+    assert exc.value.code == 0
     assert "--yes" in output
     assert 'cogstash delete 42' in output
     assert 'cogstash delete --search "installer" --yes' in output
