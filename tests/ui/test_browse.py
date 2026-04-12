@@ -177,7 +177,8 @@ def test_browse_filter_summary_hidden_when_no_filters_active(tmp_path, tk_root):
         win.window.update_idletasks()
 
         assert len(win._visible_cards) == 2
-        assert win._filter_summary_bar.winfo_manager() == ""
+        summary_frame = getattr(win, "_filter_summary_frame", None)
+        assert summary_frame is None or not summary_frame.winfo_ismapped()
     finally:
         win.window.destroy()
 
@@ -199,9 +200,14 @@ def test_browse_filter_summary_shows_combined_search_and_tag(tmp_path, tk_root):
         win._on_tag_filter("todo")
         win.window.update_idletasks()
 
+        summary_frame = getattr(win, "_filter_summary_frame", None)
+        summary_label = getattr(win, "_filter_summary_label", None)
+
         assert len(win._visible_cards) == 1
-        assert win._filter_summary_bar.winfo_manager() == "pack"
-        assert win._filter_summary_label.cget("text") == 'Filters active: Search: "install" · Tag: todo'
+        assert summary_frame is not None
+        assert summary_frame.winfo_ismapped()
+        assert summary_label is not None
+        assert summary_label.cget("text") == 'Filters active: Search: "install" · Tag: todo'
     finally:
         win.window.destroy()
 
@@ -221,9 +227,14 @@ def test_browse_filter_summary_shows_search_only_state(tmp_path, tk_root):
         win._on_search()
         win.window.update_idletasks()
 
+        summary_frame = getattr(win, "_filter_summary_frame", None)
+        summary_label = getattr(win, "_filter_summary_label", None)
+
         assert len(win._visible_cards) == 1
-        assert win._filter_summary_bar.winfo_manager() == "pack"
-        assert win._filter_summary_label.cget("text") == 'Filters active: Search: "install"'
+        assert summary_frame is not None
+        assert summary_frame.winfo_ismapped()
+        assert summary_label is not None
+        assert summary_label.cget("text") == 'Filters active: Search: "install"'
     finally:
         win.window.destroy()
 
@@ -242,9 +253,14 @@ def test_browse_filter_summary_shows_tag_only_state(tmp_path, tk_root):
         win._on_tag_filter("todo")
         win.window.update_idletasks()
 
+        summary_frame = getattr(win, "_filter_summary_frame", None)
+        summary_label = getattr(win, "_filter_summary_label", None)
+
         assert len(win._visible_cards) == 1
-        assert win._filter_summary_bar.winfo_manager() == "pack"
-        assert win._filter_summary_label.cget("text") == "Filters active: Tag: todo"
+        assert summary_frame is not None
+        assert summary_frame.winfo_ismapped()
+        assert summary_label is not None
+        assert summary_label.cget("text") == "Filters active: Tag: todo"
     finally:
         win.window.destroy()
 
@@ -266,14 +282,19 @@ def test_browse_clear_filters_resets_search_tag_and_full_list(tmp_path, tk_root)
         win._on_tag_filter("todo")
         win.window.update_idletasks()
 
-        assert len(win._visible_cards) == 1
+        clear_filters_button = getattr(win, "_clear_filters_button", None)
 
-        win._clear_filters_button.invoke()
+        assert len(win._visible_cards) == 1
+        assert clear_filters_button is not None
+
+        clear_filters_button.invoke()
         win.window.update_idletasks()
+
+        summary_frame = getattr(win, "_filter_summary_frame", None)
 
         assert win.search_var.get() == ""
         assert win._active_tag is None
         assert len(win._visible_cards) == 3
-        assert win._filter_summary_bar.winfo_manager() == ""
+        assert summary_frame is None or not summary_frame.winfo_ismapped()
     finally:
         win.window.destroy()
