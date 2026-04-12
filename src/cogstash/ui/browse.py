@@ -52,7 +52,6 @@ class BrowseWindow:
         self.window.configure(bg=self.theme["bg"])
         self.window.geometry("480x520")
         self.window.minsize(360, 300)
-        self.window.deiconify()
 
         self.search_var = tk.StringVar()
         self._build_ui()

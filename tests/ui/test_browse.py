@@ -37,6 +37,22 @@ def test_browse_window_creates(tmp_path, tk_root):
 
 
 @needs_display
+def test_browse_window_does_not_force_deiconify_on_create(tmp_path, tk_root):
+    """BrowseWindow should not force the toplevel to deiconify during creation."""
+    f = tmp_path / "cogstash.md"
+    f.write_text("- [2026-03-26 14:30] ☐ test note #todo\n", encoding="utf-8")
+
+    from cogstash.ui.app import CogStashConfig
+    from cogstash.ui.browse import BrowseWindow
+
+    with patch("cogstash.ui.browse.tk.Toplevel.deiconify") as deiconify_mock:
+        win = BrowseWindow(tk_root, CogStashConfig(output_file=f))
+
+    assert deiconify_mock.call_count == 0
+    win.window.destroy()
+
+
+@needs_display
 def test_browse_search_filters(tmp_path, tk_root):
     """Typing in search box reduces visible cards."""
     f = tmp_path / "cogstash.md"
