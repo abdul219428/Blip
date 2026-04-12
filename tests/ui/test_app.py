@@ -40,7 +40,7 @@ def _run_main_startup(monkeypatch, tmp_path, listener_cls):
     config = app_mod.CogStashConfig(
         output_file=tmp_path / "notes.md",
         log_file=tmp_path / "cogstash.log",
-        hotkey="<ctrl>+<alt>+space>",
+        hotkey="<ctrl>+<alt>+space",
         last_seen_version=cogstash.__version__,
         last_seen_installer_version=cogstash.__version__,
     )
@@ -274,7 +274,7 @@ def test_app_open_settings_receives_runtime_hotkey_warning_after_startup_failure
     config = app_mod.CogStashConfig(
         output_file=tmp_path / "notes.md",
         log_file=tmp_path / "cogstash.log",
-        hotkey="<ctrl>+<alt>+space>",
+        hotkey="<ctrl>+<alt>+space",
         last_seen_version=cogstash.__version__,
         last_seen_installer_version=cogstash.__version__,
     )
@@ -300,8 +300,9 @@ def test_app_open_settings_receives_runtime_hotkey_warning_after_startup_failure
         "showinfo",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("startup test should not show duplicate-instance dialog")),
     )
-    monkeypatch.setattr(settings_mod, "SettingsWindow", DummySettingsWindow, raising=False)
+    monkeypatch.setattr(settings_mod, "SettingsWindow", DummySettingsWindow)
     monkeypatch.setitem(sys.modules, "cogstash.ui.windows", windows_mod)
+    monkeypatch.setattr("sys.stdout", StrictEncodedStream("cp1252"))
 
     original_handlers = app_mod.logger.handlers[:]
     try:
@@ -325,6 +326,10 @@ def test_app_open_settings_receives_runtime_hotkey_warning_after_startup_failure
     assert created_settings[0]["config_path"] == created_apps[0].config_path
     assert created_settings[0]["hotkey_warning"] is not None
     assert "failed to register" in created_settings[0]["hotkey_warning"]
+    assert "Global capture is unavailable until the issue is fixed and CogStash is restarted." in created_settings[0][
+        "hotkey_warning"
+    ]
+    assert str(config.log_file) in created_settings[0]["hotkey_warning"]
     assert config.hotkey in created_settings[0]["hotkey_warning"]
 
 
