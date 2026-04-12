@@ -424,6 +424,7 @@ def test_browse_filter_empty_state_shows_message_filters_and_clear_action(tmp_pa
         empty_state_texts = _collect_widget_texts(win.cards_frame)
         empty_state_clear_button = _find_button_with_text(win.cards_frame, "Clear filters")
         expected_summary = 'Filters active: Search: "install" · Tag: idea'
+        expected_cards_filter_text = 'Search: "install" · Tag: idea'
 
         assert len(win._visible_cards) == 0
         assert summary_frame is not None
@@ -431,6 +432,9 @@ def test_browse_filter_empty_state_shows_message_filters_and_clear_action(tmp_pa
         assert win._filter_summary_label is not None
         assert win._filter_summary_label.cget("text") == expected_summary
         assert "No notes match the current filters." in empty_state_texts
+        assert any(
+            text.startswith("Active filters:") and expected_cards_filter_text in text for text in empty_state_texts
+        )
         assert empty_state_clear_button is not None
     finally:
         win.window.destroy()
