@@ -10,6 +10,15 @@ import pytest
 from ui._support import needs_display
 
 
+def _collect_label_text(widget):
+    texts = []
+    for child in widget.winfo_children():
+        if child.winfo_class() == "Label":
+            texts.append(child.cget("text"))
+        texts.extend(_collect_label_text(child))
+    return texts
+
+
 @needs_display
 def test_settings_window_has_tabs(tk_root, tmp_path):
     """Settings window creates 4 tabs."""
@@ -19,6 +28,51 @@ def test_settings_window_has_tabs(tk_root, tmp_path):
     sw = SettingsWindow(tk_root, CogStashConfig(), tmp_path / "test.json")
     assert hasattr(sw, "tab_buttons")
     assert len(sw.tab_buttons) == 4
+    sw.win.destroy()
+
+
+@needs_display
+def test_settings_shows_hotkey_warning_when_registration_failed(tk_root, tmp_path):
+    from cogstash.ui.app import CogStashConfig
+    from cogstash.ui.settings import SettingsWindow
+
+    log_file = tmp_path / "cogstash.log"
+    warning_text = (
+        "Hotkey failed to register: <ctrl>+<shift>+<space>\n"
+        "Global capture is unavailable until the issue is fixed and CogStash is restarted.\n"
+        f"See the log file for details: {log_file}"
+    )
+
+    sw = SettingsWindow(
+        tk_root,
+        CogStashConfig(log_file=log_file),
+        tmp_path / "test.json",
+        hotkey_warning=warning_text,
+    )
+    sw.win.update_idletasks()
+    labels = _collect_label_text(sw.tab_frames[0])
+    all_text = "\n".join(labels)
+
+    assert sw.win.winfo_height() > 450
+    assert "Hotkey failed to register" in all_text
+    assert "Global capture is unavailable until the issue is fixed and CogStash is restarted." in all_text
+    assert str(log_file) in all_text
+    assert "change the hotkey in Settings" not in all_text
+    assert "edit the hotkey in Settings" not in all_text
+
+    sw.win.destroy()
+
+
+@needs_display
+def test_settings_hides_hotkey_warning_when_session_is_healthy(tk_root, tmp_path):
+    from cogstash.ui.app import CogStashConfig
+    from cogstash.ui.settings import SettingsWindow
+
+    sw = SettingsWindow(tk_root, CogStashConfig(), tmp_path / "test.json")
+    labels = _collect_label_text(sw.tab_frames[0])
+
+    assert not any("failed to register" in text for text in labels)
+
     sw.win.destroy()
 
 

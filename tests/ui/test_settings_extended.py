@@ -286,11 +286,12 @@ def test_app_open_settings_uses_shared_config_path(tk_root, tmp_path):
     created = []
 
     class DummySettingsWindow:
-        def __init__(self, parent, config, passed_config_path, on_config_changed=None):
-            created.append((parent, config, passed_config_path, on_config_changed))
+        def __init__(self, parent, config, passed_config_path, on_config_changed=None, hotkey_warning=None):
+            created.append((parent, config, passed_config_path, on_config_changed, hotkey_warning))
             self.win = None
 
     with patch("cogstash.ui.settings.SettingsWindow", DummySettingsWindow):
         app._open_settings()
 
     assert created[0][2] == config_path
+    assert created[0][4] is None
