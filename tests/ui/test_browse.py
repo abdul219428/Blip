@@ -8,6 +8,19 @@ from unittest.mock import patch
 from ui._support import needs_display
 
 
+def _make_notes_file(tmp_path, contents: str):
+    f = tmp_path / "cogstash.md"
+    f.write_text(contents, encoding="utf-8")
+    return f
+
+
+def _make_browse_window(tmp_path, tk_root, contents: str):
+    from cogstash.ui.app import CogStashConfig
+    from cogstash.ui.browse import BrowseWindow
+
+    return BrowseWindow(tk_root, CogStashConfig(output_file=_make_notes_file(tmp_path, contents)))
+
+
 @needs_display
 def test_browse_window_creates(tmp_path, tk_root):
     """BrowseWindow opens without error."""
@@ -148,3 +161,119 @@ def test_browse_stale_edit_reloads_and_shows_notice(tmp_path, tk_root):
     notice_mock.assert_called_once()
     error_mock.assert_not_called()
     win.window.destroy()
+
+
+@needs_display
+def test_browse_filter_summary_hidden_when_no_filters_active(tmp_path, tk_root):
+    """No active filters should keep the summary bar hidden."""
+    win = _make_browse_window(
+        tmp_path,
+        tk_root,
+        "- [2026-03-26 14:30] install update #todo\n"
+        "- [2026-03-26 11:20] planning notes #idea\n",
+    )
+
+    try:
+        win.window.update_idletasks()
+
+        assert len(win._visible_cards) == 2
+        assert win._filter_summary_bar.winfo_manager() == ""
+    finally:
+        win.window.destroy()
+
+
+@needs_display
+def test_browse_filter_summary_shows_combined_search_and_tag(tmp_path, tk_root):
+    """Combined search and tag filters should show one joined summary string."""
+    win = _make_browse_window(
+        tmp_path,
+        tk_root,
+        "- [2026-03-26 14:30] install update #todo\n"
+        "- [2026-03-26 12:15] install backup #idea\n"
+        "- [2026-03-26 11:20] planning notes #todo\n",
+    )
+
+    try:
+        win.search_var.set("install")
+        win._on_search()
+        win._on_tag_filter("todo")
+        win.window.update_idletasks()
+
+        assert len(win._visible_cards) == 1
+        assert win._filter_summary_bar.winfo_manager() == "pack"
+        assert win._filter_summary_label.cget("text") == 'Filters active: Search: "install" · Tag: todo'
+    finally:
+        win.window.destroy()
+
+
+@needs_display
+def test_browse_filter_summary_shows_search_only_state(tmp_path, tk_root):
+    """Search-only filtering should show the search summary text."""
+    win = _make_browse_window(
+        tmp_path,
+        tk_root,
+        "- [2026-03-26 14:30] install update #todo\n"
+        "- [2026-03-26 11:20] planning notes #idea\n",
+    )
+
+    try:
+        win.search_var.set("install")
+        win._on_search()
+        win.window.update_idletasks()
+
+        assert len(win._visible_cards) == 1
+        assert win._filter_summary_bar.winfo_manager() == "pack"
+        assert win._filter_summary_label.cget("text") == 'Filters active: Search: "install"'
+    finally:
+        win.window.destroy()
+
+
+@needs_display
+def test_browse_filter_summary_shows_tag_only_state(tmp_path, tk_root):
+    """Tag-only filtering should show the tag summary text."""
+    win = _make_browse_window(
+        tmp_path,
+        tk_root,
+        "- [2026-03-26 14:30] install update #todo\n"
+        "- [2026-03-26 11:20] planning notes #idea\n",
+    )
+
+    try:
+        win._on_tag_filter("todo")
+        win.window.update_idletasks()
+
+        assert len(win._visible_cards) == 1
+        assert win._filter_summary_bar.winfo_manager() == "pack"
+        assert win._filter_summary_label.cget("text") == "Filters active: Tag: todo"
+    finally:
+        win.window.destroy()
+
+
+@needs_display
+def test_browse_clear_filters_resets_search_tag_and_full_list(tmp_path, tk_root):
+    """Clear filters should reset search, tag, and restore the full card list."""
+    win = _make_browse_window(
+        tmp_path,
+        tk_root,
+        "- [2026-03-26 14:30] install update #todo\n"
+        "- [2026-03-26 12:15] install backup #idea\n"
+        "- [2026-03-26 11:20] planning notes #todo\n",
+    )
+
+    try:
+        win.search_var.set("install")
+        win._on_search()
+        win._on_tag_filter("todo")
+        win.window.update_idletasks()
+
+        assert len(win._visible_cards) == 1
+
+        win._clear_filters_button.invoke()
+        win.window.update_idletasks()
+
+        assert win.search_var.get() == ""
+        assert win._active_tag is None
+        assert len(win._visible_cards) == 3
+        assert win._filter_summary_bar.winfo_manager() == ""
+    finally:
+        win.window.destroy()
