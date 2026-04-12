@@ -73,8 +73,8 @@ def _build_hotkey_failure_warning(config: CogStashConfig) -> str:
     """Build user-facing guidance for a failed global hotkey registration."""
     return (
         f"The configured global hotkey failed to register: {config.hotkey}\n\n"
-        "Global capture is unavailable for this session.\n"
-        "Global capture is unavailable until the issue is fixed and CogStash is restarted.\n\n"
+        "Global capture is unavailable for the rest of this session; fix the issue and restart "
+        "CogStash to re-enable it.\n\n"
         "Likely causes:\n"
         "- another app may already be using the shortcut\n"
         "- platform permissions/accessibility hooks may be blocking registration\n\n"

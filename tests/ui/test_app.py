@@ -191,7 +191,8 @@ def test_app_main_shows_hotkey_warning_when_registration_fails(monkeypatch, tmp_
         assert len(args) >= 2
         warning_text = args[1]
     assert config.hotkey in warning_text
-    assert "capture is unavailable for this session" in warning_text
+    assert "Global capture is unavailable for the rest of this session; fix the issue and restart CogStash to re-enable it." in warning_text
+    assert "Global capture is unavailable for this session." not in warning_text
     assert str(config.log_file) in warning_text
     assert "another app may already be using the shortcut" in warning_text
     assert "platform permissions/accessibility hooks may be blocking registration" in warning_text
@@ -326,9 +327,11 @@ def test_app_open_settings_receives_runtime_hotkey_warning_after_startup_failure
     assert created_settings[0]["config_path"] == created_apps[0].config_path
     assert created_settings[0]["hotkey_warning"] is not None
     assert "failed to register" in created_settings[0]["hotkey_warning"]
-    assert "Global capture is unavailable until the issue is fixed and CogStash is restarted." in created_settings[0][
-        "hotkey_warning"
-    ]
+    assert (
+        "Global capture is unavailable for the rest of this session; fix the issue and restart CogStash to re-enable it."
+        in created_settings[0]["hotkey_warning"]
+    )
+    assert "Global capture is unavailable for this session." not in created_settings[0]["hotkey_warning"]
     assert str(config.log_file) in created_settings[0]["hotkey_warning"]
     assert config.hotkey in created_settings[0]["hotkey_warning"]
 
