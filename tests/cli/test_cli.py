@@ -832,6 +832,34 @@ def test_cmd_config_get_invalid_key(tmp_path, capsys):
         )
 
 
+def test_config_help_includes_wizard_examples_and_restrictions(capsys):
+    """config help documents wizard mode, examples, and key restrictions."""
+    import re
+
+    import pytest
+
+    from cogstash.cli import build_parser
+
+    parser = build_parser()
+    with pytest.raises(SystemExit) as exc:
+        parser.parse_args(["config", "--help"])
+
+    output = capsys.readouterr().out
+    lowered = output.lower()
+
+    assert exc.value.code == 0
+    assert "cogstash config with no action starts the interactive wizard" in lowered
+    assert "press enter to keep current value" in lowered
+    assert "examples:" in lowered
+    assert re.search(r"(?m)^\s*cogstash config\s*$", output)
+    assert "cogstash config get theme" in output
+    assert "cogstash config set window_size wide" in output
+    assert "tags are not writable via config set" in lowered
+    assert "launch_at_startup" not in output
+    assert "last_seen_version" not in output
+    assert "last_seen_installer_version" not in output
+
+
 def test_version_flag(capsys):
     """cogstash --version prints the version string."""
     from cogstash.cli import build_parser
@@ -863,6 +891,41 @@ def test_version_flag_without_isatty(monkeypatch):
     assert exc.value.code == 0
     output = capture.getvalue()
     assert "cogstash" in output.lower()
+
+
+def test_edit_help_includes_note_number_and_search_examples(capsys):
+    """edit help teaches note-number and search-based editing."""
+    import pytest
+
+    from cogstash.cli import build_parser
+
+    parser = build_parser()
+    with pytest.raises(SystemExit) as exc:
+        parser.parse_args(["edit", "--help"])
+
+    output = capsys.readouterr().out
+    assert exc.value.code == 0
+    assert "note number or --search" in output.lower()
+    assert 'cogstash edit 42 "Updated note text"' in output
+    assert 'cogstash edit --search "installer" "Updated note text"' in output
+    assert "(default:" not in output
+
+
+def test_delete_help_includes_yes_and_examples(capsys):
+    """delete help teaches confirmation and search-based deletion."""
+    import pytest
+
+    from cogstash.cli import build_parser
+
+    parser = build_parser()
+    with pytest.raises(SystemExit) as exc:
+        parser.parse_args(["delete", "--help"])
+
+    output = capsys.readouterr().out
+    assert exc.value.code == 0
+    assert 'cogstash delete 42' in output
+    assert 'cogstash delete --search "installer" --yes' in output
+    assert "(default:" not in output
 
 
 def test_cli_main_version_does_not_import_app(monkeypatch):

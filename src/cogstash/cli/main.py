@@ -34,6 +34,15 @@ from .formatting import (
 )
 
 VALID_CONFIG_KEYS = {"hotkey", "theme", "window_size", "output_file", "log_file", "tags"}
+CONFIG_GET_KEYS = tuple(sorted(VALID_CONFIG_KEYS))
+CONFIG_SET_KEYS = tuple(key for key in CONFIG_GET_KEYS if key != "tags")
+
+
+class _MultilineHelpFormatter(argparse.RawDescriptionHelpFormatter):
+    def _split_lines(self, text: str, width: int) -> list[str]:
+        if "\n" in text:
+            return text.splitlines()
+        return argparse.HelpFormatter._split_lines(self, text, width)
 
 
 def _output_file(config: CogStashConfig) -> Path:
@@ -462,7 +471,10 @@ def build_parser() -> argparse.ArgumentParser:
     except PackageNotFoundError:
         package_version = "0.0.0-unknown"
 
-    parser = argparse.ArgumentParser(prog="cogstash", description="CogStash — query your brain dump from the terminal.")
+    parser = argparse.ArgumentParser(
+        prog="cogstash",
+        description="CogStash — query your brain dump from the terminal.",
+    )
     parser.add_argument("--version", "-V", action="version", version=f"cogstash {package_version}")
     sub = parser.add_subparsers(dest="command")
 
@@ -482,12 +494,40 @@ def build_parser() -> argparse.ArgumentParser:
     p_add.add_argument("text", nargs="*", help="Note text (or pipe via stdin)")
     p_add.set_defaults(func=cmd_add)
 
-    p_edit = sub.add_parser("edit", help="Edit a note's text")
+    p_edit = sub.add_parser(
+        "edit",
+        help="Edit a note's text",
+        description=(
+            "Edit a note's text.\n\n"
+            "Use a note number or --search to target the note.\n"
+            "When using --search, the replacement text follows the search term."
+        ),
+        epilog=(
+            "Examples:\n"
+            '  cogstash edit 42 "Updated note text"\n'
+            '  cogstash edit --search "installer" "Updated note text"'
+        ),
+        formatter_class=_MultilineHelpFormatter,
+    )
     p_edit.add_argument("args", nargs="*", help="Note number followed by new text")
     p_edit.add_argument("--search", "-s", help="Find note by keyword instead of number")
     p_edit.set_defaults(func=cmd_edit)
 
-    p_delete = sub.add_parser("delete", help="Delete a note")
+    p_delete = sub.add_parser(
+        "delete",
+        help="Delete a note",
+        description=(
+            "Delete a note.\n\n"
+            "Use a note number or --search to target the note.\n"
+            "The command asks for confirmation unless --yes is provided."
+        ),
+        epilog=(
+            "Examples:\n"
+            "  cogstash delete 42\n"
+            '  cogstash delete --search "installer" --yes'
+        ),
+        formatter_class=_MultilineHelpFormatter,
+    )
     p_delete.add_argument("number", type=int, nargs="?", default=None, help="Note number")
     p_delete.add_argument("--search", "-s", help="Find note by keyword")
     p_delete.add_argument("--yes", "-y", action="store_true", help="Skip confirmation")
@@ -501,7 +541,26 @@ def build_parser() -> argparse.ArgumentParser:
     p_stats = sub.add_parser("stats", help="Show note statistics")
     p_stats.set_defaults(func=cmd_stats)
 
-    p_config = sub.add_parser("config", help="View or set configuration")
+    p_config = sub.add_parser(
+        "config",
+        help="View or set configuration",
+        description=(
+            "View configuration values, update supported keys, or launch the interactive wizard.\n\n"
+            "CogStash config with no action starts the interactive wizard.\n"
+            "Press Enter to keep current value.\n"
+            f"Readable keys: {', '.join(CONFIG_GET_KEYS)}\n"
+            f"Writable via config set: {', '.join(CONFIG_SET_KEYS)}\n"
+            "Tags are not writable via config set.\n"
+            "Internal bookkeeping keys are not exposed through this command."
+        ),
+        epilog=(
+            "Examples:\n"
+            "  cogstash config\n"
+            "  cogstash config get theme\n"
+            "  cogstash config set window_size wide"
+        ),
+        formatter_class=_MultilineHelpFormatter,
+    )
     p_config.add_argument("action", nargs="?", choices=["get", "set"], default=None, help="Action: get or set (omit for wizard)")
     p_config.add_argument("key", nargs="?", help="Config key")
     p_config.add_argument("value", nargs="?", help="New value (for set)")
