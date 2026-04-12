@@ -281,7 +281,6 @@ class BrowseWindow:
         self._visible_cards = notes
         self._update_filter_summary()
         self._render_cards()
-        self.window.update_idletasks()
 
     def _render_cards(self):
         """Clear and re-render all visible cards."""

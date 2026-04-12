@@ -195,14 +195,14 @@ def test_browse_filter_summary_hidden_when_no_filters_active(tmp_path, tk_root):
         assert len(win._visible_cards) == 2
         summary_frame = getattr(win, "_filter_summary_frame", None)
         assert summary_frame is not None
-        assert not summary_frame.winfo_ismapped()
+        assert not summary_frame.winfo_manager()
     finally:
         win.window.destroy()
 
 
 @needs_display
 def test_browse_apply_filters_renders_cards_before_idletasks_flush(tmp_path, tk_root):
-    """Applying filters should not flush idle tasks before cards are rerendered."""
+    """Applying filters should rerender cards without forcing an idle-task flush."""
     win = _make_browse_window(
         tmp_path,
         tk_root,
@@ -224,9 +224,7 @@ def test_browse_apply_filters_renders_cards_before_idletasks_flush(tmp_path, tk_
         ):
             win._on_tag_filter("todo")
 
-        assert "render" in events
-        if "update" in events:
-            assert events.index("render") < events.index("update")
+        assert events == ["render"]
     finally:
         win.window.destroy()
 
@@ -253,7 +251,7 @@ def test_browse_filter_summary_shows_combined_search_and_tag(tmp_path, tk_root):
 
         assert len(win._visible_cards) == 1
         assert summary_frame is not None
-        assert summary_frame.winfo_ismapped()
+        assert summary_frame.winfo_manager() == "pack"
         assert summary_label is not None
         assert summary_label.cget("text") == 'Filters active: Search: "install" · Tag: todo'
     finally:
@@ -280,7 +278,7 @@ def test_browse_filter_summary_shows_search_only_state(tmp_path, tk_root):
 
         assert len(win._visible_cards) == 1
         assert summary_frame is not None
-        assert summary_frame.winfo_ismapped()
+        assert summary_frame.winfo_manager() == "pack"
         assert summary_label is not None
         assert summary_label.cget("text") == 'Filters active: Search: "install"'
     finally:
@@ -306,7 +304,7 @@ def test_browse_filter_summary_shows_tag_only_state(tmp_path, tk_root):
 
         assert len(win._visible_cards) == 1
         assert summary_frame is not None
-        assert summary_frame.winfo_ismapped()
+        assert summary_frame.winfo_manager() == "pack"
         assert summary_label is not None
         assert summary_label.cget("text") == "Filters active: Tag: todo"
     finally:
@@ -335,7 +333,7 @@ def test_browse_clear_filters_resets_search_tag_and_full_list(tmp_path, tk_root)
 
         assert len(win._visible_cards) == 1
         assert summary_frame is not None
-        assert summary_frame.winfo_ismapped()
+        assert summary_frame.winfo_manager() == "pack"
         assert clear_filters_button is not None
 
         clear_filters_button.invoke()
@@ -346,7 +344,7 @@ def test_browse_clear_filters_resets_search_tag_and_full_list(tmp_path, tk_root)
         assert win.search_var.get() == ""
         assert win._active_tag is None
         assert len(win._visible_cards) == 3
-        assert summary_frame is None or not summary_frame.winfo_ismapped()
+        assert summary_frame is None or not summary_frame.winfo_manager()
     finally:
         win.window.destroy()
 
