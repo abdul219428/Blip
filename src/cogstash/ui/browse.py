@@ -129,7 +129,6 @@ class BrowseWindow:
             cursor="hand2",
             highlightthickness=0,
         )
-        self._clear_filters_button.pack(side="right")
 
         # Scrollable card area
         self._cards_container = tk.Frame(self.window, bg=t["bg"])
@@ -252,15 +251,26 @@ class BrowseWindow:
 
     def _update_filter_summary(self):
         """Show or hide the active-filter summary bar."""
-        if self._filter_summary_frame is None or self._filter_summary_label is None:
+        if (
+            self._filter_summary_frame is None
+            or self._filter_summary_label is None
+            or self._clear_filters_button is None
+        ):
             return
 
         summary_text = self._format_filter_summary()
         if summary_text is None:
+            self._clear_filters_button.pack_forget()
             self._filter_summary_frame.pack_forget()
             return
 
         self._filter_summary_label.configure(text=f"Filters active: {summary_text}")
+        if self._visible_cards:
+            if not self._clear_filters_button.winfo_manager():
+                self._clear_filters_button.pack(side="right")
+        else:
+            self._clear_filters_button.pack_forget()
+
         if not self._filter_summary_frame.winfo_manager():
             pack_kwargs = {"fill": "x"}
             if self._cards_container is not None:

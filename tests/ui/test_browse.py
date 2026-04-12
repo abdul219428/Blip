@@ -49,6 +49,17 @@ def _find_button_with_text(widget, text: str):
     return None
 
 
+def _find_visible_buttons_with_text(widget, text: str):
+    buttons = []
+    for child in _iter_descendant_widgets(widget):
+        try:
+            if child.winfo_class() == "Button" and child.cget("text") == text and child.winfo_ismapped():
+                buttons.append(child)
+        except Exception:
+            continue
+    return buttons
+
+
 @needs_display
 def test_browse_window_creates(tmp_path, tk_root):
     """BrowseWindow opens without error."""
@@ -438,6 +449,33 @@ def test_browse_filter_empty_state_shows_message_filters_and_clear_action(tmp_pa
             for text in empty_state_texts
         )
         assert empty_state_clear_button is not None
+    finally:
+        win.window.destroy()
+
+
+@needs_display
+def test_browse_filter_empty_state_keeps_summary_bar_but_one_clear_action(tmp_path, tk_root):
+    """Zero-result filtered views should keep the summary bar but show one visible clear-filters action."""
+    win = _make_browse_window(
+        tmp_path,
+        tk_root,
+        "- [2026-03-26 14:30] install update #todo\n"
+        "- [2026-03-26 11:20] planning notes #idea\n",
+    )
+
+    try:
+        win.search_var.set("install")
+        win._on_search()
+        win._on_tag_filter("idea")
+        win.window.update()
+
+        summary_frame = getattr(win, "_filter_summary_frame", None)
+        visible_clear_buttons = _find_visible_buttons_with_text(win.window, "Clear filters")
+
+        assert len(win._visible_cards) == 0
+        assert summary_frame is not None
+        assert summary_frame.winfo_manager() == "pack"
+        assert visible_clear_buttons == [_find_button_with_text(win.cards_frame, "Clear filters")]
     finally:
         win.window.destroy()
 
