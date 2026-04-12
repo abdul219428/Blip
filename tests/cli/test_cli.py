@@ -832,6 +832,32 @@ def test_cmd_config_get_invalid_key(tmp_path, capsys):
         )
 
 
+def test_config_help_includes_wizard_examples_and_restrictions(capsys):
+    """config help documents wizard mode, examples, and key restrictions."""
+    import pytest
+
+    from cogstash.cli import build_parser
+
+    parser = build_parser()
+    with pytest.raises(SystemExit) as exc:
+        parser.parse_args(["config", "--help"])
+
+    output = capsys.readouterr().out
+    lowered = output.lower()
+
+    assert exc.value.code == 0
+    assert "wizard" in lowered
+    assert "no action" in lowered or "omit for wizard" in lowered
+    assert "examples:" in lowered
+    assert "cogstash config" in output
+    assert "cogstash config get theme" in output
+    assert "cogstash config set window_size wide" in output
+    assert "tags" in lowered and ("get-only" in lowered or "read-only" in lowered or "not writable" in lowered)
+    assert "output_file" not in output
+    assert "log_file" not in output
+    assert "hotkey" not in output
+
+
 def test_version_flag(capsys):
     """cogstash --version prints the version string."""
     from cogstash.cli import build_parser
