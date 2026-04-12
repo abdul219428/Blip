@@ -46,6 +46,7 @@ class BrowseWindow:
         self._filter_summary_label: tk.Label | None = None
         self._clear_filters_button: tk.Button | None = None
         self._cards_container: tk.Frame | None = None
+        self._search_after_id: str | None = None
 
         self.window = tk.Toplevel(root)
         self.window.title("CogStash — Browse Notes")
@@ -208,11 +209,18 @@ class BrowseWindow:
 
     def _schedule_search(self):
         """Debounce search by 200ms."""
-        if hasattr(self, "_search_after_id"):
-            self.window.after_cancel(self._search_after_id)
+        self._cancel_pending_search()
         self._search_after_id = self.window.after(200, self._on_search)
 
+    def _cancel_pending_search(self):
+        """Cancel any queued debounced search refresh."""
+        if self._search_after_id is None:
+            return
+        self.window.after_cancel(self._search_after_id)
+        self._search_after_id = None
+
     def _on_search(self, *_args):
+        self._search_after_id = None
         self._apply_filters()
 
     def _on_tag_filter(self, tag: str | None):
@@ -244,7 +252,6 @@ class BrowseWindow:
 
         if not summary_parts:
             self._filter_summary_frame.pack_forget()
-            self.window.update_idletasks()
             return
 
         self._filter_summary_label.configure(text=f'Filters active: {" · ".join(summary_parts)}')
@@ -253,11 +260,11 @@ class BrowseWindow:
             if self._cards_container is not None:
                 pack_kwargs["before"] = self._cards_container
             self._filter_summary_frame.pack(**pack_kwargs)
-        self.window.update_idletasks()
 
     def _clear_filters(self):
         """Reset the search and tag filters, then refresh the card list."""
         self.search_var.set("")
+        self._cancel_pending_search()
         self._active_tag = None
         self._update_pill_styles()
         self._apply_filters()
@@ -274,6 +281,7 @@ class BrowseWindow:
         self._visible_cards = notes
         self._update_filter_summary()
         self._render_cards()
+        self.window.update_idletasks()
 
     def _render_cards(self):
         """Clear and re-render all visible cards."""

@@ -194,7 +194,39 @@ def test_browse_filter_summary_hidden_when_no_filters_active(tmp_path, tk_root):
 
         assert len(win._visible_cards) == 2
         summary_frame = getattr(win, "_filter_summary_frame", None)
-        assert summary_frame is None or not summary_frame.winfo_ismapped()
+        assert summary_frame is not None
+        assert not summary_frame.winfo_ismapped()
+    finally:
+        win.window.destroy()
+
+
+@needs_display
+def test_browse_apply_filters_renders_cards_before_idletasks_flush(tmp_path, tk_root):
+    """Applying filters should not flush idle tasks before cards are rerendered."""
+    win = _make_browse_window(
+        tmp_path,
+        tk_root,
+        "- [2026-03-26 14:30] install update #todo\n"
+        "- [2026-03-26 11:20] planning notes #idea\n",
+    )
+
+    events: list[str] = []
+    original_render_cards = win._render_cards
+
+    def _record_render():
+        events.append("render")
+        original_render_cards()
+
+    try:
+        with (
+            patch("cogstash.ui.browse.tk.Misc.update_idletasks", side_effect=lambda *_args: events.append("update")),
+            patch.object(win, "_render_cards", side_effect=_record_render),
+        ):
+            win._on_tag_filter("todo")
+
+        assert "render" in events
+        if "update" in events:
+            assert events.index("render") < events.index("update")
     finally:
         win.window.destroy()
 
@@ -315,5 +347,32 @@ def test_browse_clear_filters_resets_search_tag_and_full_list(tmp_path, tk_root)
         assert win._active_tag is None
         assert len(win._visible_cards) == 3
         assert summary_frame is None or not summary_frame.winfo_ismapped()
+    finally:
+        win.window.destroy()
+
+
+@needs_display
+def test_browse_clear_filters_cancels_pending_search_before_refresh(tmp_path, tk_root):
+    """Clearing filters should cancel any scheduled search before direct refresh."""
+    win = _make_browse_window(
+        tmp_path,
+        tk_root,
+        "- [2026-03-26 14:30] install update #todo\n"
+        "- [2026-03-26 12:15] install backup #idea\n"
+        "- [2026-03-26 11:20] planning notes #todo\n",
+    )
+
+    cancelled_ids: list[str] = []
+
+    try:
+        win._search_after_id = "search-before-clear"
+
+        with (
+            patch.object(win.window, "after", return_value="search-triggered-by-clear"),
+            patch.object(win.window, "after_cancel", side_effect=cancelled_ids.append),
+        ):
+            win._clear_filters()
+
+        assert cancelled_ids == ["search-before-clear", "search-triggered-by-clear"]
     finally:
         win.window.destroy()
