@@ -49,9 +49,11 @@ def test_settings_shows_hotkey_warning_when_registration_failed(tk_root, tmp_pat
         tmp_path / "test.json",
         hotkey_warning=warning_text,
     )
+    sw.win.update_idletasks()
     labels = _collect_label_text(sw.tab_frames[0])
     all_text = "\n".join(labels)
 
+    assert sw.win.winfo_height() > 450
     assert "Hotkey failed to register" in all_text
     assert "Global capture is unavailable until the issue is fixed and CogStash is restarted." in all_text
     assert str(log_file) in all_text

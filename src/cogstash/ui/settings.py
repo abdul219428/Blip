@@ -64,7 +64,8 @@ class SettingsWindow:
         self.hotkey_warning = hotkey_warning
         self.win = tk.Toplevel(parent)
         self.win.title("CogStash Settings")
-        self.win.geometry("500x450")
+        window_height = 520 if hotkey_warning else 450
+        self.win.geometry(f"500x{window_height}")
         self.win.resizable(False, False)
         self.theme = THEMES[config.theme]
         self.win.configure(bg=self.theme["bg"])
