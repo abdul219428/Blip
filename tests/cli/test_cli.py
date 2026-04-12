@@ -880,6 +880,7 @@ def test_edit_help_includes_note_number_and_search_examples(capsys):
     assert "note number or --search" in output.lower()
     assert 'cogstash edit 42 "Updated note text"' in output
     assert 'cogstash edit --search "installer" "Updated note text"' in output
+    assert "(default:" not in output
 
 
 def test_delete_help_includes_yes_and_examples(capsys):
@@ -896,6 +897,7 @@ def test_delete_help_includes_yes_and_examples(capsys):
     assert exc.value.code == 0
     assert 'cogstash delete 42' in output
     assert 'cogstash delete --search "installer" --yes' in output
+    assert "(default:" not in output
 
 
 def test_cli_main_version_does_not_import_app(monkeypatch):

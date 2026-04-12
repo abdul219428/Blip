@@ -36,14 +36,11 @@ from .formatting import (
 VALID_CONFIG_KEYS = {"hotkey", "theme", "window_size", "output_file", "log_file", "tags"}
 
 
-class _HelpFormatter(argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescriptionHelpFormatter):
+class _MultilineHelpFormatter(argparse.RawDescriptionHelpFormatter):
     def _split_lines(self, text: str, width: int) -> list[str]:
         if "\n" in text:
             return text.splitlines()
         return argparse.HelpFormatter._split_lines(self, text, width)
-
-    def _fill_text(self, text: str, width: int, indent: str) -> str:
-        return "\n".join(f"{indent}{line}" for line in text.splitlines())
 
 
 def _output_file(config: CogStashConfig) -> Path:
@@ -475,7 +472,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="cogstash",
         description="CogStash — query your brain dump from the terminal.",
-        formatter_class=_HelpFormatter,
     )
     parser.add_argument("--version", "-V", action="version", version=f"cogstash {package_version}")
     sub = parser.add_subparsers(dest="command")
@@ -509,7 +505,7 @@ def build_parser() -> argparse.ArgumentParser:
             '  cogstash edit 42 "Updated note text"\n'
             '  cogstash edit --search "installer" "Updated note text"'
         ),
-        formatter_class=_HelpFormatter,
+        formatter_class=_MultilineHelpFormatter,
     )
     p_edit.add_argument("args", nargs="*", help="Note number followed by new text")
     p_edit.add_argument("--search", "-s", help="Find note by keyword instead of number")
@@ -528,7 +524,7 @@ def build_parser() -> argparse.ArgumentParser:
             "  cogstash delete 42\n"
             '  cogstash delete --search "installer" --yes'
         ),
-        formatter_class=_HelpFormatter,
+        formatter_class=_MultilineHelpFormatter,
     )
     p_delete.add_argument("number", type=int, nargs="?", default=None, help="Note number")
     p_delete.add_argument("--search", "-s", help="Find note by keyword")
