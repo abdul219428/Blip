@@ -834,6 +834,8 @@ def test_cmd_config_get_invalid_key(tmp_path, capsys):
 
 def test_config_help_includes_wizard_examples_and_restrictions(capsys):
     """config help documents wizard mode, examples, and key restrictions."""
+    import re
+
     import pytest
 
     from cogstash.cli import build_parser
@@ -846,12 +848,10 @@ def test_config_help_includes_wizard_examples_and_restrictions(capsys):
     lowered = output.lower()
 
     assert exc.value.code == 0
-    assert "wizard" in lowered
-    assert "interactive wizard" in lowered
+    assert "cogstash config with no action starts the interactive wizard" in lowered
     assert "press enter to keep current value" in lowered
-    assert "no action" in lowered or "omit for wizard" in lowered
     assert "examples:" in lowered
-    assert "cogstash config" in output
+    assert re.search(r"(?m)^\s*cogstash config\s*$", output)
     assert "cogstash config get theme" in output
     assert "cogstash config set window_size wide" in output
     assert "tags" in lowered and ("get-only" in lowered or "read-only" in lowered or "not writable" in lowered)
