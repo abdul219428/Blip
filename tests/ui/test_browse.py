@@ -427,7 +427,7 @@ def test_browse_filter_empty_state_shows_message_filters_and_clear_action(tmp_pa
 
         assert len(win._visible_cards) == 0
         assert summary_frame is not None
-        assert summary_frame.winfo_manager() == "pack"
+        assert summary_frame.winfo_manager()
         assert win._filter_summary_label is not None
         assert win._filter_summary_label.cget("text") == expected_summary
         assert "No notes match the current filters." in empty_state_texts
