@@ -234,6 +234,100 @@ def test_app_main_does_not_show_hotkey_warning_when_registration_succeeds(monkey
     assert warnings == []
 
 
+@needs_display
+def test_app_open_settings_receives_runtime_hotkey_warning_after_startup_failure(monkeypatch, tk_root, tmp_path):
+    """Opening Settings after a failed startup should receive the session's hotkey warning state."""
+    import types
+
+    import cogstash
+    import cogstash.ui.app as app_mod
+    import cogstash.ui.settings as settings_mod
+
+    created_apps = []
+    created_settings = []
+
+    class FakeGuard:
+        def close(self):
+            return None
+
+    class FailingListener:
+        def __init__(self, _mapping):
+            pass
+
+        def start(self):
+            raise OSError("hotkey already in use")
+
+    class DummySettingsWindow:
+        def __init__(self, parent, config, config_path, on_config_changed=None, hotkey_warning=None):
+            created_settings.append(
+                {
+                    "parent": parent,
+                    "config": config,
+                    "config_path": config_path,
+                    "on_config_changed": on_config_changed,
+                    "hotkey_warning": hotkey_warning,
+                }
+            )
+            self.win = types.SimpleNamespace(winfo_exists=lambda: False)
+
+    real_cogstash = app_mod.CogStash
+    config = app_mod.CogStashConfig(
+        output_file=tmp_path / "notes.md",
+        log_file=tmp_path / "cogstash.log",
+        hotkey="<ctrl>+<alt>+space>",
+        last_seen_version=cogstash.__version__,
+        last_seen_installer_version=cogstash.__version__,
+    )
+    windows_mod = types.ModuleType("cogstash.ui.windows")
+    windows_mod.WINDOWS_MUTEX_NAME = "Local\\CogStash.Test"
+    windows_mod.acquire_single_instance = lambda _name: FakeGuard()
+
+    def capture_app(root, app_config):
+        app = real_cogstash(root, app_config)
+        created_apps.append(app)
+        return app
+
+    monkeypatch.setattr(app_mod, "load_config", lambda _path: config)
+    monkeypatch.setattr(app_mod, "configure_dpi", lambda: None)
+    monkeypatch.setattr(app_mod.tk, "Tk", lambda: tk_root)
+    monkeypatch.setattr(tk_root, "mainloop", lambda: None)
+    monkeypatch.setattr(app_mod, "CogStash", capture_app)
+    monkeypatch.setattr(app_mod, "create_tray_icon", lambda _queue, _config: None)
+    monkeypatch.setattr(app_mod.keyboard, "GlobalHotKeys", FailingListener)
+    monkeypatch.setattr(app_mod.messagebox, "showwarning", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        app_mod.messagebox,
+        "showinfo",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("startup test should not show duplicate-instance dialog")),
+    )
+    monkeypatch.setattr(settings_mod, "SettingsWindow", DummySettingsWindow, raising=False)
+    monkeypatch.setitem(sys.modules, "cogstash.ui.windows", windows_mod)
+
+    original_handlers = app_mod.logger.handlers[:]
+    try:
+        app_mod.main()
+    finally:
+        for handler in [h for h in app_mod.logger.handlers[:] if h not in original_handlers]:
+            app_mod.logger.removeHandler(handler)
+            try:
+                handler.close()
+            except Exception:
+                pass
+        for handler in original_handlers:
+            if handler not in app_mod.logger.handlers:
+                app_mod.logger.addHandler(handler)
+
+    assert len(created_apps) == 1
+
+    created_apps[0]._open_settings()
+
+    assert len(created_settings) == 1
+    assert created_settings[0]["config_path"] == created_apps[0].config_path
+    assert created_settings[0]["hotkey_warning"] is not None
+    assert "failed to register" in created_settings[0]["hotkey_warning"]
+    assert config.hotkey in created_settings[0]["hotkey_warning"]
+
+
 def test_app_main_refuses_duplicate_instance_before_startup(monkeypatch, tmp_path):
     """A second GUI launch should stop before creating another root/tray instance."""
     import types
