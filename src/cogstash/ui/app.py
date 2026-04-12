@@ -69,6 +69,20 @@ def _create_log_handler(log_file: Path) -> logging.Handler:
 logger.addHandler(_create_log_handler(LOG_FILE))
 
 
+def _build_hotkey_failure_warning(config: CogStashConfig) -> str:
+    """Build user-facing guidance for a failed global hotkey registration."""
+    return (
+        f"The configured global hotkey failed to register: {config.hotkey}\n\n"
+        "Global capture is unavailable for this session.\n"
+        "Global capture is unavailable until the issue is fixed and CogStash is restarted.\n\n"
+        "Likely causes:\n"
+        "- another app may already be using the shortcut\n"
+        "- platform permissions/accessibility hooks may be blocking registration\n\n"
+        f"See the log file for technical details: {config.log_file}\n"
+        "If needed, change the hotkey in config for now, then restart CogStash."
+    )
+
+
 def platform_font() -> str:
     """Return the native font family for the current OS."""
     fonts = {
@@ -165,6 +179,7 @@ class CogStash:
         self.root = root
         self.config = config
         self.config_path = config_path or get_default_config_path()
+        self.hotkey_warning: str | None = None
         self.queue: queue.Queue[str] = queue.Queue()
         self.is_visible = False
         self.theme = THEMES[config.theme]
@@ -422,6 +437,7 @@ class CogStash:
             self.config,
             self.config_path,
             on_config_changed=self._on_config_changed,
+            hotkey_warning=self.hotkey_warning,
         )
 
     def _on_config_changed(self, config: CogStashConfig) -> None:
@@ -564,8 +580,13 @@ def main():
         listener = keyboard.GlobalHotKeys({config.hotkey: on_hotkey})
         listener.start()
     except Exception:
+        app.hotkey_warning = _build_hotkey_failure_warning(config)
         logger.error("Failed to register global hotkey %s", config.hotkey, exc_info=True)
         safe_print(f"ERROR: Could not register hotkey {config.hotkey}. See {config.log_file} for details.")
+        try:
+            messagebox.showwarning("CogStash Hotkey Warning", app.hotkey_warning)
+        except tk.TclError:
+            pass
         listener = None
 
     try:

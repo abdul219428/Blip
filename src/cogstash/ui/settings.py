@@ -55,11 +55,13 @@ class SettingsWindow:
         config: CogStashConfig,
         config_path: Path,
         on_config_changed=None,
+        hotkey_warning: str | None = None,
     ):
         self.parent = parent
         self.config = config
         self.config_path = config_path
         self.on_config_changed = on_config_changed
+        self.hotkey_warning = hotkey_warning
         self.win = tk.Toplevel(parent)
         self.win.title("CogStash Settings")
         self.win.geometry("500x450")
