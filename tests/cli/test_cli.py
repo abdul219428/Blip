@@ -865,6 +865,39 @@ def test_version_flag_without_isatty(monkeypatch):
     assert "cogstash" in output.lower()
 
 
+def test_edit_help_includes_note_number_and_search_examples(capsys):
+    """edit help teaches note-number and search-based editing."""
+    import pytest
+
+    from cogstash.cli import build_parser
+
+    parser = build_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args(["edit", "--help"])
+
+    output = capsys.readouterr().out
+    assert "note number" in output.lower()
+    assert "--search" in output
+    assert 'cogstash edit 42 "Updated note text"' in output
+    assert 'cogstash edit --search "installer" "Updated note text"' in output
+
+
+def test_delete_help_includes_yes_and_examples(capsys):
+    """delete help teaches confirmation and search-based deletion."""
+    import pytest
+
+    from cogstash.cli import build_parser
+
+    parser = build_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args(["delete", "--help"])
+
+    output = capsys.readouterr().out
+    assert "--yes" in output
+    assert 'cogstash delete 42' in output
+    assert 'cogstash delete --search "installer" --yes' in output
+
+
 def test_cli_main_version_does_not_import_app(monkeypatch):
     """cli_main --version should exit cleanly without importing GUI/app dependencies."""
     import sys
