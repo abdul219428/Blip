@@ -855,8 +855,9 @@ def test_config_help_includes_wizard_examples_and_restrictions(capsys):
     assert "cogstash config get theme" in output
     assert "cogstash config set window_size wide" in output
     assert "tags" in lowered and ("get-only" in lowered or "read-only" in lowered or "not writable" in lowered)
-    assert "output_file" not in output
-    assert "log_file" not in output
+    assert "launch_at_startup" not in output
+    assert "last_seen_version" not in output
+    assert "last_seen_installer_version" not in output
 
 
 def test_version_flag(capsys):
