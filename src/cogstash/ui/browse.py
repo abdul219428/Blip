@@ -42,12 +42,17 @@ class BrowseWindow:
         self._context_menu: tk.Menu | None = None
         self._notice_label: tk.Label | None = None
         self._notice_after_id: str | None = None
+        self._filter_summary_frame: tk.Frame | None = None
+        self._filter_summary_label: tk.Label | None = None
+        self._clear_filters_button: tk.Button | None = None
+        self._cards_container: tk.Frame | None = None
 
         self.window = tk.Toplevel(root)
         self.window.title("CogStash — Browse Notes")
         self.window.configure(bg=self.theme["bg"])
         self.window.geometry("480x520")
         self.window.minsize(360, 300)
+        self.window.deiconify()
 
         self.search_var = tk.StringVar()
         self._build_ui()
@@ -99,12 +104,39 @@ class BrowseWindow:
             pill.bind("<Button-1>", lambda e, tg=tag: self._on_tag_filter(tg))
             self._pill_buttons[tag] = pill
 
-        # Scrollable card area
-        container = tk.Frame(self.window, bg=t["bg"])
-        container.pack(fill="both", expand=True)
+        self._filter_summary_frame = tk.Frame(self.window, bg=t["entry_bg"], padx=8, pady=6)
+        self._filter_summary_label = tk.Label(
+            self._filter_summary_frame,
+            bg=t["entry_bg"],
+            fg=t["fg"],
+            font=(fnt, 9),
+            anchor="w",
+        )
+        self._filter_summary_label.pack(side="left", fill="x", expand=True)
+        self._clear_filters_button = tk.Button(
+            self._filter_summary_frame,
+            text="Clear filters",
+            command=self._clear_filters,
+            bg=t["accent"],
+            fg=t["bg"],
+            activebackground=t["accent"],
+            activeforeground=t["bg"],
+            font=(fnt, 9, "bold"),
+            relief="flat",
+            bd=0,
+            padx=8,
+            pady=2,
+            cursor="hand2",
+            highlightthickness=0,
+        )
+        self._clear_filters_button.pack(side="right")
 
-        self.canvas = tk.Canvas(container, bg=t["bg"], highlightthickness=0, bd=0)
-        scrollbar = tk.Scrollbar(container, orient="vertical", command=self.canvas.yview)
+        # Scrollable card area
+        self._cards_container = tk.Frame(self.window, bg=t["bg"])
+        self._cards_container.pack(fill="both", expand=True)
+
+        self.canvas = tk.Canvas(self._cards_container, bg=t["bg"], highlightthickness=0, bd=0)
+        scrollbar = tk.Scrollbar(self._cards_container, orient="vertical", command=self.canvas.yview)
         self.cards_frame = tk.Frame(self.canvas, bg=t["bg"])
 
         self.cards_frame.bind(
@@ -199,6 +231,38 @@ class BrowseWindow:
             else:
                 pill.configure(bg=t["bg"], fg=t["fg"], font=(fnt, 9))
 
+    def _update_filter_summary(self):
+        """Show or hide the active-filter summary bar."""
+        if self._filter_summary_frame is None or self._filter_summary_label is None:
+            return
+
+        query = self.search_var.get().strip()
+        summary_parts: list[str] = []
+        if query:
+            summary_parts.append(f'Search: "{query}"')
+        if self._active_tag:
+            summary_parts.append(f"Tag: {self._active_tag}")
+
+        if not summary_parts:
+            self._filter_summary_frame.pack_forget()
+            self.window.update_idletasks()
+            return
+
+        self._filter_summary_label.configure(text=f'Filters active: {" · ".join(summary_parts)}')
+        if not self._filter_summary_frame.winfo_manager():
+            pack_kwargs = {"fill": "x"}
+            if self._cards_container is not None:
+                pack_kwargs["before"] = self._cards_container
+            self._filter_summary_frame.pack(**pack_kwargs)
+        self.window.update_idletasks()
+
+    def _clear_filters(self):
+        """Reset the search and tag filters, then refresh the card list."""
+        self.search_var.set("")
+        self._active_tag = None
+        self._update_pill_styles()
+        self._apply_filters()
+
     def _apply_filters(self):
         """Apply search query + tag filter, then re-render cards."""
         notes = self._all_notes
@@ -209,6 +273,7 @@ class BrowseWindow:
             notes = filter_by_tag(notes, self._active_tag)
 
         self._visible_cards = notes
+        self._update_filter_summary()
         self._render_cards()
 
     def _render_cards(self):
