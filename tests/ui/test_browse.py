@@ -8,6 +8,58 @@ from unittest.mock import patch
 from ui._support import needs_display
 
 
+def _make_notes_file(tmp_path, contents: str):
+    f = tmp_path / "cogstash.md"
+    f.write_text(contents, encoding="utf-8")
+    return f
+
+
+def _make_browse_window(tmp_path, tk_root, contents: str):
+    from cogstash.ui.app import CogStashConfig
+    from cogstash.ui.browse import BrowseWindow
+
+    return BrowseWindow(tk_root, CogStashConfig(output_file=_make_notes_file(tmp_path, contents)))
+
+
+def _iter_descendant_widgets(widget):
+    yield widget
+    for child in widget.winfo_children():
+        yield from _iter_descendant_widgets(child)
+
+
+def _collect_widget_texts(widget):
+    texts = []
+    for child in _iter_descendant_widgets(widget):
+        try:
+            text = child.cget("text")
+        except Exception:
+            continue
+        if isinstance(text, str) and text:
+            texts.append(text)
+    return texts
+
+
+def _find_button_with_text(widget, text: str):
+    for child in _iter_descendant_widgets(widget):
+        try:
+            if child.winfo_class() == "Button" and child.cget("text") == text:
+                return child
+        except Exception:
+            continue
+    return None
+
+
+def _find_visible_buttons_with_text(widget, text: str):
+    buttons = []
+    for child in _iter_descendant_widgets(widget):
+        try:
+            if child.winfo_class() == "Button" and child.cget("text") == text and child.winfo_ismapped():
+                buttons.append(child)
+        except Exception:
+            continue
+    return buttons
+
+
 @needs_display
 def test_browse_window_creates(tmp_path, tk_root):
     """BrowseWindow opens without error."""
@@ -20,6 +72,22 @@ def test_browse_window_creates(tmp_path, tk_root):
     config = CogStashConfig(output_file=f)
     win = BrowseWindow(tk_root, config)
     assert win.window.winfo_exists()
+    win.window.destroy()
+
+
+@needs_display
+def test_browse_window_does_not_force_deiconify_on_create(tmp_path, tk_root):
+    """BrowseWindow should not force the toplevel to deiconify during creation."""
+    f = tmp_path / "cogstash.md"
+    f.write_text("- [2026-03-26 14:30] ☐ test note #todo\n", encoding="utf-8")
+
+    from cogstash.ui.app import CogStashConfig
+    from cogstash.ui.browse import BrowseWindow
+
+    with patch("cogstash.ui.browse.tk.Toplevel.deiconify") as deiconify_mock:
+        win = BrowseWindow(tk_root, CogStashConfig(output_file=f))
+
+    assert deiconify_mock.call_count == 0
     win.window.destroy()
 
 
@@ -148,3 +216,320 @@ def test_browse_stale_edit_reloads_and_shows_notice(tmp_path, tk_root):
     notice_mock.assert_called_once()
     error_mock.assert_not_called()
     win.window.destroy()
+
+
+@needs_display
+def test_browse_filter_summary_hidden_when_no_filters_active(tmp_path, tk_root):
+    """No active filters should keep the summary bar hidden."""
+    win = _make_browse_window(
+        tmp_path,
+        tk_root,
+        "- [2026-03-26 14:30] install update #todo\n"
+        "- [2026-03-26 11:20] planning notes #idea\n",
+    )
+
+    try:
+        win.window.update_idletasks()
+
+        assert len(win._visible_cards) == 2
+        summary_frame = getattr(win, "_filter_summary_frame", None)
+        assert summary_frame is not None
+        assert not summary_frame.winfo_manager()
+    finally:
+        win.window.destroy()
+
+
+@needs_display
+def test_browse_apply_filters_renders_cards_before_idletasks_flush(tmp_path, tk_root):
+    """Applying filters should rerender cards without forcing an idle-task flush."""
+    win = _make_browse_window(
+        tmp_path,
+        tk_root,
+        "- [2026-03-26 14:30] install update #todo\n"
+        "- [2026-03-26 11:20] planning notes #idea\n",
+    )
+
+    events: list[str] = []
+    original_render_cards = win._render_cards
+
+    def _record_render():
+        events.append("render")
+        original_render_cards()
+
+    try:
+        with (
+            patch("cogstash.ui.browse.tk.Misc.update_idletasks", side_effect=lambda *_args: events.append("update")),
+            patch.object(win, "_render_cards", side_effect=_record_render),
+        ):
+            win._on_tag_filter("todo")
+
+        assert events == ["render"]
+    finally:
+        win.window.destroy()
+
+
+@needs_display
+def test_browse_filter_summary_shows_combined_search_and_tag(tmp_path, tk_root):
+    """Combined search and tag filters should show one joined summary string."""
+    win = _make_browse_window(
+        tmp_path,
+        tk_root,
+        "- [2026-03-26 14:30] install update #todo\n"
+        "- [2026-03-26 12:15] install backup #idea\n"
+        "- [2026-03-26 11:20] planning notes #todo\n",
+    )
+
+    try:
+        win.search_var.set("install")
+        win._on_search()
+        win._on_tag_filter("todo")
+        win.window.update_idletasks()
+
+        summary_frame = getattr(win, "_filter_summary_frame", None)
+        summary_label = getattr(win, "_filter_summary_label", None)
+
+        assert len(win._visible_cards) == 1
+        assert summary_frame is not None
+        assert summary_frame.winfo_manager() == "pack"
+        assert summary_label is not None
+        assert summary_label.cget("text") == 'Filters active: Search: "install" · Tag: todo'
+    finally:
+        win.window.destroy()
+
+
+@needs_display
+def test_browse_filter_summary_shows_search_only_state(tmp_path, tk_root):
+    """Search-only filtering should show the search summary text."""
+    win = _make_browse_window(
+        tmp_path,
+        tk_root,
+        "- [2026-03-26 14:30] install update #todo\n"
+        "- [2026-03-26 11:20] planning notes #idea\n",
+    )
+
+    try:
+        win.search_var.set("install")
+        win._on_search()
+        win.window.update_idletasks()
+
+        summary_frame = getattr(win, "_filter_summary_frame", None)
+        summary_label = getattr(win, "_filter_summary_label", None)
+
+        assert len(win._visible_cards) == 1
+        assert summary_frame is not None
+        assert summary_frame.winfo_manager() == "pack"
+        assert summary_label is not None
+        assert summary_label.cget("text") == 'Filters active: Search: "install"'
+    finally:
+        win.window.destroy()
+
+
+@needs_display
+def test_browse_filter_summary_shows_tag_only_state(tmp_path, tk_root):
+    """Tag-only filtering should show the tag summary text."""
+    win = _make_browse_window(
+        tmp_path,
+        tk_root,
+        "- [2026-03-26 14:30] install update #todo\n"
+        "- [2026-03-26 11:20] planning notes #idea\n",
+    )
+
+    try:
+        win._on_tag_filter("todo")
+        win.window.update_idletasks()
+
+        summary_frame = getattr(win, "_filter_summary_frame", None)
+        summary_label = getattr(win, "_filter_summary_label", None)
+
+        assert len(win._visible_cards) == 1
+        assert summary_frame is not None
+        assert summary_frame.winfo_manager() == "pack"
+        assert summary_label is not None
+        assert summary_label.cget("text") == "Filters active: Tag: todo"
+    finally:
+        win.window.destroy()
+
+
+@needs_display
+def test_browse_clear_filters_resets_search_tag_and_full_list(tmp_path, tk_root):
+    """Clear filters should reset search, tag, and restore the full card list."""
+    win = _make_browse_window(
+        tmp_path,
+        tk_root,
+        "- [2026-03-26 14:30] install update #todo\n"
+        "- [2026-03-26 12:15] install backup #idea\n"
+        "- [2026-03-26 11:20] planning notes #todo\n",
+    )
+
+    try:
+        win.search_var.set("install")
+        win._on_search()
+        win._on_tag_filter("todo")
+        win.window.update_idletasks()
+
+        summary_frame = getattr(win, "_filter_summary_frame", None)
+        clear_filters_button = getattr(win, "_clear_filters_button", None)
+
+        assert len(win._visible_cards) == 1
+        assert summary_frame is not None
+        assert summary_frame.winfo_manager() == "pack"
+        assert clear_filters_button is not None
+
+        clear_filters_button.invoke()
+        win.window.update_idletasks()
+
+        summary_frame = getattr(win, "_filter_summary_frame", None)
+
+        assert win.search_var.get() == ""
+        assert win._active_tag is None
+        assert len(win._visible_cards) == 3
+        assert summary_frame is None or not summary_frame.winfo_manager()
+    finally:
+        win.window.destroy()
+
+
+@needs_display
+def test_browse_clear_filters_cancels_pending_search_before_refresh(tmp_path, tk_root):
+    """Clearing filters should cancel any scheduled search before direct refresh."""
+    win = _make_browse_window(
+        tmp_path,
+        tk_root,
+        "- [2026-03-26 14:30] install update #todo\n"
+        "- [2026-03-26 12:15] install backup #idea\n"
+        "- [2026-03-26 11:20] planning notes #todo\n",
+    )
+
+    cancelled_ids: list[str] = []
+
+    try:
+        win._search_after_id = "search-before-clear"
+
+        with (
+            patch.object(win.window, "after", return_value="search-triggered-by-clear"),
+            patch.object(win.window, "after_cancel", side_effect=cancelled_ids.append),
+        ):
+            win._clear_filters()
+
+        assert cancelled_ids == ["search-before-clear", "search-triggered-by-clear"]
+    finally:
+        win.window.destroy()
+
+
+@needs_display
+def test_browse_filter_empty_state_shows_message_filters_and_clear_action(tmp_path, tk_root):
+    """Zero-result filtered views should render a filter-aware empty state in the cards area."""
+    win = _make_browse_window(
+        tmp_path,
+        tk_root,
+        "- [2026-03-26 14:30] install update #todo\n"
+        "- [2026-03-26 11:20] planning notes #idea\n",
+    )
+
+    try:
+        win.search_var.set("install")
+        win._on_search()
+        win._on_tag_filter("idea")
+        win.window.update_idletasks()
+
+        summary_frame = getattr(win, "_filter_summary_frame", None)
+        empty_state_texts = _collect_widget_texts(win.cards_frame)
+        empty_state_clear_button = _find_button_with_text(win.cards_frame, "Clear filters")
+        expected_summary = 'Filters active: Search: "install" · Tag: idea'
+        expected_cards_filter_prefix = "Filters active:"
+        expected_cards_filter_text = 'Search: "install" · Tag: idea'
+
+        assert len(win._visible_cards) == 0
+        assert summary_frame is not None
+        assert summary_frame.winfo_manager()
+        assert win._filter_summary_label is not None
+        assert win._filter_summary_label.cget("text") == expected_summary
+        assert "No notes match the current filters." in empty_state_texts
+        assert any(
+            text.startswith(expected_cards_filter_prefix) and expected_cards_filter_text in text
+            for text in empty_state_texts
+        )
+        assert empty_state_clear_button is not None
+    finally:
+        win.window.destroy()
+
+
+@needs_display
+def test_browse_filter_empty_state_keeps_summary_bar_but_one_clear_action(tmp_path, tk_root):
+    """Zero-result filtered views should keep the summary bar but show one visible clear-filters action."""
+    win = _make_browse_window(
+        tmp_path,
+        tk_root,
+        "- [2026-03-26 14:30] install update #todo\n"
+        "- [2026-03-26 11:20] planning notes #idea\n",
+    )
+
+    try:
+        win.search_var.set("install")
+        win._on_search()
+        win._on_tag_filter("idea")
+        win.window.update()
+
+        summary_frame = getattr(win, "_filter_summary_frame", None)
+        visible_clear_buttons = _find_visible_buttons_with_text(win.window, "Clear filters")
+
+        assert len(win._visible_cards) == 0
+        assert summary_frame is not None
+        assert summary_frame.winfo_manager() == "pack"
+        assert visible_clear_buttons == [_find_button_with_text(win.cards_frame, "Clear filters")]
+    finally:
+        win.window.destroy()
+
+
+@needs_display
+def test_browse_filter_empty_state_stays_distinct_from_unfiltered_empty_state(tmp_path, tk_root):
+    """The filtered empty-state wording should not appear when Browse has no notes and no filters."""
+    win = _make_browse_window(tmp_path, tk_root, "")
+
+    try:
+        win.window.update_idletasks()
+
+        cards_texts = _collect_widget_texts(win.cards_frame)
+        empty_state_clear_button = _find_button_with_text(win.cards_frame, "Clear filters")
+        summary_frame = getattr(win, "_filter_summary_frame", None)
+        filtered_cards_prefix = "Filters active:"
+
+        assert len(win._visible_cards) == 0
+        assert summary_frame is not None
+        assert not summary_frame.winfo_manager()
+        assert "No notes match the current filters." not in cards_texts
+        assert not any(text.startswith(filtered_cards_prefix) for text in cards_texts)
+        assert empty_state_clear_button is None
+    finally:
+        win.window.destroy()
+
+
+@needs_display
+def test_browse_filter_empty_state_clear_action_restores_full_list(tmp_path, tk_root):
+    """Clearing filters from the empty state should restore the unfiltered list."""
+    win = _make_browse_window(
+        tmp_path,
+        tk_root,
+        "- [2026-03-26 14:30] install update #todo\n"
+        "- [2026-03-26 11:20] planning notes #idea\n",
+    )
+
+    try:
+        win.search_var.set("install")
+        win._on_search()
+        win._on_tag_filter("idea")
+        win.window.update_idletasks()
+
+        empty_state_clear_button = _find_button_with_text(win.cards_frame, "Clear filters")
+
+        assert len(win._visible_cards) == 0
+        assert empty_state_clear_button is not None
+
+        empty_state_clear_button.invoke()
+        win.window.update_idletasks()
+
+        assert win.search_var.get() == ""
+        assert win._active_tag is None
+        assert len(win._visible_cards) == 2
+        assert "No notes match the current filters." not in _collect_widget_texts(win.cards_frame)
+    finally:
+        win.window.destroy()

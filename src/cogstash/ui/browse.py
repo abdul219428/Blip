@@ -42,6 +42,11 @@ class BrowseWindow:
         self._context_menu: tk.Menu | None = None
         self._notice_label: tk.Label | None = None
         self._notice_after_id: str | None = None
+        self._filter_summary_frame: tk.Frame | None = None
+        self._filter_summary_label: tk.Label | None = None
+        self._clear_filters_button: tk.Button | None = None
+        self._cards_container: tk.Frame | None = None
+        self._search_after_id: str | None = None
 
         self.window = tk.Toplevel(root)
         self.window.title("CogStash — Browse Notes")
@@ -99,12 +104,38 @@ class BrowseWindow:
             pill.bind("<Button-1>", lambda e, tg=tag: self._on_tag_filter(tg))
             self._pill_buttons[tag] = pill
 
-        # Scrollable card area
-        container = tk.Frame(self.window, bg=t["bg"])
-        container.pack(fill="both", expand=True)
+        self._filter_summary_frame = tk.Frame(self.window, bg=t["entry_bg"], padx=8, pady=6)
+        self._filter_summary_label = tk.Label(
+            self._filter_summary_frame,
+            bg=t["entry_bg"],
+            fg=t["fg"],
+            font=(fnt, 9),
+            anchor="w",
+        )
+        self._filter_summary_label.pack(side="left", fill="x", expand=True)
+        self._clear_filters_button = tk.Button(
+            self._filter_summary_frame,
+            text="Clear filters",
+            command=self._clear_filters,
+            bg=t["accent"],
+            fg=t["bg"],
+            activebackground=t["accent"],
+            activeforeground=t["bg"],
+            font=(fnt, 9, "bold"),
+            relief="flat",
+            bd=0,
+            padx=8,
+            pady=2,
+            cursor="hand2",
+            highlightthickness=0,
+        )
 
-        self.canvas = tk.Canvas(container, bg=t["bg"], highlightthickness=0, bd=0)
-        scrollbar = tk.Scrollbar(container, orient="vertical", command=self.canvas.yview)
+        # Scrollable card area
+        self._cards_container = tk.Frame(self.window, bg=t["bg"])
+        self._cards_container.pack(fill="both", expand=True)
+
+        self.canvas = tk.Canvas(self._cards_container, bg=t["bg"], highlightthickness=0, bd=0)
+        scrollbar = tk.Scrollbar(self._cards_container, orient="vertical", command=self.canvas.yview)
         self.cards_frame = tk.Frame(self.canvas, bg=t["bg"])
 
         self.cards_frame.bind(
@@ -177,11 +208,18 @@ class BrowseWindow:
 
     def _schedule_search(self):
         """Debounce search by 200ms."""
-        if hasattr(self, "_search_after_id"):
-            self.window.after_cancel(self._search_after_id)
+        self._cancel_pending_search()
         self._search_after_id = self.window.after(200, self._on_search)
 
+    def _cancel_pending_search(self):
+        """Cancel any queued debounced search refresh."""
+        if self._search_after_id is None:
+            return
+        self.window.after_cancel(self._search_after_id)
+        self._search_after_id = None
+
     def _on_search(self, *_args):
+        self._search_after_id = None
         self._apply_filters()
 
     def _on_tag_filter(self, tag: str | None):
@@ -199,6 +237,54 @@ class BrowseWindow:
             else:
                 pill.configure(bg=t["bg"], fg=t["fg"], font=(fnt, 9))
 
+    def _format_filter_summary(self) -> str | None:
+        """Return the active-filter summary text without the prefix."""
+        query = self.search_var.get().strip()
+        summary_parts: list[str] = []
+        if query:
+            summary_parts.append(f'Search: "{query}"')
+        if self._active_tag:
+            summary_parts.append(f"Tag: {self._active_tag}")
+        if not summary_parts:
+            return None
+        return " · ".join(summary_parts)
+
+    def _update_filter_summary(self):
+        """Show or hide the active-filter summary bar."""
+        if (
+            self._filter_summary_frame is None
+            or self._filter_summary_label is None
+            or self._clear_filters_button is None
+        ):
+            return
+
+        summary_text = self._format_filter_summary()
+        if summary_text is None:
+            self._clear_filters_button.pack_forget()
+            self._filter_summary_frame.pack_forget()
+            return
+
+        self._filter_summary_label.configure(text=f"Filters active: {summary_text}")
+        if self._visible_cards:
+            if not self._clear_filters_button.winfo_manager():
+                self._clear_filters_button.pack(side="right")
+        else:
+            self._clear_filters_button.pack_forget()
+
+        if not self._filter_summary_frame.winfo_manager():
+            pack_kwargs = {"fill": "x"}
+            if self._cards_container is not None:
+                pack_kwargs["before"] = self._cards_container
+            self._filter_summary_frame.pack(**pack_kwargs)
+
+    def _clear_filters(self):
+        """Reset the search and tag filters, then refresh the card list."""
+        self.search_var.set("")
+        self._cancel_pending_search()
+        self._active_tag = None
+        self._update_pill_styles()
+        self._apply_filters()
+
     def _apply_filters(self):
         """Apply search query + tag filter, then re-render cards."""
         notes = self._all_notes
@@ -209,6 +295,7 @@ class BrowseWindow:
             notes = filter_by_tag(notes, self._active_tag)
 
         self._visible_cards = notes
+        self._update_filter_summary()
         self._render_cards()
 
     def _render_cards(self):
@@ -223,6 +310,47 @@ class BrowseWindow:
         today = datetime.now().date()
         yesterday = today - timedelta(days=1)
         current_date = None
+
+        if not notes:
+            summary_text = self._format_filter_summary()
+            if summary_text is not None:
+                empty_state = tk.Frame(self.cards_frame, bg=t["bg"], padx=24, pady=32)
+                empty_state.pack(fill="both", expand=True)
+
+                tk.Label(
+                    empty_state,
+                    text="No notes match the current filters.",
+                    bg=t["bg"],
+                    fg=t["fg"],
+                    font=(fnt, 11, "bold"),
+                    anchor="center",
+                    justify="center",
+                ).pack()
+                tk.Label(
+                    empty_state,
+                    text=f"Filters active: {summary_text}",
+                    bg=t["bg"],
+                    fg=t["muted"],
+                    font=(fnt, 9),
+                    anchor="center",
+                    justify="center",
+                ).pack(pady=(6, 12))
+                tk.Button(
+                    empty_state,
+                    text="Clear filters",
+                    command=self._clear_filters,
+                    bg=t["accent"],
+                    fg=t["bg"],
+                    activebackground=t["accent"],
+                    activeforeground=t["bg"],
+                    font=(fnt, 9, "bold"),
+                    relief="flat",
+                    bd=0,
+                    padx=10,
+                    pady=4,
+                    cursor="hand2",
+                    highlightthickness=0,
+                ).pack()
 
         for note in reversed(notes):  # newest first
             note_date = note.timestamp.date()
