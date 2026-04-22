@@ -66,13 +66,13 @@ def drain_app_queue(
         except queue.Empty:
             return True
 
-        if command == AppCommand.SHOW:
+        if command is AppCommand.SHOW:
             on_show()
-        elif command == AppCommand.BROWSE:
+        elif command is AppCommand.BROWSE:
             on_browse()
-        elif command == AppCommand.SETTINGS:
+        elif command is AppCommand.SETTINGS:
             on_settings()
-        elif command == AppCommand.QUIT:
+        elif command is AppCommand.QUIT:
             on_quit()
             return False
         else:
