@@ -12,9 +12,9 @@ import tkinter as tk
 from datetime import datetime, timedelta
 
 from cogstash.search import (
-    _atomic_write,
     DEFAULT_TAG_COLORS,
     Note,
+    _atomic_write,
     delete_note,
     edit_note,
     filter_by_tag,
