@@ -143,6 +143,22 @@ def test_cmd_recent_limit(tmp_path, capsys):
     assert "fix login bug" in lines[1]
 
 
+def test_cmd_recent_tag_filter(tmp_path, capsys):
+    """recent --tag should only show matching tagged notes newest first."""
+    f = _make_notes_file(tmp_path)
+    from types import SimpleNamespace
+
+    from cogstash.cli import cmd_recent
+    from cogstash.core import CogStashConfig
+
+    cmd_recent(SimpleNamespace(limit=20, tag="todo"), CogStashConfig(output_file=f))
+    output = capsys.readouterr().out
+
+    assert "buy milk" in output
+    assert "redesign dashboard" not in output
+    assert "fix login bug" not in output
+
+
 def test_cmd_recent_empty(tmp_path, capsys):
     """Empty/missing file shows 'No notes found.' message."""
     f = tmp_path / "cogstash.md"
@@ -154,6 +170,20 @@ def test_cmd_recent_empty(tmp_path, capsys):
     cmd_recent(SimpleNamespace(limit=20), CogStashConfig(output_file=f))
     output = capsys.readouterr().out
     assert "No notes found." in output
+
+
+def test_cmd_recent_tag_filter_no_match(tmp_path, capsys):
+    """recent --tag with no matches should report that no notes were found."""
+    f = _make_notes_file(tmp_path)
+    from types import SimpleNamespace
+
+    from cogstash.cli import cmd_recent
+    from cogstash.core import CogStashConfig
+
+    cmd_recent(SimpleNamespace(limit=20, tag="idea"), CogStashConfig(output_file=f))
+    output = capsys.readouterr().out
+
+    assert "No notes found for tag #idea." in output
 
 
 def test_cmd_search_match(tmp_path, capsys):
@@ -172,6 +202,26 @@ def test_cmd_search_match(tmp_path, capsys):
     assert "buy milk" in lines[0]
 
 
+def test_cmd_search_tag_filter(tmp_path, capsys):
+    """search --tag should keep only matches within the requested tag scope."""
+    f = _make_notes_file(tmp_path)
+    from types import SimpleNamespace
+
+    from cogstash.cli import cmd_search
+    from cogstash.core import CogStashConfig
+
+    cmd_search(SimpleNamespace(query="note", limit=20, tag=None), CogStashConfig(output_file=f))
+    unfiltered = capsys.readouterr().out
+
+    cmd_search(SimpleNamespace(query="note", limit=20, tag="todo"), CogStashConfig(output_file=f))
+    filtered = capsys.readouterr().out
+
+    assert "old note" in unfiltered
+    assert "buy milk" not in filtered
+    assert "old note" not in filtered
+    assert "No matching notes for tag #todo." in filtered
+
+
 def test_cmd_search_no_match(tmp_path, capsys):
     """No matches shows 'No matching notes.' message."""
     f = _make_notes_file(tmp_path)
@@ -183,6 +233,28 @@ def test_cmd_search_no_match(tmp_path, capsys):
     cmd_search(SimpleNamespace(query="nonexistent xyz", limit=20), CogStashConfig(output_file=f))
     output = capsys.readouterr().out
     assert "No matching notes." in output
+
+
+def test_cmd_export_tag_filter_json_content(tmp_path, capsys):
+    """export --tag should only write matching notes to the export file."""
+    import json
+    from types import SimpleNamespace
+
+    from cogstash.cli import cmd_export
+    from cogstash.core import CogStashConfig
+
+    f = _make_notes_file(tmp_path)
+    out_path = tmp_path / "todo-notes.json"
+
+    cmd_export(
+        SimpleNamespace(format="json", output=str(out_path), tag="todo"),
+        CogStashConfig(output_file=f),
+    )
+
+    data = json.loads(out_path.read_text(encoding="utf-8"))
+    assert len(data) == 1
+    assert data[0]["tags"] == ["todo"]
+    assert "buy milk" in data[0]["text"]
 
 
 def test_cmd_tags_counts(tmp_path, capsys):

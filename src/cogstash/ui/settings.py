@@ -5,6 +5,9 @@ from __future__ import annotations
 import sys
 import tkinter as tk
 from pathlib import Path
+from tkinter import messagebox
+
+from pynput import keyboard
 
 from cogstash.ui.app import (
     DEFAULT_SMART_TAGS,
@@ -17,6 +20,21 @@ from cogstash.ui.app import (
     save_config,
 )
 from cogstash.ui.install_state import get_startup_shortcut_path
+
+
+def validate_hotkey(value: str) -> tuple[bool, str | None]:
+    """Validate a pynput GlobalHotKeys hotkey string."""
+    hotkey = value.strip()
+    if not hotkey:
+        return False, "Hotkey is required."
+    try:
+        keyboard.HotKey.parse(hotkey)
+    except Exception:
+        return False, (
+            "Enter a valid global hotkey like <ctrl>+<shift>+<space> or "
+            "<ctrl>+<alt>+h."
+        )
+    return True, None
 
 
 def set_launch_at_startup(enable: bool) -> None:
@@ -141,10 +159,35 @@ class SettingsWindow:
         # Section: Hotkey
         tk.Label(frame, text="Hotkey", bg=t["bg"], fg=t["fg"],
                  font=(platform_font(), 11, "bold")).pack(anchor="w", pady=(8, 4))
-        tk.Label(frame, text=self.config.hotkey, bg=t["entry_bg"], fg=t["fg"],
-                 font=(platform_font(), 10), padx=8, pady=4).pack(anchor="w", padx=(8, 0))
-        tk.Label(frame, text="Edit in ~/.cogstash.json to change", bg=t["bg"], fg=t["muted"],
-                 font=(platform_font(), 8)).pack(anchor="w", padx=(8, 0), pady=(2, 0))
+        self.hotkey_var = tk.StringVar(value=self.config.hotkey)
+        hotkey_frame = tk.Frame(frame, bg=t["bg"])
+        hotkey_frame.pack(fill="x", padx=(8, 0))
+        tk.Entry(
+            hotkey_frame,
+            textvariable=self.hotkey_var,
+            bg=t["entry_bg"],
+            fg=t["fg"],
+            insertbackground=t["fg"],
+            relief="flat",
+            font=(platform_font(), 10),
+        ).pack(side="left", fill="x", expand=True, ipady=4)
+        tk.Button(
+            hotkey_frame,
+            text="Test Hotkey",
+            command=self._test_hotkey,
+            bg=t["entry_bg"],
+            fg=t["fg"],
+            relief="flat",
+            font=(platform_font(), 9),
+            cursor="hand2",
+        ).pack(side="left", padx=(8, 0))
+        tk.Label(
+            frame,
+            text="Use pynput format, for example <ctrl>+<shift>+<space>.",
+            bg=t["bg"],
+            fg=t["muted"],
+            font=(platform_font(), 8),
+        ).pack(anchor="w", padx=(8, 0), pady=(2, 0))
         if self.hotkey_warning:
             warning_frame = tk.Frame(
                 frame,
@@ -223,6 +266,12 @@ class SettingsWindow:
 
     def _save_general(self):
         """Save General tab settings to config."""
+        hotkey = self.hotkey_var.get().strip()
+        is_valid, error = validate_hotkey(hotkey)
+        if not is_valid:
+            messagebox.showerror("Invalid Hotkey", error, parent=self.win)
+            return
+        self.config.hotkey = hotkey
         self.config.output_file = Path(self.notes_file_var.get()).expanduser()
         new_launch = self.launch_var.get()
         if new_launch != self.config.launch_at_startup:
@@ -232,6 +281,23 @@ class SettingsWindow:
         self._flash_saved()
         if self.on_config_changed is not None:
             self.on_config_changed(self.config)
+
+    def _test_hotkey(self) -> None:
+        """Validate the currently entered hotkey and explain how it applies."""
+        hotkey = self.hotkey_var.get().strip()
+        is_valid, error = validate_hotkey(hotkey)
+        if not is_valid:
+            messagebox.showerror("Invalid Hotkey", error, parent=self.win)
+            return
+        messagebox.showinfo(
+            "Hotkey Looks Valid",
+            (
+                f"Hotkey syntax looks valid: {hotkey}\n\n"
+                "Save your changes to use it for future launches. If CogStash is already "
+                "running with a different global hotkey, restart the app to rebind capture."
+            ),
+            parent=self.win,
+        )
 
     def _flash_saved(self):
         """Briefly show a 'Saved' indicator."""
@@ -560,6 +626,7 @@ class WizardWindow:
         self.btn_frame.pack(side="right")
 
         self.notes_file_var = tk.StringVar(value=str(config.output_file))
+        self.hotkey_var = tk.StringVar(value=config.hotkey)
         self.selected_theme = tk.StringVar(value=config.theme)
         self.selected_size = tk.StringVar(value=config.window_size)
 
@@ -612,8 +679,35 @@ class WizardWindow:
                      side="left", fill="x", expand=True, ipady=6)
         tk.Button(notes_frame, text="Browse", command=self._browse_notes, bg=t["entry_bg"],
                   fg=t["fg"], relief="flat", font=(platform_font(), 9)).pack(side="left", padx=(8, 0))
-        tk.Label(self.content, text=f"Hotkey: {self.config.hotkey}", bg=t["bg"], fg=t["muted"],
-                 font=(platform_font(), 10)).pack(anchor="w", pady=(16, 0))
+        tk.Label(self.content, text="Choose your capture hotkey", bg=t["bg"], fg=t["fg"],
+                 font=(platform_font(), 11)).pack(anchor="w", pady=(16, 8))
+        hotkey_frame = tk.Frame(self.content, bg=t["bg"])
+        hotkey_frame.pack(fill="x")
+        tk.Entry(
+            hotkey_frame,
+            textvariable=self.hotkey_var,
+            bg=t["entry_bg"],
+            fg=t["fg"],
+            insertbackground=t["fg"],
+            relief="flat",
+            font=(platform_font(), 10),
+        ).pack(side="left", fill="x", expand=True, ipady=6)
+        tk.Button(
+            hotkey_frame,
+            text="Test Hotkey",
+            command=self._test_hotkey,
+            bg=t["entry_bg"],
+            fg=t["fg"],
+            relief="flat",
+            font=(platform_font(), 9),
+        ).pack(side="left", padx=(8, 0))
+        tk.Label(
+            self.content,
+            text="Use pynput format, for example <ctrl>+<shift>+<space>.",
+            bg=t["bg"],
+            fg=t["muted"],
+            font=(platform_font(), 9),
+        ).pack(anchor="w", pady=(8, 0))
 
     def _browse_notes(self):
         """File dialog for notes file."""
@@ -689,7 +783,7 @@ class WizardWindow:
         tk.Label(self.content, text="Quick Tour", bg=t["bg"], fg=t["fg"],
                  font=(platform_font(), 14, "bold")).pack(pady=(8, 12))
         cards = [
-            ("⚡", "Capture", f"Press {self.config.hotkey} anywhere.\nType your thought, press Enter."),
+            ("⚡", "Capture", f"Press {self.hotkey_var.get()} anywhere.\nType your thought, press Enter."),
             ("📋", "Browse", "Right-click the tray icon → Browse Notes\nSearch, filter by tags, mark done."),
             ("💻", "CLI", "cogstash recent — last 10 notes\ncogstash search <query>\ncogstash tags"),
         ]
@@ -716,7 +810,7 @@ class WizardWindow:
             ("Notes", self.notes_file_var.get()),
             ("Theme", self.selected_theme.get()),
             ("Size", self.selected_size.get()),
-            ("Hotkey", self.config.hotkey),
+            ("Hotkey", self.hotkey_var.get()),
         ]
         for label, value in items:
             row = tk.Frame(summary, bg=t["entry_bg"])
@@ -730,6 +824,12 @@ class WizardWindow:
         """Save config and close wizard."""
         from cogstash import __version__
         from cogstash.ui.install_state import is_installed_windows_run
+        hotkey = self.hotkey_var.get().strip()
+        is_valid, error = validate_hotkey(hotkey)
+        if not is_valid:
+            messagebox.showerror("Invalid Hotkey", error, parent=self.win)
+            return
+        self.config.hotkey = hotkey
         self.config.output_file = Path(self.notes_file_var.get()).expanduser()
         self.config.theme = self.selected_theme.get()
         self.config.window_size = self.selected_size.get()
@@ -738,6 +838,22 @@ class WizardWindow:
             self.config.last_seen_installer_version = __version__
         save_config(self.config, self.config_path)
         self._close()
+
+    def _test_hotkey(self) -> None:
+        """Validate the currently entered wizard hotkey and explain next steps."""
+        hotkey = self.hotkey_var.get().strip()
+        is_valid, error = validate_hotkey(hotkey)
+        if not is_valid:
+            messagebox.showerror("Invalid Hotkey", error, parent=self.win)
+            return
+        messagebox.showinfo(
+            "Hotkey Looks Valid",
+            (
+                f"Hotkey syntax looks valid: {hotkey}\n\n"
+                "Finish setup to save it. The new hotkey will be used when CogStash starts."
+            ),
+            parent=self.win,
+        )
 
     def _close(self):
         """Close the wizard and release its modal grab."""
