@@ -1,4 +1,9 @@
-"""Compatibility wrapper for shared note helpers."""
+"""Compatibility shim for the legacy ``cogstash.search`` import surface.
+
+The owning implementation lives in ``cogstash.core.notes``. Keep this module
+as a temporary re-export layer for compatibility while internal code imports
+the core module directly.
+"""
 
 from __future__ import annotations
 

@@ -1,8 +1,8 @@
-"""
-cogstash.py — A global hotkey brain dump — press, type, gone.
-Hotkey: Ctrl + Shift + Space
-Enter  → appends timestamped note to cogstash.md
-Escape → hides window
+"""Compatibility shim for the legacy ``cogstash.app`` import surface.
+
+The owning implementation lives in ``cogstash.ui.app``. Keep this module as a
+temporary re-export layer for compatibility while internal code imports the UI
+module directly.
 """
 
 from __future__ import annotations

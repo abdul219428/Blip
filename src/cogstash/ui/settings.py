@@ -9,15 +9,12 @@ from tkinter import messagebox
 
 from pynput import keyboard
 
+from cogstash.core import DEFAULT_SMART_TAGS, CogStashConfig, merge_tags, save_config
 from cogstash.ui.app import (
-    DEFAULT_SMART_TAGS,
     THEMES,
     WINDOW_SIZES,
-    CogStashConfig,
     logger,
-    merge_tags,
     platform_font,
-    save_config,
 )
 from cogstash.ui.install_state import get_startup_shortcut_path
 
