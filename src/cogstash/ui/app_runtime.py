@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Callable
+from typing import Callable, Protocol
 
 from cogstash.core import CogStashConfig
 from cogstash.ui import windows_runtime
@@ -21,6 +21,12 @@ except Exception:  # pragma: no cover - exercised only when dependency is absent
     keyboard = SimpleNamespace(GlobalHotKeys=None, HotKey=SimpleNamespace(parse=lambda _value: None))
 
 logger = logging.getLogger("cogstash")
+
+
+class _StopHandle(Protocol):
+    """Object that can be stopped during runtime shutdown."""
+
+    def stop(self) -> None: ...
 
 
 class AppCommand(str, Enum):
@@ -36,8 +42,8 @@ class AppCommand(str, Enum):
 class AppRuntimeHandles:
     """Resources that need coordinated shutdown."""
 
-    tray_icon: object | None = None
-    hotkey_listener: object | None = None
+    tray_icon: _StopHandle | None = None
+    hotkey_listener: _StopHandle | None = None
 
 
 def enqueue_command(app_queue: queue.Queue[AppCommand], command: AppCommand) -> None:
@@ -103,7 +109,10 @@ def _create_tray_image(theme: dict[str, str]):
 
     def hex_to_rgba(hex_color: str) -> tuple[int, int, int, int]:
         value = hex_color.lstrip("#")
-        return tuple(int(value[index : index + 2], 16) for index in (0, 2, 4)) + (255,)
+        red = int(value[0:2], 16)
+        green = int(value[2:4], 16)
+        blue = int(value[4:6], 16)
+        return (red, green, blue, 255)
 
     img = None
     if getattr(sys, "frozen", False):
