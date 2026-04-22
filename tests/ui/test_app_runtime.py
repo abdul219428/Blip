@@ -68,6 +68,7 @@ def test_register_hotkey_listener_enqueues_show_command(monkeypatch):
     import cogstash.ui.app_runtime as runtime
 
     app_queue: queue.Queue[runtime.AppCommand] = queue.Queue()
+    hotkey = "<ctrl>+<alt>+space"
 
     class FakeListener:
         def __init__(self, mapping):
@@ -79,9 +80,10 @@ def test_register_hotkey_listener_enqueues_show_command(monkeypatch):
 
     monkeypatch.setattr(runtime.keyboard, "GlobalHotKeys", FakeListener)
 
-    listener = runtime.start_hotkey_listener(app_queue, "<ctrl>+<alt>+space")
+    listener = runtime.start_hotkey_listener(app_queue, hotkey)
 
-    hotkey_callback = next(iter(listener.mapping.values()))
+    assert list(listener.mapping.keys()) == [hotkey]
+    hotkey_callback = listener.mapping[hotkey]
     hotkey_callback()
 
     assert listener.started is True
