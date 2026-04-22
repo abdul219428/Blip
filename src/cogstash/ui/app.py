@@ -8,9 +8,7 @@ Escape → hides window
 from __future__ import annotations
 
 import logging
-import os
 import queue
-import subprocess
 import sys
 import threading
 import tkinter as tk
@@ -30,6 +28,7 @@ from cogstash.core import (
     save_config,
 )
 from cogstash.core import parse_smart_tags as _parse_smart_tags
+from cogstash.ui import windows_runtime
 
 parse_smart_tags = _parse_smart_tags
 
@@ -94,13 +93,8 @@ def platform_font() -> str:
 
 
 def configure_dpi() -> None:
-    """Enable DPI awareness on Windows so the UI renders crisply on HiDPI displays."""
-    if sys.platform == "win32":
-        try:
-            import ctypes
-            ctypes.windll.shcore.SetProcessDpiAwareness(1)
-        except (AttributeError, OSError):
-            pass
+    """Compatibility forwarder for UI Windows runtime DPI setup."""
+    windows_runtime.configure_dpi()
 
 
 def create_tray_icon(app_queue: queue.Queue, config: CogStashConfig) -> None:
@@ -140,13 +134,7 @@ def create_tray_icon(app_queue: queue.Queue, config: CogStashConfig) -> None:
         draw.text((x, y), "⚡", fill=hex_to_rgba(theme["fg"]), font=font)
 
     def open_notes():
-        path = str(config.output_file)
-        if sys.platform == "win32":
-            os.startfile(path)
-        elif sys.platform == "darwin":
-            subprocess.run(["open", path], check=False)
-        else:
-            subprocess.run(["xdg-open", path], check=False)
+        windows_runtime.open_target_in_shell(str(config.output_file))
 
     def quit_app(icon):
         icon.stop()

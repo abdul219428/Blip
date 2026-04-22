@@ -583,3 +583,71 @@ def test_app_main_installer_welcome_shown_for_first_installed_launch(monkeypatch
 
     assert len(welcome_calls) == 1
     assert saved_configs == [cogstash.__version__]
+
+
+def test_app_main_delegates_dpi_setup_to_windows_runtime(monkeypatch, tmp_path):
+    import types
+
+    import cogstash
+    import cogstash.ui.app as app_mod
+    import cogstash.ui.windows_runtime as runtime_mod
+
+    calls: list[str] = []
+
+    class FakeRoot:
+        def mainloop(self):
+            return None
+
+    class FakeApp:
+        def __init__(self, _root, _config):
+            self.queue = object()
+
+    class FakeGuard:
+        def close(self):
+            return None
+
+    class FakeListener:
+        def __init__(self, _mapping):
+            pass
+
+        def start(self):
+            pass
+
+        def stop(self):
+            pass
+
+    config = app_mod.CogStashConfig(
+        output_file=tmp_path / "notes.md",
+        log_file=tmp_path / "cogstash.log",
+        last_seen_version=cogstash.__version__,
+        last_seen_installer_version=cogstash.__version__,
+    )
+    windows_mod = types.ModuleType("cogstash.ui.windows")
+    windows_mod.WINDOWS_MUTEX_NAME = "Local\\CogStash.Test"
+    windows_mod.acquire_single_instance = lambda _name: FakeGuard()
+
+    monkeypatch.setattr(app_mod, "load_config", lambda _path: config)
+    monkeypatch.setattr(runtime_mod, "configure_dpi", lambda: calls.append("dpi"))
+    monkeypatch.setattr(app_mod.tk, "Tk", lambda: FakeRoot())
+    monkeypatch.setattr(app_mod, "CogStash", FakeApp)
+    monkeypatch.setattr(app_mod, "create_tray_icon", lambda _queue, _config: None)
+    monkeypatch.setattr(app_mod.keyboard, "GlobalHotKeys", FakeListener)
+    monkeypatch.setattr(app_mod.messagebox, "showinfo", lambda *_args, **_kwargs: None)
+    monkeypatch.setitem(sys.modules, "cogstash.ui.windows", windows_mod)
+    monkeypatch.setattr("sys.stdout", StrictEncodedStream("cp1252"))
+
+    original_handlers = app_mod.logger.handlers[:]
+    try:
+        app_mod.main()
+    finally:
+        for handler in [h for h in app_mod.logger.handlers[:] if h not in original_handlers]:
+            app_mod.logger.removeHandler(handler)
+            try:
+                handler.close()
+            except Exception:
+                pass
+        for handler in original_handlers:
+            if handler not in app_mod.logger.handlers:
+                app_mod.logger.addHandler(handler)
+
+    assert calls == ["dpi"]
