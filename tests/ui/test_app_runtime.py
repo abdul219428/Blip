@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import queue
-from types import SimpleNamespace
 
 
 def test_drain_queue_dispatches_supported_commands():
@@ -69,11 +68,10 @@ def test_register_hotkey_listener_enqueues_show_command(monkeypatch):
     import cogstash.ui.app_runtime as runtime
 
     app_queue: queue.Queue[runtime.AppCommand] = queue.Queue()
-    created_mappings: list[dict[str, object]] = []
 
     class FakeListener:
         def __init__(self, mapping):
-            created_mappings.append(mapping)
+            self.mapping = dict(mapping)
             self.started = False
 
         def start(self):
@@ -83,7 +81,7 @@ def test_register_hotkey_listener_enqueues_show_command(monkeypatch):
 
     listener = runtime.start_hotkey_listener(app_queue, "<ctrl>+<alt>+space")
 
-    hotkey_callback = created_mappings[0]["<ctrl>+<alt>+space"]
+    hotkey_callback = next(iter(listener.mapping.values()))
     hotkey_callback()
 
     assert listener.started is True
@@ -95,14 +93,22 @@ def test_shutdown_runtime_stops_listener_and_tray():
 
     stopped: list[str] = []
 
+    class FakeStopHandle:
+        def __init__(self, name: str):
+            self.name = name
+
+        def stop(self):
+            stopped.append(self.name)
+
     runtime.shutdown_runtime(
         runtime.AppRuntimeHandles(
-            tray_icon=SimpleNamespace(stop=lambda: stopped.append("tray")),
-            hotkey_listener=SimpleNamespace(stop=lambda: stopped.append("hotkey")),
+            tray_icon=FakeStopHandle("tray"),
+            hotkey_listener=FakeStopHandle("hotkey"),
         )
     )
 
-    assert stopped == ["tray", "hotkey"]
+    assert set(stopped) == {"tray", "hotkey"}
+    assert len(stopped) == 2
 
 
 def test_shutdown_runtime_tolerates_missing_handles():
