@@ -156,17 +156,19 @@ def test_start_tray_icon_enqueues_shared_commands(monkeypatch):
     )
 
     menu_items = created_items[0].items
-    browse_item = menu_items[3]
-    settings_item = menu_items[4]
-    quit_item = menu_items[6]
+    items_by_label = {
+        item.label: item
+        for item in menu_items
+        if getattr(item, "label", None)
+    }
 
-    browse_item.command()
+    items_by_label["Browse Notes"].command()
     assert app_queue.get_nowait() is runtime.AppCommand.BROWSE
 
-    settings_item.command()
+    items_by_label["Settings"].command()
     assert app_queue.get_nowait() is runtime.AppCommand.SETTINGS
 
-    quit_item.command(icon)
+    items_by_label["Quit"].command(icon)
     assert icon.stopped is True
     assert app_queue.get_nowait() is runtime.AppCommand.QUIT
 

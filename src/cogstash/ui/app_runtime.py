@@ -47,7 +47,7 @@ def enqueue_command(app_queue: queue.Queue[AppCommand], command: AppCommand) -> 
 
 
 def drain_app_queue(
-    app_queue: queue.Queue[object],
+    app_queue: queue.Queue[AppCommand],
     *,
     on_show: Callable[[], None],
     on_browse: Callable[[], None],
@@ -55,6 +55,9 @@ def drain_app_queue(
     on_quit: Callable[[], None],
 ) -> bool:
     """Drain pending commands and dispatch them through explicit callbacks.
+
+    Only ``AppCommand`` values are recognized. Legacy raw strings are
+    intentionally treated as unknown commands and ignored.
 
     Returns False when QUIT is observed so the caller can stop rescheduling the
     poll loop.
