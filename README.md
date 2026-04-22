@@ -17,9 +17,9 @@ a card-based UI, or query from the command line.
 - 🏷️ **Smart tags** — `#todo`, `#urgent`, `#important`, `#idea` with emoji prefixes
 - 🔤 **Autocomplete** — type `#` and pick a tag from the popup
 - ✨ **Guided onboarding** — first-run wizard for new users plus lightweight installed-build welcome/upgrade flow
-- ⚙️ **Settings window** — theme, window size, startup, and custom tag management from the UI, with hotkey shown for reference
+- ⚙️ **Settings window** — theme, window size, startup, hotkey, and custom tag management from the UI
 - 🎨 **Themes** — 5 built-in color schemes (tokyo-night, light, dracula, gruvbox, mono)
-- 🗂️ **Browse window** — card view with live search, tag filtering, and mark-done
+- 🗂️ **Browse window** — card view with live search, tag filtering, safer delete preview, undo, and mark-done
 - 💻 **CLI commands** — `recent`, `search`, `tags`, `add`, `edit`, `delete`, `export`, `stats`, and `config`
 - 🖥️ **System tray** — runs quietly in the background with a tray icon menu
 - 🌍 **Cross-platform** — Windows, macOS, and Linux
@@ -57,6 +57,17 @@ On Windows you can now choose between:
 - `CogStash-vX.Y.Z-setup.exe` — installs `CogStash.exe` and `CogStash-CLI.exe` to `%LocalAppData%\Programs\CogStash`, adds an Apps & Features entry, creates Start Menu/Desktop shortcuts only for the UI app, and can optionally enable launch at sign-in plus add the installed CLI directory to `PATH` during setup.
 - `CogStash-vX.Y.Z-windows.exe` — portable onefile executable; download and run without installing.
 - `CogStash-CLI-vX.Y.Z-windows.exe` — portable CLI executable for shell-only usage.
+
+### Which Download Should I Choose?
+
+| If you want... | Choose... |
+|----------------|-----------|
+| the easiest Windows setup with shortcuts, uninstall support, and optional `PATH` / startup integration | `CogStash-vX.Y.Z-setup.exe` |
+| the normal UI app without installing anything | `CogStash-vX.Y.Z-windows.exe` |
+| the CLI only for shell workflows | `CogStash-CLI-vX.Y.Z-windows.exe` |
+| the UI app as an extracted folder instead of a single file | `.zip` / `.tar.gz` onedir bundle |
+| macOS or Linux UI app | `CogStash-vX.Y.Z-macos` or `CogStash-vX.Y.Z-linux` |
+| macOS or Linux CLI only | `CogStash-CLI-vX.Y.Z-macos` or `CogStash-CLI-vX.Y.Z-linux` |
 
 > **Tip:** The `.zip` / `.tar.gz` files are UI onedir bundles (a folder with all files).
 > They start slightly faster but aren't a single portable file.
@@ -103,6 +114,21 @@ uv run cogstash
 python -m cogstash --help
 ```
 
+### Quick Verification After Download or Install
+
+Use the shortest check that matches what you downloaded:
+
+| Artifact | Verify with |
+|----------|-------------|
+| Windows installer | Launch **CogStash** from Start Menu, confirm the tray icon appears, then run `CogStash-CLI.exe --help` if you enabled the installer `PATH` option |
+| Windows portable UI | Run `./CogStash-vX.Y.Z-windows.exe`, confirm the tray icon appears, then press the hotkey once |
+| Windows portable CLI | Run `./CogStash-CLI-vX.Y.Z-windows.exe --help` and `./CogStash-CLI-vX.Y.Z-windows.exe --version` |
+| macOS / Linux UI binary | Run the UI binary, confirm it stays running and shows the tray / menu-bar presence supported by your desktop |
+| macOS / Linux CLI binary | Run `./CogStash-CLI-vX.Y.Z-<platform> --help` and `--version` |
+| source install | Run `uv run cogstash` for the UI or `python -m cogstash --help` for CLI dispatch |
+
+If the UI starts cleanly, the tray/menu icon stays present, and the default hotkey opens the capture window, the installation is working.
+
 CogStash starts in the system tray. Press the hotkey to capture a note:
 
 | Key | Action |
@@ -127,7 +153,7 @@ Multi-line notes use 2-space indented continuation lines.
 New users see the first-run wizard on their first launch. After that, use the tray icon to open:
 
 - **Browse Notes** for searching, filtering, editing, and marking notes done
-- **Settings** for theme, window size, startup, and tag preferences, with the current hotkey shown for reference
+- **Settings** for theme, window size, startup, hotkey, and tag preferences
 
 ---
 
@@ -173,6 +199,7 @@ Show the most recent notes (newest first).
 ```bash
 cogstash recent            # last 20 notes (default)
 cogstash recent --limit 5  # last 5 notes
+cogstash recent --tag todo # last todo notes only
 ```
 
 ### `cogstash search`
@@ -182,6 +209,7 @@ Full-text search across all notes. Case-insensitive, multi-word AND matching.
 ```bash
 cogstash search "buy milk"        # notes containing "buy" AND "milk"
 cogstash search "todo" --limit 10 # limit results
+cogstash search "deploy" --tag urgent
 ```
 
 ### `cogstash tags`
@@ -243,6 +271,7 @@ Export all notes to JSON, CSV, or Markdown. Without `--output`, CogStash writes 
 cogstash export --format json
 cogstash export --format csv --output notes.csv
 cogstash export --format md --output notes.md
+cogstash export --format json --tag todo --output todo-notes.json
 ```
 
 ### `cogstash stats`

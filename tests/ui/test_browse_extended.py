@@ -361,6 +361,64 @@ def test_browse_delete_note(tmp_path, tk_root):
 
 
 @needs_display
+def test_browse_delete_confirmation_uses_multiline_preview(tmp_path, tk_root):
+    """Delete confirmation should show a readable multiline preview, not a terse one-liner."""
+    f = tmp_path / "cogstash.md"
+    f.write_text(
+        "- [2026-03-26 14:30] first line of a longer note\n"
+        "  second line with extra context\n"
+        "  third line for preview\n",
+        encoding="utf-8",
+    )
+
+    from cogstash.app import CogStashConfig
+    from cogstash.browse import BrowseWindow
+
+    win = BrowseWindow(tk_root, CogStashConfig(output_file=f))
+    note = win._all_notes[0]
+
+    with patch("tkinter.messagebox.askyesno", return_value=False) as confirm_mock:
+        win._on_delete(note)
+
+    args, kwargs = confirm_mock.call_args
+    message = kwargs.get("message") if kwargs else None
+    if message is None:
+        message = args[1]
+    assert "Delete this note?" in message
+    assert "Preview:" in message
+    assert "second line with extra context" in message
+    win.window.destroy()
+
+
+@needs_display
+def test_browse_delete_undo_restores_note(tmp_path, tk_root):
+    """Undo should restore the most recently deleted note during the session."""
+    f = tmp_path / "cogstash.md"
+    f.write_text(
+        "- [2026-03-26 14:30] first note\n"
+        "- [2026-03-26 15:00] second note\n",
+        encoding="utf-8",
+    )
+
+    from cogstash.app import CogStashConfig
+    from cogstash.browse import BrowseWindow
+
+    win = BrowseWindow(tk_root, CogStashConfig(output_file=f))
+    note = win._all_notes[0]
+
+    with patch("tkinter.messagebox.askyesno", return_value=True):
+        win._on_delete(note)
+
+    assert len(win._all_notes) == 1
+
+    win._undo_delete()
+
+    assert len(win._all_notes) == 2
+    assert "first note" in f.read_text(encoding="utf-8")
+    win.window.destroy()
+
+
+@needs_display
 def test_browse_copy_shows_non_blocking_notice(tmp_path, tk_root):
     """Copy action should acknowledge success without a modal dialog."""
     f = tmp_path / "cogstash.md"

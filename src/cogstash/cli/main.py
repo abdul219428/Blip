@@ -13,6 +13,7 @@ from cogstash.core import (
     compute_stats,
     delete_note,
     edit_note,
+    filter_by_tag,
     get_default_config_path,
     load_config,
     merge_tags,
@@ -51,11 +52,22 @@ def _output_file(config: CogStashConfig) -> Path:
     return output_file
 
 
+def _apply_tag_filter(notes: list[Note], tag: str | None) -> list[Note]:
+    """Optionally restrict a note list to one tag."""
+    if not tag:
+        return notes
+    return filter_by_tag(notes, tag)
+
+
 def cmd_recent(args, config: CogStashConfig, ansi_tag=None):
     """Show the most recent N notes."""
-    notes = parse_notes(_output_file(config))
+    tag = getattr(args, "tag", None)
+    notes = _apply_tag_filter(parse_notes(_output_file(config)), tag)
     if not notes:
-        safe_print("No notes found.")
+        if tag:
+            safe_print(f"No notes found for tag #{tag}.")
+        else:
+            safe_print("No notes found.")
         return
 
     use_color = stream_supports_color(sys.stdout)
@@ -68,11 +80,15 @@ def cmd_recent(args, config: CogStashConfig, ansi_tag=None):
 
 def cmd_search(args, config: CogStashConfig, ansi_tag=None):
     """Search notes by keyword."""
-    notes = parse_notes(_output_file(config))
+    tag = getattr(args, "tag", None)
+    notes = _apply_tag_filter(parse_notes(_output_file(config)), tag)
     results = search_notes(notes, args.query)
 
     if not results:
-        safe_print("No matching notes.")
+        if tag:
+            safe_print(f"No matching notes for tag #{tag}.")
+        else:
+            safe_print("No matching notes.")
         return
 
     use_color = stream_supports_color(sys.stdout)
@@ -212,9 +228,13 @@ def cmd_export(args, config: CogStashConfig, ansi_tag=None):
     import csv
     import json as json_mod
 
-    notes = parse_notes(_output_file(config))
+    tag = getattr(args, "tag", None)
+    notes = _apply_tag_filter(parse_notes(_output_file(config)), tag)
     if not notes:
-        safe_print("No notes to export.")
+        if tag:
+            safe_print(f"No notes found for tag #{tag}.")
+        else:
+            safe_print("No notes to export.")
         return
 
     today = datetime.now().strftime("%Y-%m-%d")
@@ -480,11 +500,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_recent = sub.add_parser("recent", help="Show latest notes")
     p_recent.add_argument("--limit", type=int, default=20, help="Max notes to show (default: 20)")
+    p_recent.add_argument("--tag", help="Only include notes with this tag")
     p_recent.set_defaults(func=cmd_recent)
 
     p_search = sub.add_parser("search", help="Search notes by keyword")
     p_search.add_argument("query", help="Search term")
     p_search.add_argument("--limit", type=int, default=20, help="Max results (default: 20)")
+    p_search.add_argument("--tag", help="Only search within notes with this tag")
     p_search.set_defaults(func=cmd_search)
 
     p_tags = sub.add_parser("tags", help="List all tags with counts")
@@ -536,6 +558,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_export = sub.add_parser("export", help="Export all notes to file")
     p_export.add_argument("--format", "-f", choices=["json", "csv", "md"], default="json", help="Export format (default: json)")
     p_export.add_argument("--output", "-o", help="Output file path (default: auto-named)")
+    p_export.add_argument("--tag", help="Only export notes with this tag")
     p_export.set_defaults(func=cmd_export)
 
     p_stats = sub.add_parser("stats", help="Show note statistics")

@@ -12,6 +12,7 @@ import tkinter as tk
 from datetime import datetime, timedelta
 
 from cogstash.search import (
+    _atomic_write,
     DEFAULT_TAG_COLORS,
     Note,
     delete_note,
@@ -41,7 +42,9 @@ class BrowseWindow:
         self._card_frames: list[tk.Frame] = []
         self._context_menu: tk.Menu | None = None
         self._notice_label: tk.Label | None = None
+        self._notice_button: tk.Button | None = None
         self._notice_after_id: str | None = None
+        self._last_deleted_note: tuple[Note, list[str]] | None = None
         self._filter_summary_frame: tk.Frame | None = None
         self._filter_summary_label: tk.Label | None = None
         self._clear_filters_button: tk.Button | None = None
@@ -570,18 +573,61 @@ class BrowseWindow:
     def _on_delete(self, note: Note):
         """Delete a note with confirmation dialog."""
         from tkinter import messagebox
-        preview = note.text[:50] + ("..." if len(note.text) > 50 else "")
+        preview = self._build_delete_preview(note)
         if messagebox.askyesno(
             "Delete Note",
-            f"Delete this note?\n\n\"{preview}\"",
+            f"Delete this note?\n\nPreview:\n{preview}",
             parent=self.window,
         ):
             assert self.config.output_file is not None, "output_file should be set by __post_init__"
             if delete_note(self.config.output_file, note):
+                self._last_deleted_note = (note, self._serialize_note_lines(note))
                 self._all_notes = [existing for existing in self._all_notes if existing is not note]
                 self._apply_filters()
+                self._show_notice("Note deleted", action_label="Undo", action=self._undo_delete)
                 return
             self._handle_stale_action()
+
+    def _build_delete_preview(self, note: Note) -> str:
+        """Return a readable delete preview for confirmation dialogs."""
+        preview_lines = note.text.splitlines()[:3]
+        preview = "\n".join(preview_lines)
+        if len(note.text.splitlines()) > 3 or len(preview) > 180:
+            preview = preview[:177].rstrip()
+            preview += "..."
+        return preview
+
+    def _serialize_note_lines(self, note: Note) -> list[str]:
+        """Render a note back into on-disk line form for session-level undo."""
+        timestamp = note.timestamp.strftime("%Y-%m-%d %H:%M")
+        text_lines = note.text.split("\n")
+        rendered = [f"- [{timestamp}] {text_lines[0]}\n"]
+        rendered.extend(f"  {line}\n" for line in text_lines[1:])
+        return rendered
+
+    def _undo_delete(self) -> None:
+        """Restore the most recently deleted note for this session."""
+        if self._last_deleted_note is None:
+            return
+        note, rendered_lines = self._last_deleted_note
+        assert self.config.output_file is not None, "output_file should be set by __post_init__"
+        try:
+            lines = self.config.output_file.read_text(encoding="utf-8").splitlines(keepends=True)
+        except OSError:
+            self._show_notice("Could not restore deleted note")
+            return
+
+        insert_at = min(note.line_number, len(lines))
+        lines[insert_at:insert_at] = rendered_lines
+        try:
+            _atomic_write(self.config.output_file, "".join(lines))
+        except OSError:
+            self._show_notice("Could not restore deleted note")
+            return
+
+        self._last_deleted_note = None
+        self._load_notes()
+        self._show_notice("Deletion undone")
 
     def _on_copy(self, note: Note):
         """Copy note text to clipboard."""
@@ -594,30 +640,52 @@ class BrowseWindow:
         self._load_notes()
         self._show_notice("Notes changed on disk — reloaded")
 
-    def _show_notice(self, text: str) -> None:
+    def _show_notice(self, text: str, action_label: str | None = None, action=None) -> None:
         """Show a brief non-blocking status notice."""
         if self._notice_after_id is not None:
             self.window.after_cancel(self._notice_after_id)
             self._notice_after_id = None
-        if self._notice_label is not None and self._notice_label.winfo_exists():
-            self._notice_label.destroy()
+        self._clear_notice()
+
+        notice_frame = tk.Frame(self.window, bg=self.theme["accent"], padx=10, pady=4)
         self._notice_label = tk.Label(
-            self.window,
+            notice_frame,
             text=text,
             bg=self.theme["accent"],
             fg=self.theme["bg"],
             font=(platform_font(), 9),
-            padx=10,
-            pady=4,
         )
-        self._notice_label.place(relx=0.5, rely=0.94, anchor="center")
-        self._notice_after_id = self.window.after(1500, self._clear_notice)
+        self._notice_label.pack(side="left")
+        if action_label and action is not None:
+            self._notice_button = tk.Button(
+                notice_frame,
+                text=action_label,
+                command=action,
+                bg=self.theme["bg"],
+                fg=self.theme["accent"],
+                activebackground=self.theme["bg"],
+                activeforeground=self.theme["accent"],
+                font=(platform_font(), 9, "bold"),
+                relief="flat",
+                bd=0,
+                padx=8,
+                pady=1,
+                cursor="hand2",
+                highlightthickness=0,
+            )
+            self._notice_button.pack(side="left", padx=(8, 0))
+        else:
+            self._notice_button = None
+        notice_frame.place(relx=0.5, rely=0.94, anchor="center")
+        self._notice_frame = notice_frame
+        self._notice_after_id = self.window.after(5000 if action_label else 1500, self._clear_notice)
 
     def _clear_notice(self) -> None:
         """Remove the transient status notice."""
         self._notice_after_id = None
-        if self._notice_label is not None and self._notice_label.winfo_exists():
-            self._notice_label.destroy()
+        if hasattr(self, "_notice_frame") and self._notice_frame is not None and self._notice_frame.winfo_exists():
+            self._notice_frame.destroy()
+        self._notice_button = None
         self._notice_label = None
 
     def _replace_note(self, original: Note, updated: Note) -> None:

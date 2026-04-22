@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
+from unittest.mock import patch
 
 import pytest
 
@@ -99,6 +100,74 @@ def test_settings_save_appearance_applies_changes_immediately(tk_root, tmp_path)
 
 
 @needs_display
+def test_settings_save_general_persists_hotkey_and_notifies_app(tk_root, tmp_path):
+    """Saving General should persist an edited hotkey and notify the app."""
+    from cogstash.ui.app import CogStashConfig
+    from cogstash.ui.settings import SettingsWindow
+
+    config_path = tmp_path / "test.json"
+    calls = []
+    sw = SettingsWindow(
+        tk_root,
+        CogStashConfig(),
+        config_path,
+        on_config_changed=lambda config: calls.append(config.hotkey),
+    )
+    sw.hotkey_var.set("<ctrl>+<alt>+h")
+
+    sw._save_general()
+
+    data = json.loads(config_path.read_text(encoding="utf-8"))
+    assert sw.config.hotkey == "<ctrl>+<alt>+h"
+    assert data["hotkey"] == "<ctrl>+<alt>+h"
+    assert calls == ["<ctrl>+<alt>+h"]
+    sw.win.destroy()
+
+
+@needs_display
+def test_settings_invalid_hotkey_shows_error_and_does_not_save(tk_root, tmp_path):
+    """Saving an invalid hotkey should show an error and leave config untouched."""
+    from cogstash.ui.app import CogStashConfig
+    from cogstash.ui.settings import SettingsWindow
+
+    config_path = tmp_path / "test.json"
+    sw = SettingsWindow(tk_root, CogStashConfig(), config_path)
+    sw.hotkey_var.set("not-a-hotkey")
+
+    with patch("tkinter.messagebox.showerror") as error_mock:
+        sw._save_general()
+
+    assert sw.config.hotkey == "<ctrl>+<shift>+<space>"
+    assert not config_path.exists()
+    error_mock.assert_called_once()
+    sw.win.destroy()
+
+
+@needs_display
+def test_settings_test_hotkey_shows_success_for_valid_input(tk_root, tmp_path, monkeypatch):
+    """Test Hotkey should confirm valid hotkey syntax and guidance."""
+    from cogstash.ui.app import CogStashConfig
+    from cogstash.ui.settings import SettingsWindow
+
+    sw = SettingsWindow(tk_root, CogStashConfig(), tmp_path / "test.json")
+    sw.hotkey_var.set("<ctrl>+<alt>+h")
+
+    class FakeHotKey:
+        @staticmethod
+        def parse(value):
+            assert value == "<ctrl>+<alt>+h"
+            return ["parsed"]
+
+    monkeypatch.setattr("cogstash.ui.settings.keyboard.HotKey", FakeHotKey)
+
+    with patch("tkinter.messagebox.showinfo") as info_mock:
+        sw._test_hotkey()
+
+    info_mock.assert_called_once()
+    sw.win.destroy()
+
+
+@needs_display
 def test_wizard_saves_config(tk_root, tmp_path):
     """Wizard writes valid config with all fields when completed."""
     from cogstash.ui.app import CogStashConfig
@@ -113,6 +182,24 @@ def test_wizard_saves_config(tk_root, tmp_path):
     assert "theme" in data
     assert "last_seen_version" in data
     assert data["last_seen_version"] != ""
+    wiz.win.destroy()
+
+
+@needs_display
+def test_wizard_finish_persists_edited_hotkey(tk_root, tmp_path):
+    """Finishing the wizard should persist an edited hotkey."""
+    from cogstash.ui.app import CogStashConfig
+    from cogstash.ui.settings import WizardWindow
+
+    config = CogStashConfig()
+    config_path = tmp_path / ".cogstash.json"
+    wiz = WizardWindow(tk_root, config, config_path)
+    wiz.hotkey_var.set("<ctrl>+<alt>+h")
+
+    wiz._finish()
+
+    data = json.loads(config_path.read_text(encoding="utf-8"))
+    assert data["hotkey"] == "<ctrl>+<alt>+h"
     wiz.win.destroy()
 
 
