@@ -111,6 +111,19 @@ def merge_tags(config: CogStashConfig) -> tuple[dict[str, str], dict[str, str]]:
     return smart_tags, tag_colors
 
 
+def count_tags(notes: list[Note]) -> dict[str, int]:
+    """Count note tags in deterministic order: descending count, then tag name."""
+    from collections import Counter
+
+    tag_counter: Counter[str] = Counter()
+    for note in notes:
+        for tag in note.tags:
+            tag_counter[tag] += 1
+
+    sorted_items = sorted(tag_counter.items(), key=lambda item: (-item[1], item[0]))
+    return dict(sorted_items)
+
+
 def parse_smart_tags(text: str, smart_tags: dict[str, str] | None = None) -> str:
     """Prepend smart-tag emojis to text. Tags stay inline for searchability."""
     tags_dict = smart_tags if smart_tags is not None else DEFAULT_SMART_TAGS
@@ -260,10 +273,7 @@ def compute_stats(notes: list[Note]) -> dict:
     first_date = timestamps[0]
     last_date = timestamps[-1]
 
-    tag_counter: Counter[str] = Counter()
-    for note in notes:
-        for tag in note.tags:
-            tag_counter[tag] += 1
+    tag_counts = count_tags(notes)
 
     lengths = [len(note.text) for note in notes]
     today = date.today()
@@ -302,7 +312,7 @@ def compute_stats(notes: list[Note]) -> dict:
         "pending": pending,
         "first_date": first_date,
         "last_date": last_date,
-        "tag_counts": dict(tag_counter.most_common()),
+        "tag_counts": tag_counts,
         "avg_length": sum(lengths) // total,
         "longest": max(lengths),
         "notes_this_week": notes_this_week,
@@ -319,6 +329,7 @@ __all__ = [
     "DEFAULT_TAG_COLORS",
     "Note",
     "append_note_to_file",
+    "count_tags",
     "compute_stats",
     "delete_note",
     "edit_note",

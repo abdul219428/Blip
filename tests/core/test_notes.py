@@ -348,6 +348,47 @@ def test_compute_stats_basic_and_empty(tmp_path):
     assert empty_stats["tag_counts"] == {}
 
 
+def test_count_tags_empty_input_returns_empty_dict():
+    from cogstash.core.notes import count_tags
+
+    assert count_tags([]) == {}
+
+
+def test_count_tags_aggregates_counts_and_orders_ties_by_tag_name(tmp_path):
+    from cogstash.core import parse_notes
+    from cogstash.core.notes import count_tags
+
+    notes_file = tmp_path / "cogstash.md"
+    notes_file.write_text(
+        "- [2026-03-26 09:00] first #beta #alpha\n"
+        "- [2026-03-26 10:00] second #beta #gamma\n"
+        "- [2026-03-26 11:00] third #alpha\n",
+        encoding="utf-8",
+    )
+
+    tag_counts = count_tags(parse_notes(notes_file))
+
+    assert tag_counts == {"alpha": 2, "beta": 2, "gamma": 1}
+    assert list(tag_counts.items()) == [("alpha", 2), ("beta", 2), ("gamma", 1)]
+
+
+def test_compute_stats_reuses_shared_tag_count_ordering(tmp_path):
+    from cogstash.core import compute_stats, parse_notes
+
+    notes_file = tmp_path / "cogstash.md"
+    notes_file.write_text(
+        "- [2026-03-26 09:00] first #beta #alpha\n"
+        "- [2026-03-26 10:00] second #beta #gamma\n"
+        "- [2026-03-26 11:00] third #alpha\n",
+        encoding="utf-8",
+    )
+
+    stats = compute_stats(parse_notes(notes_file))
+
+    assert stats["tag_counts"] == {"alpha": 2, "beta": 2, "gamma": 1}
+    assert list(stats["tag_counts"].items()) == [("alpha", 2), ("beta", 2), ("gamma", 1)]
+
+
 def test_compute_stats_streaks(tmp_path):
     from cogstash.core import compute_stats, parse_notes
 

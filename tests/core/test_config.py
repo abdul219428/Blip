@@ -174,6 +174,53 @@ def test_save_config(tmp_path):
     assert Path(data["output_file"]) == tmp_path / "notes.md"
 
 
+def test_to_pretty_json_preserves_unicode_and_indent():
+    from cogstash.core.config import to_pretty_json
+
+    payload = {"tags": {"focus": {"emoji": "cafe ☕", "color": "#ABCDEF"}}}
+
+    assert to_pretty_json(payload) == '{\n  "tags": {\n    "focus": {\n      "emoji": "cafe ☕",\n      "color": "#ABCDEF"\n    }\n  }\n}'
+
+
+def test_load_config_creates_default_file_with_shared_json_format(tmp_path):
+    from cogstash.core import load_config
+    from cogstash.core.config import to_pretty_json
+
+    config_path = tmp_path / ".cogstash.json"
+
+    load_config(config_path)
+
+    expected = {
+        "hotkey": "<ctrl>+<shift>+<space>",
+        "output_file": str(Path.home() / "cogstash.md"),
+        "log_file": str(Path.home() / "cogstash.log"),
+        "theme": "tokyo-night",
+        "window_size": "default",
+        "launch_at_startup": False,
+        "last_seen_version": "",
+        "last_seen_installer_version": "",
+    }
+    assert config_path.read_text(encoding="utf-8") == to_pretty_json(expected)
+
+
+def test_save_config_writes_pretty_json_with_unicode(tmp_path):
+    from cogstash.core import CogStashConfig, save_config
+
+    config = CogStashConfig(
+        output_file=tmp_path / "notes.md",
+        log_file=tmp_path / "cogstash.log",
+        tags={"focus": {"emoji": "cafe ☕", "color": "#ABCDEF"}},
+    )
+    config_path = tmp_path / ".cogstash.json"
+
+    save_config(config, config_path)
+
+    written = config_path.read_text(encoding="utf-8")
+    assert '"emoji": "cafe ☕"' in written
+    assert "\n  " in written
+    assert "\\u2615" not in written
+
+
 def test_valid_theme_and_window_size_sets_match_ui_runtime():
     import cogstash.core.config as config_mod
     import cogstash.ui.app as app_mod
