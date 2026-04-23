@@ -10,33 +10,22 @@ import subprocess
 from importlib.metadata import version as package_version
 from pathlib import Path
 
+from _artifacts import (
+    get_staged_app_dirname,
+    get_staged_cli_exe_name,
+    get_staged_ui_exe_name,
+    windows_artifact_layout,
+)
+
 ROOT = Path(__file__).resolve().parent.parent
 BUILD_DIR = ROOT / "build"
 DIST_DIR = ROOT / "dist"
 ISS_PATH = ROOT / "installer" / "windows" / "CogStash.iss"
-STAGED_APP_DIRNAME = "CogStash"
-STAGED_EXE_NAME = "CogStash.exe"
-STAGED_CLI_EXE_NAME = "CogStash-CLI.exe"
 
 
 def get_version() -> str:
     """Get the installed package version."""
     return package_version("cogstash")
-
-
-def get_onedir_dir_name(version: str) -> str:
-    """Return the expected versioned onedir folder name."""
-    return f"CogStash-{version}-onedir"
-
-
-def get_onedir_exe_name(version: str) -> str:
-    """Return the expected versioned onedir executable name."""
-    return f"{get_onedir_dir_name(version)}.exe"
-
-
-def get_cli_exe_name(version: str) -> str:
-    """Return the expected versioned CLI executable name."""
-    return f"CogStash-CLI-{version}.exe"
 
 
 def make_version_info_version(version: str) -> str:
@@ -50,11 +39,12 @@ def make_version_info_version(version: str) -> str:
 
 def find_windows_onedir_bundle(dist_dir: Path, version: str) -> Path:
     """Locate the Windows onedir bundle created by scripts/build.py."""
-    bundle_dir = dist_dir / get_onedir_dir_name(version)
+    layout = windows_artifact_layout(version=version, dist_dir=dist_dir)
+    bundle_dir = layout.onedir_dir
     if not bundle_dir.is_dir():
         raise FileNotFoundError(f"Windows onedir bundle not found: {bundle_dir}")
 
-    bundle_exe = bundle_dir / get_onedir_exe_name(version)
+    bundle_exe = layout.onedir_exe
     if not bundle_exe.is_file():
         raise FileNotFoundError(f"Expected bundle executable not found: {bundle_exe}")
 
@@ -63,7 +53,7 @@ def find_windows_onedir_bundle(dist_dir: Path, version: str) -> Path:
 
 def find_windows_cli_binary(dist_dir: Path, version: str) -> Path:
     """Locate the Windows CLI onefile binary created by scripts/build.py."""
-    cli_binary = dist_dir / get_cli_exe_name(version)
+    cli_binary = windows_artifact_layout(version=version, dist_dir=dist_dir).cli_exe
     if not cli_binary.is_file():
         raise FileNotFoundError(f"Windows CLI binary not found: {cli_binary}")
     return cli_binary
@@ -71,17 +61,18 @@ def find_windows_cli_binary(dist_dir: Path, version: str) -> Path:
 
 def stage_windows_payload(*, bundle_dir: Path, cli_binary: Path, version: str, staging_root: Path) -> Path:
     """Copy the versioned onedir bundle into a versionless installer payload."""
-    staged_dir = staging_root / STAGED_APP_DIRNAME
+    layout = windows_artifact_layout(version=version, dist_dir=bundle_dir.parent)
+    staged_dir = staging_root / get_staged_app_dirname()
     if staged_dir.exists():
         shutil.rmtree(staged_dir)
 
     staging_root.mkdir(parents=True, exist_ok=True)
     shutil.copytree(bundle_dir, staged_dir)
 
-    versioned_exe = staged_dir / get_onedir_exe_name(version)
-    staged_exe = staged_dir / STAGED_EXE_NAME
+    versioned_exe = staged_dir / layout.onedir_exe.name
+    staged_exe = staged_dir / get_staged_ui_exe_name()
     versioned_exe.rename(staged_exe)
-    shutil.copy2(cli_binary, staged_dir / STAGED_CLI_EXE_NAME)
+    shutil.copy2(cli_binary, staged_dir / get_staged_cli_exe_name())
     return staged_dir
 
 

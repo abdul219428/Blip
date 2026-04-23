@@ -12,6 +12,18 @@ from _helpers import StrictEncodedStream
 from ui._support import needs_display
 
 
+def _patch_runtime_startup(monkeypatch, app_mod, *, start_runtime=None, start_hotkey_listener=None, shutdown_runtime=None):
+    handles = app_mod.app_runtime.AppRuntimeHandles()
+    monkeypatch.setattr(app_mod.app_runtime, "start_runtime", start_runtime or (lambda *_a, **_k: handles))
+    monkeypatch.setattr(
+        app_mod.app_runtime,
+        "start_hotkey_listener",
+        start_hotkey_listener or (lambda *_a, **_k: object()),
+    )
+    monkeypatch.setattr(app_mod.app_runtime, "shutdown_runtime", shutdown_runtime or (lambda _handles: None))
+    return handles
+
+
 def _run_main_startup(monkeypatch, tmp_path, listener_cls):
     import types
 
@@ -53,8 +65,15 @@ def _run_main_startup(monkeypatch, tmp_path, listener_cls):
     monkeypatch.setattr(app_mod, "configure_dpi", lambda: None)
     monkeypatch.setattr(app_mod.tk, "Tk", lambda: FakeRoot())
     monkeypatch.setattr(app_mod, "CogStash", FakeApp)
-    monkeypatch.setattr(app_mod, "create_tray_icon", lambda _queue, _config: None)
-    monkeypatch.setattr(app_mod.keyboard, "GlobalHotKeys", listener_cls)
+    if listener_cls is None:
+        def start_hotkey_listener(*_a, **_k):
+            raise AssertionError("hotkey listener should not be started")
+    else:
+        def start_hotkey_listener(_queue, hotkey):
+            listener = listener_cls({hotkey: lambda: None})
+            listener.start()
+            return listener
+    _patch_runtime_startup(monkeypatch, app_mod, start_hotkey_listener=start_hotkey_listener)
     monkeypatch.setattr(app_mod.messagebox, "showwarning", lambda *a, **kw: warnings.append((a, kw)))
     monkeypatch.setattr(
         app_mod.messagebox,
@@ -142,8 +161,11 @@ def test_app_main_startup_output_is_cp1252_safe(monkeypatch, tmp_path):
     monkeypatch.setattr(app_mod, "configure_dpi", lambda: None)
     monkeypatch.setattr(app_mod.tk, "Tk", lambda: FakeRoot())
     monkeypatch.setattr(app_mod, "CogStash", FakeApp)
-    monkeypatch.setattr(app_mod, "create_tray_icon", lambda _queue, _config: None)
-    monkeypatch.setattr(app_mod.keyboard, "GlobalHotKeys", FakeListener)
+    _patch_runtime_startup(
+        monkeypatch,
+        app_mod,
+        start_hotkey_listener=lambda _queue, hotkey: FakeListener({hotkey: lambda: None}),
+    )
     monkeypatch.setattr(
         app_mod.messagebox,
         "showinfo",
@@ -293,8 +315,11 @@ def test_app_open_settings_receives_runtime_hotkey_warning_after_startup_failure
     monkeypatch.setattr(app_mod.tk, "Tk", lambda: tk_root)
     monkeypatch.setattr(tk_root, "mainloop", lambda: None)
     monkeypatch.setattr(app_mod, "CogStash", capture_app)
-    monkeypatch.setattr(app_mod, "create_tray_icon", lambda _queue, _config: None)
-    monkeypatch.setattr(app_mod.keyboard, "GlobalHotKeys", FailingListener)
+    _patch_runtime_startup(
+        monkeypatch,
+        app_mod,
+        start_hotkey_listener=lambda *_a, **_k: (_ for _ in ()).throw(OSError("hotkey already in use")),
+    )
     monkeypatch.setattr(app_mod.messagebox, "showwarning", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(
         app_mod.messagebox,
@@ -487,8 +512,11 @@ def test_app_main_installer_welcome_shown_for_installed_upgrade(monkeypatch, tmp
     monkeypatch.setattr(app_mod, "configure_dpi", lambda: None)
     monkeypatch.setattr(app_mod.tk, "Tk", lambda: FakeRoot())
     monkeypatch.setattr(app_mod, "CogStash", FakeApp)
-    monkeypatch.setattr(app_mod, "create_tray_icon", lambda _queue, _config: None)
-    monkeypatch.setattr(app_mod.keyboard, "GlobalHotKeys", FakeListener)
+    _patch_runtime_startup(
+        monkeypatch,
+        app_mod,
+        start_hotkey_listener=lambda _queue, hotkey: FakeListener({hotkey: lambda: None}),
+    )
     monkeypatch.setattr(app_mod, "save_config", lambda _c, _p: None)
     monkeypatch.setattr(install_state_mod, "is_installed_windows_run", lambda: True)
     monkeypatch.setattr(settings_mod, "InstallerWelcomeDialog", lambda *a, **kw: welcome_calls.append(a), raising=False)
@@ -560,8 +588,11 @@ def test_app_main_installer_welcome_shown_for_first_installed_launch(monkeypatch
     monkeypatch.setattr(app_mod, "configure_dpi", lambda: None)
     monkeypatch.setattr(app_mod.tk, "Tk", lambda: FakeRoot())
     monkeypatch.setattr(app_mod, "CogStash", FakeApp)
-    monkeypatch.setattr(app_mod, "create_tray_icon", lambda _queue, _config: None)
-    monkeypatch.setattr(app_mod.keyboard, "GlobalHotKeys", FakeListener)
+    _patch_runtime_startup(
+        monkeypatch,
+        app_mod,
+        start_hotkey_listener=lambda _queue, hotkey: FakeListener({hotkey: lambda: None}),
+    )
     monkeypatch.setattr(app_mod, "save_config", lambda c, _p: saved_configs.append(c.last_seen_installer_version))
     monkeypatch.setattr(install_state_mod, "is_installed_windows_run", lambda: True)
     monkeypatch.setattr(settings_mod, "InstallerWelcomeDialog", lambda *a, **kw: welcome_calls.append(a), raising=False)
@@ -583,3 +614,95 @@ def test_app_main_installer_welcome_shown_for_first_installed_launch(monkeypatch
 
     assert len(welcome_calls) == 1
     assert saved_configs == [cogstash.__version__]
+
+
+def test_app_main_delegates_dpi_setup_to_windows_runtime(monkeypatch, tmp_path):
+    import types
+
+    import cogstash
+    import cogstash.ui.app as app_mod
+    import cogstash.ui.windows_runtime as runtime_mod
+
+    calls: list[str] = []
+
+    class FakeRoot:
+        def mainloop(self):
+            return None
+
+    class FakeApp:
+        def __init__(self, _root, _config):
+            self.queue = object()
+
+    class FakeGuard:
+        def close(self):
+            return None
+
+    class FakeListener:
+        def __init__(self, _mapping):
+            pass
+
+        def start(self):
+            pass
+
+        def stop(self):
+            pass
+
+    config = app_mod.CogStashConfig(
+        output_file=tmp_path / "notes.md",
+        log_file=tmp_path / "cogstash.log",
+        last_seen_version=cogstash.__version__,
+        last_seen_installer_version=cogstash.__version__,
+    )
+    windows_mod = types.ModuleType("cogstash.ui.windows")
+    windows_mod.WINDOWS_MUTEX_NAME = "Local\\CogStash.Test"
+    windows_mod.acquire_single_instance = lambda _name: FakeGuard()
+
+    monkeypatch.setattr(app_mod, "load_config", lambda _path: config)
+    monkeypatch.setattr(runtime_mod, "configure_dpi", lambda: calls.append("dpi"))
+    monkeypatch.setattr(app_mod.tk, "Tk", lambda: FakeRoot())
+    monkeypatch.setattr(app_mod, "CogStash", FakeApp)
+    _patch_runtime_startup(
+        monkeypatch,
+        app_mod,
+        start_hotkey_listener=lambda _queue, hotkey: FakeListener({hotkey: lambda: None}),
+    )
+    monkeypatch.setattr(app_mod.messagebox, "showinfo", lambda *_args, **_kwargs: None)
+    monkeypatch.setitem(sys.modules, "cogstash.ui.windows", windows_mod)
+    monkeypatch.setattr("sys.stdout", StrictEncodedStream("cp1252"))
+
+    original_handlers = app_mod.logger.handlers[:]
+    try:
+        app_mod.main()
+    finally:
+        for handler in [h for h in app_mod.logger.handlers[:] if h not in original_handlers]:
+            app_mod.logger.removeHandler(handler)
+            try:
+                handler.close()
+            except Exception:
+                pass
+        for handler in original_handlers:
+            if handler not in app_mod.logger.handlers:
+                app_mod.logger.addHandler(handler)
+
+    assert calls == ["dpi"]
+
+
+@needs_display
+def test_poll_queue_delegates_to_app_runtime(monkeypatch, tk_root):
+    import cogstash.ui.app as app_mod
+
+    app = app_mod.CogStash(tk_root, app_mod.CogStashConfig())
+    calls: list[object] = []
+
+    def fake_drain(app_queue, **callbacks):
+        calls.append(app_queue)
+        callbacks["on_show"]()
+        return False
+
+    monkeypatch.setattr(app_mod.app_runtime, "drain_app_queue", fake_drain)
+    monkeypatch.setattr(app, "show_window", lambda: calls.append("show"))
+
+    app.poll_queue()
+
+    assert calls[0] is app.queue
+    assert calls[1] == "show"

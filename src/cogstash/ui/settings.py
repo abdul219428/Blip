@@ -2,24 +2,19 @@
 
 from __future__ import annotations
 
-import sys
 import tkinter as tk
 from pathlib import Path
 from tkinter import messagebox
 
 from pynput import keyboard
 
+from cogstash.core import DEFAULT_SMART_TAGS, CogStashConfig, merge_tags, save_config
+from cogstash.ui import windows_runtime
 from cogstash.ui.app import (
-    DEFAULT_SMART_TAGS,
     THEMES,
     WINDOW_SIZES,
-    CogStashConfig,
-    logger,
-    merge_tags,
     platform_font,
-    save_config,
 )
-from cogstash.ui.install_state import get_startup_shortcut_path
 
 
 def validate_hotkey(value: str) -> tuple[bool, str | None]:
@@ -35,31 +30,6 @@ def validate_hotkey(value: str) -> tuple[bool, str | None]:
             "<ctrl>+<alt>+h."
         )
     return True, None
-
-
-def set_launch_at_startup(enable: bool) -> None:
-    """Enable or disable launch at system startup (Windows only)."""
-    if sys.platform != "win32":
-        return
-    shortcut_path = get_startup_shortcut_path()
-    if enable:
-        exe = sys.executable
-        if getattr(sys, "frozen", False):
-            exe = sys.argv[0]
-            content = f'@echo off\nstart "" "{exe}"\n'
-        else:
-            content = f'@echo off\nstart "" "{exe}" -m cogstash.ui\n'
-        try:
-            shortcut_path.parent.mkdir(parents=True, exist_ok=True)
-            shortcut_path.write_text(content, encoding="utf-8")
-        except OSError:
-            logger.error("Failed to create startup shortcut", exc_info=True)
-    else:
-        try:
-            if shortcut_path.exists():
-                shortcut_path.unlink()
-        except OSError:
-            logger.error("Failed to remove startup shortcut", exc_info=True)
 
 
 class SettingsWindow:
@@ -231,7 +201,7 @@ class SettingsWindow:
         tk.Label(frame, text="Startup", bg=t["bg"], fg=t["fg"],
                  font=(platform_font(), 11, "bold")).pack(anchor="w", pady=(16, 4))
         # Reflect actual on-disk state so installer-created scripts are visible immediately.
-        if sys.platform == "win32":
+        if windows_runtime.sys.platform == "win32":
             from cogstash.ui.install_state import startup_script_exists  # lazy — keeps install_state optional
 
             startup_state = startup_script_exists()
@@ -275,7 +245,7 @@ class SettingsWindow:
         self.config.output_file = Path(self.notes_file_var.get()).expanduser()
         new_launch = self.launch_var.get()
         if new_launch != self.config.launch_at_startup:
-            set_launch_at_startup(new_launch)
+            windows_runtime.set_launch_at_startup(new_launch)
         self.config.launch_at_startup = new_launch
         save_config(self.config, self.config_path)
         self._flash_saved()
@@ -495,17 +465,7 @@ class SettingsWindow:
 
     def _open_link(self, target: str):
         """Open a URL or file path."""
-        import os
-        import subprocess
-        if target.startswith("http"):
-            import webbrowser
-            webbrowser.open(target)
-        elif sys.platform == "win32":
-            os.startfile(target)
-        elif sys.platform == "darwin":
-            subprocess.run(["open", target], check=False)
-        else:
-            subprocess.run(["xdg-open", target], check=False)
+        windows_runtime.open_target_in_shell(target)
 
     def _render_tags(self):
         """Render the tag list in the tags tab."""

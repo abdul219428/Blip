@@ -161,21 +161,49 @@ jobs:
         shell: bash
       - name: Archive onedir bundle (Windows)
         if: matrix.os == 'windows-latest'
-        run: Compress-Archive -Path dist/CogStash-*-onedir -DestinationPath dist/CogStash-${{ github.ref_name }}-windows.zip
-        shell: pwsh
+        run: |
+          import subprocess
+          import sys
+
+          sys.path.insert(0, "scripts")
+          from _artifacts import get_release_archive_name
+
+          archive_name = get_release_archive_name(tag="${{ github.ref_name }}", platform_suffix="windows")
+          subprocess.run(["powershell", "-Command", f"Compress-Archive -Path dist/CogStash-*-onedir -DestinationPath dist/{archive_name}"], check=True)
+        shell: python
       - name: Archive onedir bundle (macOS)
         if: matrix.os == 'macos-latest'
-        run: cd dist && zip -r CogStash-${{ github.ref_name }}-macos.zip CogStash-*-onedir
-        shell: bash
+        run: |
+          import subprocess
+          import sys
+
+          sys.path.insert(0, "scripts")
+          from _artifacts import get_release_archive_name
+
+          archive_name = get_release_archive_name(tag="${{ github.ref_name }}", platform_suffix="macos")
+          subprocess.run(["bash", "-lc", f"cd dist && zip -r {archive_name} CogStash-*-onedir"], check=True)
+        shell: python
       - name: Archive onedir bundle (Linux)
         if: matrix.os == 'ubuntu-latest'
-        run: cd dist && tar -czf CogStash-${{ github.ref_name }}-linux.tar.gz CogStash-*-onedir
-        shell: bash
+        run: |
+          import subprocess
+          import sys
+
+          sys.path.insert(0, "scripts")
+          from _artifacts import get_release_archive_name
+
+          archive_name = get_release_archive_name(tag="${{ github.ref_name }}", platform_suffix="linux")
+          subprocess.run(["bash", "-lc", f"cd dist && tar -czf {archive_name} CogStash-*-onedir"], check=True)
+        shell: python
       - name: Rename onefile artifacts
         run: |
           import glob
           import os
+          import sys
           from pathlib import Path
+
+          sys.path.insert(0, "scripts")
+          from _artifacts import get_executable_name
 
           suffix = "${{ matrix.artifact_suffix }}"
           ext = "${{ matrix.exe_ext }}"
@@ -191,8 +219,8 @@ jobs:
           if not cli_candidates:
               raise SystemExit("Could not find CLI onefile artifact to rename")
 
-          ui_target = dist_dir / f"CogStash-{version}-{suffix}{ext}"
-          cli_target = dist_dir / f"CogStash-CLI-{version}-{suffix}{ext}"
+          ui_target = dist_dir / f"{get_executable_name(target='ui', bundle_mode='onefile', version=version)}-{suffix}{ext}"
+          cli_target = dist_dir / f"{get_executable_name(target='cli', bundle_mode='onefile', version=version)}-{suffix}{ext}"
           ui_candidates[0].replace(ui_target)
           cli_candidates[0].replace(cli_target)
         shell: python
