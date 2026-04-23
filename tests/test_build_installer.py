@@ -396,6 +396,25 @@ def test_release_workflow_builds_and_uploads_windows_installer():
     assert "--version output unexpectedly contained Traceback" in content
 
 
+def test_release_workflow_uses_shared_artifact_contract():
+    repo_root = Path(__file__).resolve().parents[1]
+    workflow_path = repo_root / ".github" / "workflows" / "release.yml"
+
+    content = workflow_path.read_text(encoding="utf-8")
+
+    assert "sys.path.insert(0, \"scripts\")" in content
+    assert "from _artifacts import get_executable_name" in content
+    assert "from _artifacts import get_release_archive_name" in content
+    assert "get_executable_name(target='ui', bundle_mode='onefile'" in content
+    assert "get_executable_name(target='cli', bundle_mode='onefile'" in content
+    assert "get_release_archive_name(tag=\"${{ github.ref_name }}\", platform_suffix=\"windows\")" in content
+    assert "get_release_archive_name(tag=\"${{ github.ref_name }}\", platform_suffix=\"macos\")" in content
+    assert "get_release_archive_name(tag=\"${{ github.ref_name }}\", platform_suffix=\"linux\")" in content
+    assert "CogStash-${{ github.ref_name }}-windows.zip" not in content
+    assert "CogStash-${{ github.ref_name }}-macos.zip" not in content
+    assert "CogStash-${{ github.ref_name }}-linux.tar.gz" not in content
+
+
 def test_release_workflow_uploads_ui_and_cli_artifacts():
     repo_root = Path(__file__).resolve().parents[1]
     workflow_path = repo_root / ".github" / "workflows" / "release.yml"
