@@ -67,7 +67,7 @@ def get_release_archive_name(*, tag: str, platform_suffix: str) -> str:
     raise ValueError(f"Unknown platform suffix: {platform_suffix}")
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class WindowsArtifactLayout:
     """Paths and staged names for Windows build and installer artifacts."""
 
