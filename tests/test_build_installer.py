@@ -33,9 +33,9 @@ def _load_build_module():
 
 def _load_artifact_contract_module():
     repo_root = Path(__file__).resolve().parents[1]
-    module_path = repo_root / "scripts" / "artifact_contract.py"
+    module_path = repo_root / "scripts" / "_artifacts.py"
     assert module_path.is_file(), f"Shared artifact contract not found: {module_path}"
-    spec = importlib.util.spec_from_file_location("artifact_contract", module_path)
+    spec = importlib.util.spec_from_file_location("_artifacts", module_path)
     assert spec is not None
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -121,7 +121,7 @@ def test_build_scripts_import_shared_artifact_contract():
     build_source = _read_script_source("scripts/build.py")
     build_installer_source = _read_script_source("scripts/build_installer.py")
     import_pattern = re.compile(
-        r"^\s*(?:from\s+scripts(?:\.\w+)?\s+import\s+artifact_contract|import\s+scripts\.artifact_contract\s+as\s+artifact_contract)\s*$",
+        r"^\s*(?:from\s+scripts\s+import\s+_artifacts|import\s+scripts\._artifacts\s+as\s+_artifacts)\s*$",
         re.M,
     )
 
