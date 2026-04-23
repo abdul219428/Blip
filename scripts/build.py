@@ -10,6 +10,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from _artifacts import get_executable_name
+
 ROOT = Path(__file__).resolve().parent.parent
 ICON_SRC = ROOT / "assets" / "cogstash_icon.png"
 BUILD_DIR = ROOT / "build"
@@ -50,15 +52,6 @@ def get_hidden_imports(target: str) -> list[str]:
         return UI_HIDDEN_IMPORTS
     if target == "cli":
         return CLI_HIDDEN_IMPORTS
-    raise ValueError(f"Unknown target: {target}")
-
-
-def get_executable_name(*, target: str, bundle_mode: str, version: str) -> str:
-    """Return the versioned output name for a target/bundle combination."""
-    if target == "ui":
-        return f"CogStash-{version}" if bundle_mode == "onefile" else f"CogStash-{version}-onedir"
-    if target == "cli":
-        return f"CogStash-CLI-{version}"
     raise ValueError(f"Unknown target: {target}")
 
 
