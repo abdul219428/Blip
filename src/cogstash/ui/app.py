@@ -10,13 +10,10 @@ from __future__ import annotations
 import logging
 import queue
 import sys
-import threading
 import tkinter as tk
 from pathlib import Path
 from tkinter import messagebox
 from typing import Any
-
-from pynput import keyboard
 
 from cogstash.core import (
     DEFAULT_SMART_TAGS,
@@ -28,7 +25,7 @@ from cogstash.core import (
     save_config,
 )
 from cogstash.core import parse_smart_tags as _parse_smart_tags
-from cogstash.ui import windows_runtime
+from cogstash.ui import app_runtime, windows_runtime
 
 parse_smart_tags = _parse_smart_tags
 
@@ -97,78 +94,13 @@ def configure_dpi() -> None:
     windows_runtime.configure_dpi()
 
 
-def create_tray_icon(app_queue: queue.Queue, config: CogStashConfig) -> None:
-    """Create and run a system tray icon on a daemon thread."""
-    try:
-        import pystray
-        from PIL import Image, ImageDraw, ImageFont
-    except ImportError:
-        logger.warning("pystray or Pillow not installed — skipping tray icon")
-        return
-
-    theme = THEMES[config.theme]
-    # Parse hex color to RGBA tuple
-    def hex_to_rgba(h):
-        h = h.lstrip("#")
-        return tuple(int(h[i:i+2], 16) for i in (0, 2, 4)) + (255,)
-
-    # Try bundled icon first (PyInstaller frozen binary)
-    img = None
-    if getattr(sys, "frozen", False):
-        bundle_dir = Path(getattr(sys, "_MEIPASS", "."))
-        icon_path = bundle_dir / "assets" / "cogstash_icon.png"
-        if icon_path.exists():
-            img = Image.open(icon_path).resize((64, 64))
-
-    if img is None:
-        # Fallback: generate icon programmatically
-        img = Image.new("RGBA", (64, 64), hex_to_rgba(theme["bg"]))
-        draw = ImageDraw.Draw(img)
-        try:
-            font: ImageFont.FreeTypeFont | ImageFont.ImageFont = ImageFont.truetype("arial", 40)
-        except OSError:
-            font = ImageFont.load_default()
-        bbox = draw.textbbox((0, 0), "⚡", font=font)
-        x = (64 - (bbox[2] - bbox[0])) // 2 - bbox[0]
-        y = (64 - (bbox[3] - bbox[1])) // 2 - bbox[1]
-        draw.text((x, y), "⚡", fill=hex_to_rgba(theme["fg"]), font=font)
-
-    def open_notes():
-        windows_runtime.open_target_in_shell(str(config.output_file))
-
-    def quit_app(icon):
-        icon.stop()
-        app_queue.put("QUIT")
-
-    def browse_notes():
-        app_queue.put("BROWSE")
-
-    def open_settings():
-        app_queue.put("SETTINGS")
-
-    assert config.output_file is not None, "output_file should be set by __post_init__"
-    menu = pystray.Menu(
-        pystray.MenuItem("CogStash ⚡", None, enabled=False),
-        pystray.Menu.SEPARATOR,
-        pystray.MenuItem(f"Open {config.output_file.name}", lambda: open_notes()),
-        pystray.MenuItem("Browse Notes", lambda: browse_notes()),
-        pystray.MenuItem("Settings", lambda: open_settings()),
-        pystray.Menu.SEPARATOR,
-        pystray.MenuItem("Quit", quit_app),
-    )
-
-    icon = pystray.Icon("cogstash", img, "CogStash", menu)
-    thread = threading.Thread(target=icon.run, daemon=True)
-    thread.start()
-
-
 class CogStash:
     def __init__(self, root: tk.Tk, config: CogStashConfig, config_path: Path | None = None):
         self.root = root
         self.config = config
         self.config_path = config_path or get_default_config_path()
         self.hotkey_warning: str | None = None
-        self.queue: queue.Queue[str] = queue.Queue()
+        self.queue: queue.Queue[app_runtime.AppCommand] = queue.Queue()
         self.is_visible = False
         self.theme = THEMES[config.theme]
         self.win_size = WINDOW_SIZES[config.window_size]
@@ -390,21 +322,15 @@ class CogStash:
 
     def poll_queue(self):
         """Check the queue for messages from the pynput/tray threads."""
-        try:
-            while True:
-                msg = self.queue.get_nowait()
-                if msg == "SHOW":
-                    self.show_window()
-                elif msg == "BROWSE":
-                    self._open_browse()
-                elif msg == "SETTINGS":
-                    self._open_settings()
-                elif msg == "QUIT":
-                    self.root.quit()
-                    return
-        except queue.Empty:
-            pass
-        self.root.after(100, self.poll_queue)
+        should_continue = app_runtime.drain_app_queue(
+            self.queue,
+            on_show=self.show_window,
+            on_browse=self._open_browse,
+            on_settings=self._open_settings,
+            on_quit=self.root.quit,
+        )
+        if should_continue:
+            self.root.after(100, self.poll_queue)
 
     def _open_browse(self):
         """Open the Browse Notes window."""
@@ -559,14 +485,10 @@ def main():
     app = CogStash(root, config)
     app.config_path = config_path
 
-    create_tray_icon(app.queue, config)
-
-    def on_hotkey():
-        app.queue.put("SHOW")
+    runtime_handles = app_runtime.start_runtime(app.queue, config, themes=THEMES)
 
     try:
-        listener = keyboard.GlobalHotKeys({config.hotkey: on_hotkey})
-        listener.start()
+        runtime_handles.hotkey_listener = app_runtime.start_hotkey_listener(app.queue, config.hotkey)
     except Exception:
         app.hotkey_warning = _build_hotkey_failure_warning(config)
         logger.error("Failed to register global hotkey %s", config.hotkey, exc_info=True)
@@ -575,15 +497,13 @@ def main():
             messagebox.showwarning("CogStash Hotkey Warning", app.hotkey_warning)
         except tk.TclError:
             pass
-        listener = None
 
     try:
         root.mainloop()
     except KeyboardInterrupt:
         safe_print("\nCogStash stopped.")
     finally:
-        if listener is not None:
-            listener.stop()
+        app_runtime.shutdown_runtime(runtime_handles)
         instance_guard.close()
 
 

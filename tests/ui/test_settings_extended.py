@@ -16,10 +16,11 @@ def test_settings_queue_message(tk_root):
     """SETTINGS message in queue triggers _open_settings."""
     from cogstash.core import CogStashConfig
     from cogstash.ui.app import CogStash
+    from cogstash.ui.app_runtime import AppCommand
 
     config = CogStashConfig()
     app = CogStash(tk_root, config)
-    app.queue.put("SETTINGS")
+    app.queue.put(AppCommand.SETTINGS)
     opened = []
     app._open_settings = lambda: opened.append(True)
     app.poll_queue()
