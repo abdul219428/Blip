@@ -443,6 +443,7 @@ def _bootstrap_app_config() -> tuple[Path, CogStashConfig]:
     """Load config and reconfigure logging for the current session."""
     config_path = get_default_config_path()
     config = load_config(config_path)
+    assert config.log_file is not None, "log_file should be set by __post_init__"
     _reconfigure_logger(config.log_file)
     return config_path, config
 

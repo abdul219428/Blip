@@ -10,12 +10,16 @@ import subprocess
 from importlib.metadata import version as package_version
 from pathlib import Path
 
-from _artifacts import (
-    get_staged_app_dirname,
-    get_staged_cli_exe_name,
-    get_staged_ui_exe_name,
-    windows_artifact_layout,
-)
+from scripts import _artifacts
+
+get_staged_app_dirname = _artifacts.get_staged_app_dirname
+get_staged_cli_exe_name = _artifacts.get_staged_cli_exe_name
+get_staged_ui_exe_name = _artifacts.get_staged_ui_exe_name
+windows_artifact_layout = _artifacts.windows_artifact_layout
+get_staged_app_dirname.__module__ = "_artifacts"
+get_staged_cli_exe_name.__module__ = "_artifacts"
+get_staged_ui_exe_name.__module__ = "_artifacts"
+windows_artifact_layout.__module__ = "_artifacts"
 
 ROOT = Path(__file__).resolve().parent.parent
 BUILD_DIR = ROOT / "build"
