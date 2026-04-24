@@ -10,7 +10,14 @@ import subprocess
 import sys
 from pathlib import Path
 
-from _artifacts import get_executable_name
+try:
+    from scripts import _artifacts
+except ModuleNotFoundError:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import _artifacts  # type: ignore[no-redef]
+
+get_executable_name = _artifacts.get_executable_name
+get_executable_name.__module__ = "_artifacts"
 
 ROOT = Path(__file__).resolve().parent.parent
 ICON_SRC = ROOT / "assets" / "cogstash_icon.png"

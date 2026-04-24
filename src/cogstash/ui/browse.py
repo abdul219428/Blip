@@ -15,6 +15,7 @@ from cogstash.core import (
     DEFAULT_SMART_TAGS,
     DEFAULT_TAG_COLORS,
     CogStashConfig,
+    MutationStatus,
     Note,
     delete_note,
     edit_note,
@@ -464,10 +465,17 @@ class BrowseWindow:
     def _on_mark_done(self, note: Note):
         """Mark a todo note as done and refresh the display."""
         assert self.config.output_file is not None, "output_file should be set by __post_init__"
-        if mark_done(self.config.output_file, note):
+        result = mark_done(self.config.output_file, note)
+        if result is MutationStatus.SUCCESS:
             self._replace_note(note, self._build_updated_note(note, note.text.replace("☐", "☑", 1), is_done=True))
             return
-        self._handle_stale_action()
+        if result is MutationStatus.ALREADY_DONE:
+            self._show_notice("Note already done")
+            return
+        if result is MutationStatus.STALE_NOTE:
+            self._handle_stale_action()
+            return
+        self._show_notice("Could not update note")
 
     def _show_context_menu(self, event, note: Note):
         """Show right-click context menu for a note card."""
@@ -552,12 +560,18 @@ class BrowseWindow:
             if not new_text:
                 messagebox.showerror("Error", "Note text cannot be empty.", parent=dialog)
                 return
-            if edit_note(self.config.output_file, note, new_text):
+            result = edit_note(self.config.output_file, note, new_text)
+            if result is MutationStatus.SUCCESS:
                 self._replace_note(note, self._build_updated_note(note, new_text))
                 close_dialog()
-            else:
+            elif result is MutationStatus.STALE_NOTE:
                 close_dialog()
                 self._handle_stale_action()
+            elif result is MutationStatus.INVALID_INPUT:
+                messagebox.showerror("Error", "Note text cannot be empty.", parent=dialog)
+            else:
+                close_dialog()
+                messagebox.showerror("Error", "Could not update note.", parent=self.window)
 
         tk.Button(
             btn_frame, text="Cancel", command=close_dialog,
@@ -582,13 +596,17 @@ class BrowseWindow:
             parent=self.window,
         ):
             assert self.config.output_file is not None, "output_file should be set by __post_init__"
-            if delete_note(self.config.output_file, note):
+            result = delete_note(self.config.output_file, note)
+            if result is MutationStatus.SUCCESS:
                 self._last_deleted_note = (note, self._serialize_note_lines(note))
                 self._all_notes = [existing for existing in self._all_notes if existing is not note]
                 self._apply_filters()
                 self._show_notice("Note deleted", action_label="Undo", action=self._undo_delete)
                 return
-            self._handle_stale_action()
+            if result is MutationStatus.STALE_NOTE:
+                self._handle_stale_action()
+                return
+            self._show_notice("Could not delete note")
 
     def _build_delete_preview(self, note: Note) -> str:
         """Return a readable delete preview for confirmation dialogs."""

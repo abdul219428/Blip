@@ -5,6 +5,7 @@ import os
 import re
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
+from enum import Enum
 from pathlib import Path
 
 from cogstash.core.config import CogStashConfig
@@ -27,6 +28,14 @@ DEFAULT_TAG_COLORS = {
 }
 
 logger = logging.getLogger("cogstash")
+
+
+class MutationStatus(Enum):
+    SUCCESS = "success"
+    STALE_NOTE = "stale_note"
+    INVALID_INPUT = "invalid_input"
+    ALREADY_DONE = "already_done"
+    IO_ERROR = "io_error"
 
 
 @dataclass
@@ -111,6 +120,19 @@ def merge_tags(config: CogStashConfig) -> tuple[dict[str, str], dict[str, str]]:
     return smart_tags, tag_colors
 
 
+def count_tags(notes: list[Note]) -> dict[str, int]:
+    """Count note tags in deterministic order: descending count, then tag name."""
+    from collections import Counter
+
+    tag_counter: Counter[str] = Counter()
+    for note in notes:
+        for tag in note.tags:
+            tag_counter[tag] += 1
+
+    sorted_items = sorted(tag_counter.items(), key=lambda item: (-item[1], item[0]))
+    return dict(sorted_items)
+
+
 def parse_smart_tags(text: str, smart_tags: dict[str, str] | None = None) -> str:
     """Prepend smart-tag emojis to text. Tags stay inline for searchability."""
     tags_dict = smart_tags if smart_tags is not None else DEFAULT_SMART_TAGS
@@ -171,20 +193,20 @@ def _line_matches_note(lines: list[str], note: Note) -> bool:
     return lines[note.line_number].startswith(f"- [{timestamp}] ")
 
 
-def mark_done(path: Path, note: Note) -> bool:
-    """Rewrite note's line in the file: ☐ → ☑. Returns True on success."""
+def mark_done(path: Path, note: Note) -> MutationStatus:
+    """Rewrite note's line in the file: ☐ → ☑."""
     try:
         lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
         if not _line_matches_note(lines, note):
-            return False
+            return MutationStatus.STALE_NOTE
         new_line = lines[note.line_number].replace("☐", "☑", 1)
         if new_line == lines[note.line_number]:
-            return False
+            return MutationStatus.ALREADY_DONE
         lines[note.line_number] = new_line
         _atomic_write(path, "".join(lines))
-        return True
+        return MutationStatus.SUCCESS
     except OSError:
-        return False
+        return MutationStatus.IO_ERROR
 
 
 def _note_line_span(lines: list[str], line_number: int) -> tuple[int, int]:
@@ -195,15 +217,15 @@ def _note_line_span(lines: list[str], line_number: int) -> tuple[int, int]:
     return (line_number, end)
 
 
-def edit_note(path: Path, note: Note, new_text: str) -> bool:
-    """Replace a note's text, preserving its timestamp. Returns True on success."""
+def edit_note(path: Path, note: Note, new_text: str) -> MutationStatus:
+    """Replace a note's text, preserving its timestamp."""
     new_text = new_text.strip()
     if not new_text:
-        return False
+        return MutationStatus.INVALID_INPUT
     try:
         lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
         if not _line_matches_note(lines, note):
-            return False
+            return MutationStatus.STALE_NOTE
         start, end = _note_line_span(lines, note.line_number)
         timestamp = note.timestamp.strftime("%Y-%m-%d %H:%M")
         text_lines = new_text.split("\n")
@@ -211,23 +233,23 @@ def edit_note(path: Path, note: Note, new_text: str) -> bool:
         replacement.extend(f"  {line}\n" for line in text_lines[1:])
         lines[start:end] = replacement
         _atomic_write(path, "".join(lines))
-        return True
+        return MutationStatus.SUCCESS
     except OSError:
-        return False
+        return MutationStatus.IO_ERROR
 
 
-def delete_note(path: Path, note: Note) -> bool:
-    """Remove a note and its continuation lines from the file. Returns True on success."""
+def delete_note(path: Path, note: Note) -> MutationStatus:
+    """Remove a note and its continuation lines from the file."""
     try:
         lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
         if not _line_matches_note(lines, note):
-            return False
+            return MutationStatus.STALE_NOTE
         start, end = _note_line_span(lines, note.line_number)
         del lines[start:end]
         _atomic_write(path, "".join(lines))
-        return True
+        return MutationStatus.SUCCESS
     except OSError:
-        return False
+        return MutationStatus.IO_ERROR
 
 
 def compute_stats(notes: list[Note]) -> dict:
@@ -260,10 +282,7 @@ def compute_stats(notes: list[Note]) -> dict:
     first_date = timestamps[0]
     last_date = timestamps[-1]
 
-    tag_counter: Counter[str] = Counter()
-    for note in notes:
-        for tag in note.tags:
-            tag_counter[tag] += 1
+    tag_counts = count_tags(notes)
 
     lengths = [len(note.text) for note in notes]
     today = date.today()
@@ -302,7 +321,7 @@ def compute_stats(notes: list[Note]) -> dict:
         "pending": pending,
         "first_date": first_date,
         "last_date": last_date,
-        "tag_counts": dict(tag_counter.most_common()),
+        "tag_counts": tag_counts,
         "avg_length": sum(lengths) // total,
         "longest": max(lengths),
         "notes_this_week": notes_this_week,
@@ -317,8 +336,10 @@ def compute_stats(notes: list[Note]) -> dict:
 __all__ = [
     "DEFAULT_SMART_TAGS",
     "DEFAULT_TAG_COLORS",
+    "MutationStatus",
     "Note",
     "append_note_to_file",
+    "count_tags",
     "compute_stats",
     "delete_note",
     "edit_note",

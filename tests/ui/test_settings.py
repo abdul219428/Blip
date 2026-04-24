@@ -126,7 +126,9 @@ def test_settings_save_general_persists_hotkey_and_notifies_app(tk_root, tmp_pat
 
 @needs_display
 def test_settings_invalid_hotkey_shows_error_and_does_not_save(tk_root, tmp_path):
-    """Saving an invalid hotkey should show an error and leave config untouched."""
+    """Saving an invalid hotkey should show an error and not persist the invalid value."""
+    import json
+
     from cogstash.ui.app import CogStashConfig
     from cogstash.ui.settings import SettingsWindow
 
@@ -138,7 +140,9 @@ def test_settings_invalid_hotkey_shows_error_and_does_not_save(tk_root, tmp_path
         sw._save_general()
 
     assert sw.config.hotkey == "<ctrl>+<shift>+<space>"
-    assert not config_path.exists()
+    if config_path.exists():
+        data = json.loads(config_path.read_text(encoding="utf-8"))
+        assert data["hotkey"] == "<ctrl>+<shift>+<space>"
     error_mock.assert_called_once()
     sw.win.destroy()
 

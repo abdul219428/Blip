@@ -276,6 +276,32 @@ def test_cmd_tags_counts(tmp_path, capsys):
     assert "1 note" in lines[0]
 
 
+def test_cmd_tags_orders_ties_by_tag_name(tmp_path, capsys):
+    """tags output should reuse alphabetical ordering for count ties."""
+    from types import SimpleNamespace
+
+    from cogstash.cli import cmd_tags
+    from cogstash.core import CogStashConfig
+
+    notes_file = tmp_path / "cogstash.md"
+    notes_file.write_text(
+        "- [2026-03-26 09:00] first #beta #alpha\n"
+        "- [2026-03-26 10:00] second #beta #gamma\n"
+        "- [2026-03-26 11:00] third #alpha\n",
+        encoding="utf-8",
+    )
+
+    cmd_tags(SimpleNamespace(), CogStashConfig(output_file=notes_file))
+    lines = [line for line in capsys.readouterr().out.strip().split("\n") if line.strip()]
+
+    assert len(lines) == 3
+    assert "#alpha" in lines[0]
+    assert "#beta" in lines[1]
+    assert "#gamma" in lines[2]
+    assert "2 notes" in lines[0]
+    assert "2 notes" in lines[1]
+
+
 def test_cmd_tags_empty(tmp_path, capsys):
     """Empty file shows 'No tags found.' message."""
     f = tmp_path / "cogstash.md"
@@ -506,6 +532,42 @@ def test_cmd_edit_search_multiple_matches(tmp_path, capsys):
     assert "Multiple matches" in err
 
 
+def test_cmd_edit_stale_note_shows_specific_error(tmp_path, capsys, monkeypatch):
+    from types import SimpleNamespace
+
+    import pytest
+
+    from cogstash.cli import cmd_edit
+    from cogstash.core import CogStashConfig, MutationStatus
+
+    f = _make_notes_file(tmp_path)
+    monkeypatch.setattr("cogstash.cli.main.edit_note", lambda *_args, **_kwargs: MutationStatus.STALE_NOTE)
+
+    with pytest.raises(SystemExit) as exc:
+        cmd_edit(SimpleNamespace(args=["3", "updated", "note"], search=None), CogStashConfig(output_file=f))
+
+    assert exc.value.code == 1
+    assert "changed on disk" in capsys.readouterr().err
+
+
+def test_cmd_edit_io_error_shows_failure_message(tmp_path, capsys, monkeypatch):
+    from types import SimpleNamespace
+
+    import pytest
+
+    from cogstash.cli import cmd_edit
+    from cogstash.core import CogStashConfig, MutationStatus
+
+    f = _make_notes_file(tmp_path)
+    monkeypatch.setattr("cogstash.cli.main.edit_note", lambda *_args, **_kwargs: MutationStatus.IO_ERROR)
+
+    with pytest.raises(SystemExit) as exc:
+        cmd_edit(SimpleNamespace(args=["3", "updated", "note"], search=None), CogStashConfig(output_file=f))
+
+    assert exc.value.code == 1
+    assert "failed to update note" in capsys.readouterr().err
+
+
 def test_cmd_delete_with_yes(tmp_path, capsys):
     """Delete with --yes skips confirmation and removes note."""
     f = _make_notes_file(tmp_path)
@@ -577,6 +639,42 @@ def test_cmd_delete_not_found(tmp_path):
         cmd_delete(SimpleNamespace(number=99, yes=True, search=None), CogStashConfig(output_file=f))
 
 
+def test_cmd_delete_stale_note_shows_specific_error(tmp_path, capsys, monkeypatch):
+    from types import SimpleNamespace
+
+    import pytest
+
+    from cogstash.cli import cmd_delete
+    from cogstash.core import CogStashConfig, MutationStatus
+
+    f = _make_notes_file(tmp_path)
+    monkeypatch.setattr("cogstash.cli.main.delete_note", lambda *_args, **_kwargs: MutationStatus.STALE_NOTE)
+
+    with pytest.raises(SystemExit) as exc:
+        cmd_delete(SimpleNamespace(number=3, yes=True, search=None), CogStashConfig(output_file=f))
+
+    assert exc.value.code == 1
+    assert "changed on disk" in capsys.readouterr().err
+
+
+def test_cmd_delete_io_error_shows_failure_message(tmp_path, capsys, monkeypatch):
+    from types import SimpleNamespace
+
+    import pytest
+
+    from cogstash.cli import cmd_delete
+    from cogstash.core import CogStashConfig, MutationStatus
+
+    f = _make_notes_file(tmp_path)
+    monkeypatch.setattr("cogstash.cli.main.delete_note", lambda *_args, **_kwargs: MutationStatus.IO_ERROR)
+
+    with pytest.raises(SystemExit) as exc:
+        cmd_delete(SimpleNamespace(number=3, yes=True, search=None), CogStashConfig(output_file=f))
+
+    assert exc.value.code == 1
+    assert "failed to delete note" in capsys.readouterr().err
+
+
 def test_cmd_export_json(tmp_path, monkeypatch, capsys):
     """Export to JSON creates file with all notes."""
     f = _make_notes_file(tmp_path)
@@ -615,6 +713,30 @@ def test_cmd_export_json_content(tmp_path, monkeypatch, capsys):
     assert "text" in data[0]
     assert "timestamp" in data[0]
     assert "tags" in data[0]
+
+
+def test_cmd_export_json_uses_shared_pretty_unicode_format(tmp_path, capsys):
+    """JSON export preserves Unicode and pretty formatting."""
+    import json
+    from types import SimpleNamespace
+
+    from cogstash.cli import cmd_export
+    from cogstash.core import CogStashConfig
+
+    notes_file = tmp_path / "cogstash.md"
+    notes_file.write_text("- [2026-03-28 09:00] smile 😀 note #todo\n", encoding="utf-8")
+    out_path = tmp_path / "unicode-export.json"
+
+    cmd_export(
+        SimpleNamespace(format="json", output=str(out_path), tag=None),
+        CogStashConfig(output_file=notes_file),
+    )
+
+    written = out_path.read_text(encoding="utf-8")
+    assert '"text": "smile 😀 note #todo"' in written
+    assert "\\ud83d" not in written
+    assert written.startswith("[\n  {")
+    assert json.loads(written)[0]["tags"] == ["todo"]
 
 
 def test_cmd_export_csv(tmp_path, monkeypatch, capsys):
@@ -678,6 +800,81 @@ def test_cmd_export_custom_output(tmp_path, capsys):
     assert out_path.exists()
     data = json.loads(out_path.read_text(encoding="utf-8"))
     assert len(data) == 5
+
+
+def test_cmd_export_json_write_failure_exits_with_clear_error(tmp_path, monkeypatch, capsys):
+    from types import SimpleNamespace
+
+    import pytest
+
+    from cogstash.cli import cmd_export
+    from cogstash.core import CogStashConfig
+
+    f = _make_notes_file(tmp_path)
+    out_path = tmp_path / "broken.json"
+
+    def fail_write_json(path, data):
+        raise OSError("disk full")
+
+    monkeypatch.setattr("cogstash.cli.main.write_json_file", fail_write_json)
+
+    with pytest.raises(SystemExit) as exc:
+        cmd_export(SimpleNamespace(format="json", output=str(out_path)), CogStashConfig(output_file=f))
+
+    assert exc.value.code == 1
+    captured = capsys.readouterr()
+    assert f"Error: failed to export notes to {out_path}." in captured.err
+    assert "Exported" not in captured.out
+
+
+def test_cmd_export_csv_write_failure_exits_with_clear_error(tmp_path, monkeypatch, capsys):
+    from types import SimpleNamespace
+
+    import pytest
+
+    from cogstash.cli import cmd_export
+    from cogstash.core import CogStashConfig
+
+    f = _make_notes_file(tmp_path)
+    out_path = tmp_path / "broken.csv"
+
+    def fail_open(*args, **kwargs):
+        raise OSError("permission denied")
+
+    monkeypatch.setattr("cogstash.cli.main.open", fail_open, raising=False)
+
+    with pytest.raises(SystemExit) as exc:
+        cmd_export(SimpleNamespace(format="csv", output=str(out_path)), CogStashConfig(output_file=f))
+
+    assert exc.value.code == 1
+    captured = capsys.readouterr()
+    assert f"Error: failed to export notes to {out_path}." in captured.err
+    assert "Exported" not in captured.out
+
+
+def test_cmd_export_markdown_write_failure_exits_with_clear_error(tmp_path, monkeypatch, capsys):
+    from types import SimpleNamespace
+
+    import pytest
+
+    from cogstash.cli import cmd_export
+    from cogstash.core import CogStashConfig
+
+    f = _make_notes_file(tmp_path)
+    out_path = tmp_path / "broken.md"
+
+    def fail_write_text(self, data, encoding=None):
+        raise OSError("read only")
+
+    monkeypatch.setattr("cogstash.cli.main.Path.write_text", fail_write_text)
+
+    with pytest.raises(SystemExit) as exc:
+        cmd_export(SimpleNamespace(format="md", output=str(out_path)), CogStashConfig(output_file=f))
+
+    assert exc.value.code == 1
+    captured = capsys.readouterr()
+    assert f"Error: failed to export notes to {out_path}." in captured.err
+    assert "Exported" not in captured.out
 
 
 def test_cmd_stats_output(tmp_path, capsys):
@@ -824,6 +1021,25 @@ def test_cmd_config_get(tmp_path, capsys):
     assert "dracula" in output
 
 
+def test_cmd_config_get_tags_pretty_prints_shared_json(tmp_path, capsys):
+    """Dictionary-valued config output uses the shared pretty JSON format."""
+    from types import SimpleNamespace
+
+    from cogstash.cli import cmd_config
+    from cogstash.core import CogStashConfig
+
+    cmd_config(
+        SimpleNamespace(action="get", key="tags", value=None),
+        CogStashConfig(tags={"focus": {"emoji": "cafe ☕", "color": "#ABCDEF"}}),
+        config_path=tmp_path / ".cogstash.json",
+    )
+
+    output = capsys.readouterr().out
+    assert '"emoji": "cafe ☕"' in output
+    assert output.startswith("{\n  ")
+    assert "\\u2615" not in output
+
+
 def test_cmd_config_set(tmp_path, capsys):
     """cogstash config set updates JSON file."""
     import json
@@ -841,6 +1057,8 @@ def test_cmd_config_set(tmp_path, capsys):
     )
     data = json.loads(config_path.read_text(encoding="utf-8"))
     assert data["theme"] == "dracula"
+    written = config_path.read_text(encoding="utf-8")
+    assert written.startswith("{\n  ")
     output = capsys.readouterr().out
     assert "dracula" in output
 

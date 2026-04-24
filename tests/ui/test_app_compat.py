@@ -310,7 +310,7 @@ def test_app_main_startup_output_is_cp1252_safe(monkeypatch, tmp_path):
             self.stopped = True
 
     class FakeApp:
-        def __init__(self, _root, _config):
+        def __init__(self, _root, _config, _config_path=None):
             self.queue = object()
 
     class FakeGuard:

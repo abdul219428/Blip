@@ -167,7 +167,7 @@ def test_append_note_to_file_empty(tmp_path):
 
 
 def test_mark_done_and_stale_line_rejected(tmp_path):
-    from cogstash.core import mark_done, parse_notes
+    from cogstash.core import MutationStatus, mark_done, parse_notes
 
     notes_file = tmp_path / "cogstash.md"
     notes_file.write_text(
@@ -178,7 +178,7 @@ def test_mark_done_and_stale_line_rejected(tmp_path):
     )
 
     notes = parse_notes(notes_file)
-    assert mark_done(notes_file, notes[1]) is True
+    assert mark_done(notes_file, notes[1]) is MutationStatus.SUCCESS
     assert "☑ target #todo" in notes_file.read_text(encoding="utf-8")
 
     stale_note = parse_notes(notes_file)[2]
@@ -187,19 +187,34 @@ def test_mark_done_and_stale_line_rejected(tmp_path):
         "- [2026-03-26 16:00] ☐ last #todo\n",
         encoding="utf-8",
     )
-    assert mark_done(notes_file, stale_note) is False
+    assert mark_done(notes_file, stale_note) is MutationStatus.STALE_NOTE
 
 
 def test_mark_done_already_done(tmp_path):
-    from cogstash.core import mark_done, parse_notes
+    from cogstash.core import MutationStatus, mark_done, parse_notes
 
     notes_file = tmp_path / "cogstash.md"
     notes_file.write_text("- [2026-03-26 14:30] ☑ already done #todo\n", encoding="utf-8")
 
     note = parse_notes(notes_file)[0]
 
-    assert mark_done(notes_file, note) is False
+    assert mark_done(notes_file, note) is MutationStatus.ALREADY_DONE
     assert notes_file.read_text(encoding="utf-8") == "- [2026-03-26 14:30] ☑ already done #todo\n"
+
+
+def test_mark_done_returns_io_error_when_write_fails(tmp_path, monkeypatch):
+    from cogstash.core import MutationStatus, mark_done, parse_notes
+    from cogstash.core import notes as notes_mod
+
+    notes_file = tmp_path / "cogstash.md"
+    original = "- [2026-03-26 14:30] ☐ target #todo\n"
+    notes_file.write_text(original, encoding="utf-8")
+
+    note = parse_notes(notes_file)[0]
+    monkeypatch.setattr(notes_mod, "_atomic_write", lambda _path, _content: (_ for _ in ()).throw(OSError("disk full")))
+
+    assert mark_done(notes_file, note) is MutationStatus.IO_ERROR
+    assert notes_file.read_text(encoding="utf-8") == original
 
 
 def test_note_line_span_single_and_multiline(tmp_path):
@@ -223,7 +238,7 @@ def test_note_line_span_single_and_multiline(tmp_path):
 
 
 def test_edit_note(tmp_path):
-    from cogstash.core import edit_note, parse_notes
+    from cogstash.core import MutationStatus, edit_note, parse_notes
 
     notes_file = tmp_path / "cogstash.md"
     notes_file.write_text(
@@ -235,8 +250,8 @@ def test_edit_note(tmp_path):
 
     notes = parse_notes(notes_file)
 
-    assert edit_note(notes_file, notes[0], "new first\nnew second\nnew third") is True
-    assert edit_note(notes_file, notes[1], "   ") is False
+    assert edit_note(notes_file, notes[0], "new first\nnew second\nnew third") is MutationStatus.SUCCESS
+    assert edit_note(notes_file, notes[1], "   ") is MutationStatus.INVALID_INPUT
 
     content = notes_file.read_text(encoding="utf-8")
     assert "- [2026-03-26 14:30] new first\n" in content
@@ -246,7 +261,7 @@ def test_edit_note(tmp_path):
 
 
 def test_edit_note_single_line(tmp_path):
-    from cogstash.core import edit_note, parse_notes
+    from cogstash.core import MutationStatus, edit_note, parse_notes
 
     notes_file = tmp_path / "cogstash.md"
     notes_file.write_text(
@@ -257,7 +272,7 @@ def test_edit_note_single_line(tmp_path):
 
     note = parse_notes(notes_file)[0]
 
-    assert edit_note(notes_file, note, "buy oat milk #todo") is True
+    assert edit_note(notes_file, note, "buy oat milk #todo") is MutationStatus.SUCCESS
 
     content = notes_file.read_text(encoding="utf-8")
     assert "- [2026-03-26 14:30] buy oat milk #todo\n" in content
@@ -266,7 +281,7 @@ def test_edit_note_single_line(tmp_path):
 
 
 def test_edit_and_delete_stale_line_rejected(tmp_path):
-    from cogstash.core import delete_note, edit_note, parse_notes
+    from cogstash.core import MutationStatus, delete_note, edit_note, parse_notes
 
     notes_file = tmp_path / "cogstash.md"
     notes_file.write_text(
@@ -280,13 +295,13 @@ def test_edit_and_delete_stale_line_rejected(tmp_path):
     current = "- [2026-03-26 15:00] target #todo\n- [2026-03-26 16:00] last\n"
     notes_file.write_text(current, encoding="utf-8")
 
-    assert edit_note(notes_file, note, "updated #todo") is False
-    assert delete_note(notes_file, note) is False
+    assert edit_note(notes_file, note, "updated #todo") is MutationStatus.STALE_NOTE
+    assert delete_note(notes_file, note) is MutationStatus.STALE_NOTE
     assert notes_file.read_text(encoding="utf-8") == current
 
 
 def test_delete_note(tmp_path):
-    from cogstash.core import delete_note, parse_notes
+    from cogstash.core import MutationStatus, delete_note, parse_notes
 
     notes_file = tmp_path / "cogstash.md"
     notes_file.write_text(
@@ -298,12 +313,42 @@ def test_delete_note(tmp_path):
 
     note = parse_notes(notes_file)[0]
 
-    assert delete_note(notes_file, note) is True
+    assert delete_note(notes_file, note) is MutationStatus.SUCCESS
 
     content = notes_file.read_text(encoding="utf-8")
     assert "delete me" not in content
     assert "continuation" not in content
     assert "- [2026-03-26 15:00] keep me\n" in content
+
+
+def test_edit_note_returns_io_error_when_write_fails(tmp_path, monkeypatch):
+    from cogstash.core import MutationStatus, edit_note, parse_notes
+    from cogstash.core import notes as notes_mod
+
+    notes_file = tmp_path / "cogstash.md"
+    original = "- [2026-03-26 14:30] old text\n"
+    notes_file.write_text(original, encoding="utf-8")
+
+    note = parse_notes(notes_file)[0]
+    monkeypatch.setattr(notes_mod, "_atomic_write", lambda _path, _content: (_ for _ in ()).throw(OSError("disk full")))
+
+    assert edit_note(notes_file, note, "new text") is MutationStatus.IO_ERROR
+    assert notes_file.read_text(encoding="utf-8") == original
+
+
+def test_delete_note_returns_io_error_when_write_fails(tmp_path, monkeypatch):
+    from cogstash.core import MutationStatus, delete_note, parse_notes
+    from cogstash.core import notes as notes_mod
+
+    notes_file = tmp_path / "cogstash.md"
+    original = "- [2026-03-26 14:30] delete me\n"
+    notes_file.write_text(original, encoding="utf-8")
+
+    note = parse_notes(notes_file)[0]
+    monkeypatch.setattr(notes_mod, "_atomic_write", lambda _path, _content: (_ for _ in ()).throw(OSError("disk full")))
+
+    assert delete_note(notes_file, note) is MutationStatus.IO_ERROR
+    assert notes_file.read_text(encoding="utf-8") == original
 
 
 def test_atomic_write_cleans_up_temp_file_on_replace_failure(tmp_path, monkeypatch):
@@ -346,6 +391,47 @@ def test_compute_stats_basic_and_empty(tmp_path):
     assert stats["longest"] >= stats["avg_length"]
     assert empty_stats["total"] == 0
     assert empty_stats["tag_counts"] == {}
+
+
+def test_count_tags_empty_input_returns_empty_dict():
+    from cogstash.core.notes import count_tags
+
+    assert count_tags([]) == {}
+
+
+def test_count_tags_aggregates_counts_and_orders_ties_by_tag_name(tmp_path):
+    from cogstash.core import parse_notes
+    from cogstash.core.notes import count_tags
+
+    notes_file = tmp_path / "cogstash.md"
+    notes_file.write_text(
+        "- [2026-03-26 09:00] first #beta #alpha\n"
+        "- [2026-03-26 10:00] second #beta #gamma\n"
+        "- [2026-03-26 11:00] third #alpha\n",
+        encoding="utf-8",
+    )
+
+    tag_counts = count_tags(parse_notes(notes_file))
+
+    assert tag_counts == {"alpha": 2, "beta": 2, "gamma": 1}
+    assert list(tag_counts.items()) == [("alpha", 2), ("beta", 2), ("gamma", 1)]
+
+
+def test_compute_stats_reuses_shared_tag_count_ordering(tmp_path):
+    from cogstash.core import compute_stats, parse_notes
+
+    notes_file = tmp_path / "cogstash.md"
+    notes_file.write_text(
+        "- [2026-03-26 09:00] first #beta #alpha\n"
+        "- [2026-03-26 10:00] second #beta #gamma\n"
+        "- [2026-03-26 11:00] third #alpha\n",
+        encoding="utf-8",
+    )
+
+    stats = compute_stats(parse_notes(notes_file))
+
+    assert stats["tag_counts"] == {"alpha": 2, "beta": 2, "gamma": 1}
+    assert list(stats["tag_counts"].items()) == [("alpha", 2), ("beta", 2), ("gamma", 1)]
 
 
 def test_compute_stats_streaks(tmp_path):

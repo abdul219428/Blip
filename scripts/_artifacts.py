@@ -1,7 +1,5 @@
 """Shared artifact naming and path contract for CogStash packaging."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -46,9 +44,19 @@ def get_staged_app_dirname() -> str:
     return STAGED_APP_DIRNAME
 
 
+def get_windows_installer_app_dirname() -> str:
+    """Compatibility name for the installer staging directory contract."""
+    return get_staged_app_dirname()
+
+
 def get_staged_ui_exe_name() -> str:
     """Return the UI executable name inside the installer staging directory."""
     return STAGED_UI_EXE_NAME
+
+
+def get_windows_installer_exe_name() -> str:
+    """Compatibility name for the staged Windows UI executable."""
+    return get_staged_ui_exe_name()
 
 
 def get_staged_cli_exe_name() -> str:
@@ -56,14 +64,22 @@ def get_staged_cli_exe_name() -> str:
     return STAGED_CLI_EXE_NAME
 
 
-def get_release_archive_name(*, tag: str, platform_suffix: str) -> str:
+def get_windows_installer_cli_exe_name() -> str:
+    """Compatibility name for the staged Windows CLI executable."""
+    return get_staged_cli_exe_name()
+
+
+def get_release_archive_name(*, tag: str | None = None, ref_name: str | None = None, platform_suffix: str) -> str:
     """Return the release archive filename for a tag and platform."""
+    release_ref = tag if tag is not None else ref_name
+    if release_ref is None:
+        raise TypeError("get_release_archive_name() requires tag or ref_name")
     if platform_suffix == "windows":
-        return f"{APP_NAME}-{tag}-windows.zip"
+        return f"{APP_NAME}-{release_ref}-windows.zip"
     if platform_suffix == "macos":
-        return f"{APP_NAME}-{tag}-macos.zip"
+        return f"{APP_NAME}-{release_ref}-macos.zip"
     if platform_suffix == "linux":
-        return f"{APP_NAME}-{tag}-linux.tar.gz"
+        return f"{APP_NAME}-{release_ref}-linux.tar.gz"
     raise ValueError(f"Unknown platform suffix: {platform_suffix}")
 
 

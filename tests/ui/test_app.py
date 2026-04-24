@@ -41,7 +41,7 @@ def _run_main_startup(monkeypatch, tmp_path, listener_cls):
             return None
 
     class FakeApp:
-        def __init__(self, _root, _config):
+        def __init__(self, _root, _config, _config_path=None):
             created_apps.append(True)
             self.queue = object()
 
@@ -140,7 +140,7 @@ def test_app_main_startup_output_is_cp1252_safe(monkeypatch, tmp_path):
             self.stopped = True
 
     class FakeApp:
-        def __init__(self, _root, _config):
+        def __init__(self, _root, _config, _config_path=None):
             self.queue = object()
 
     class FakeGuard:
@@ -305,8 +305,8 @@ def test_app_open_settings_receives_runtime_hotkey_warning_after_startup_failure
     windows_mod.WINDOWS_MUTEX_NAME = "Local\\CogStash.Test"
     windows_mod.acquire_single_instance = lambda _name: FakeGuard()
 
-    def capture_app(root, app_config):
-        app = real_cogstash(root, app_config)
+    def capture_app(root, app_config, config_path=None):
+        app = real_cogstash(root, app_config, config_path)
         created_apps.append(app)
         return app
 
@@ -487,7 +487,7 @@ def test_app_main_installer_welcome_shown_for_installed_upgrade(monkeypatch, tmp
             return None
 
     class FakeApp:
-        def __init__(self, _root, _config):
+        def __init__(self, _root, _config, _config_path=None):
             self.queue = object()
 
     class FakeGuard:
@@ -563,7 +563,7 @@ def test_app_main_installer_welcome_shown_for_first_installed_launch(monkeypatch
             return None
 
     class FakeApp:
-        def __init__(self, _root, _config):
+        def __init__(self, _root, _config, _config_path=None):
             self.queue = object()
 
     class FakeGuard:
@@ -616,6 +616,48 @@ def test_app_main_installer_welcome_shown_for_first_installed_launch(monkeypatch
     assert saved_configs == [cogstash.__version__]
 
 
+def test_run_startup_dialog_flow_reloads_config_after_first_run_wizard(monkeypatch, tmp_path):
+    """First-run startup flow should wait for the wizard and then reload config from disk."""
+    import types
+
+    import cogstash.ui.app as app_mod
+
+    initial = app_mod.CogStashConfig(
+        output_file=tmp_path / "notes.md",
+        log_file=tmp_path / "cogstash.log",
+        last_seen_version="",
+    )
+    reloaded = app_mod.CogStashConfig(
+        output_file=tmp_path / "notes.md",
+        log_file=tmp_path / "cogstash.log",
+        last_seen_version="1.2.3",
+    )
+
+    class FakeRoot:
+        def __init__(self):
+            self.waited_on = None
+
+        def wait_window(self, win):
+            self.waited_on = win
+
+    created_wizards: list[tuple[object, object, object, object]] = []
+
+    class FakeWizardWindow:
+        def __init__(self, root, config, config_path):
+            self.win = object()
+            created_wizards.append((root, config, config_path, self.win))
+
+    monkeypatch.setattr(app_mod, "load_config", lambda _path: reloaded)
+    monkeypatch.setitem(sys.modules, "cogstash.ui.settings", types.SimpleNamespace(WizardWindow=FakeWizardWindow))
+
+    root = FakeRoot()
+    result = app_mod._run_startup_dialog_flow(root, initial, tmp_path / "config.json")
+    wizard_root, wizard_config, wizard_path, wizard_win = created_wizards[0]
+
+    assert result is reloaded
+    assert (wizard_root, wizard_config, wizard_path) == (root, initial, tmp_path / "config.json")
+    assert root.waited_on is wizard_win
+
 def test_app_main_delegates_dpi_setup_to_windows_runtime(monkeypatch, tmp_path):
     import types
 
@@ -630,7 +672,7 @@ def test_app_main_delegates_dpi_setup_to_windows_runtime(monkeypatch, tmp_path):
             return None
 
     class FakeApp:
-        def __init__(self, _root, _config):
+        def __init__(self, _root, _config, _config_path=None):
             self.queue = object()
 
     class FakeGuard:

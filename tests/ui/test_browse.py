@@ -195,13 +195,13 @@ def test_browse_stale_edit_reloads_and_shows_notice(tmp_path, tk_root):
     f.write_text("- [2026-03-26 14:30] original text\n", encoding="utf-8")
 
     from cogstash.ui.app import CogStashConfig
-    from cogstash.ui.browse import BrowseWindow
+    from cogstash.ui.browse import BrowseWindow, MutationStatus
 
     win = BrowseWindow(tk_root, CogStashConfig(output_file=f))
     note = win._all_notes[0]
 
     with (
-        patch("cogstash.ui.browse.edit_note", return_value=False),
+        patch("cogstash.ui.browse.edit_note", return_value=MutationStatus.STALE_NOTE),
         patch.object(win, "_load_notes") as reload_mock,
         patch.object(win, "_show_notice") as notice_mock,
         patch("tkinter.messagebox.showerror") as error_mock,

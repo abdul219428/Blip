@@ -42,6 +42,16 @@ def get_default_config_path() -> Path:
     return Path.home() / ".cogstash.json"
 
 
+def to_pretty_json(data: object) -> str:
+    """Serialize data as readable UTF-8-safe JSON."""
+    return json.dumps(data, indent=2, ensure_ascii=False)
+
+
+def write_json_file(path: Path, data: object) -> None:
+    """Write JSON data using the shared serialization contract."""
+    path.write_text(to_pretty_json(data), encoding="utf-8")
+
+
 def load_config(config_path: Path) -> CogStashConfig:
     """Load config from JSON file, merging with defaults."""
     defaults = {
@@ -59,7 +69,7 @@ def load_config(config_path: Path) -> CogStashConfig:
         logger.warning("No config file found — creating %s with defaults", config_path)
         try:
             config_path.parent.mkdir(parents=True, exist_ok=True)
-            config_path.write_text(json.dumps(defaults, indent=2), encoding="utf-8")
+            write_json_file(config_path, defaults)
         except OSError:
             logger.warning("Could not create config file %s", config_path, exc_info=True)
         return CogStashConfig()
@@ -126,7 +136,7 @@ def save_config(config: CogStashConfig, config_path: Path) -> None:
         data["tags"] = config.tags
     try:
         config_path.parent.mkdir(parents=True, exist_ok=True)
-        config_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        write_json_file(config_path, data)
     except OSError:
         logger.error("Failed to save config to %s", config_path, exc_info=True)
 
@@ -138,4 +148,6 @@ __all__ = [
     "get_default_config_path",
     "load_config",
     "save_config",
+    "to_pretty_json",
+    "write_json_file",
 ]

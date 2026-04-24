@@ -56,6 +56,23 @@ def _load_build_module():
     return module
 
 
+def _load_artifact_contract_module():
+    repo_root = Path(__file__).resolve().parents[1]
+    module_path = repo_root / "scripts" / "_artifacts.py"
+    assert module_path.is_file(), f"Shared artifact contract not found: {module_path}"
+    spec = importlib.util.spec_from_file_location("_artifacts", module_path)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _read_script_source(relative_path: str) -> str:
+    repo_root = Path(__file__).resolve().parents[1]
+    return (repo_root / relative_path).read_text(encoding="utf-8")
+
+
 def test_inno_setup_script_uses_per_user_defaults():
     """Installer script should target a per-user install with standard shortcuts."""
     repo_root = Path(__file__).resolve().parents[1]
@@ -148,6 +165,48 @@ def test_inno_setup_script_offers_optional_path_task_with_correct_description():
     assert 'Name: "addtopath"; Description: "Add CogStash CLI to PATH"' in content
     assert "ChangesEnvironment=yes" in content
     assert "ExpandConstant('{app}')" in content
+
+
+def test_shared_artifact_contract_defines_versioned_artifact_names():
+    """Shared contract should own the versioned UI/CLI artifact naming rules."""
+    contract = _load_artifact_contract_module()
+
+    assert contract.get_executable_name(target="ui", bundle_mode="onefile", version="1.2.3") == "CogStash-1.2.3"
+    assert contract.get_executable_name(target="ui", bundle_mode="onedir", version="1.2.3") == "CogStash-1.2.3-onedir"
+    assert contract.get_executable_name(target="cli", bundle_mode="onefile", version="1.2.3") == "CogStash-CLI-1.2.3"
+
+
+def test_shared_artifact_contract_defines_windows_layout_names():
+    """Shared contract should centralize the Windows bundle and staged payload layout."""
+    contract = _load_artifact_contract_module()
+
+    assert contract.get_onedir_dir_name("1.2.3") == "CogStash-1.2.3-onedir"
+    assert contract.get_onedir_exe_name("1.2.3") == "CogStash-1.2.3-onedir.exe"
+    assert contract.get_windows_installer_app_dirname() == "CogStash"
+    assert contract.get_windows_installer_exe_name() == "CogStash.exe"
+    assert contract.get_windows_installer_cli_exe_name() == "CogStash-CLI.exe"
+
+
+def test_shared_artifact_contract_defines_release_archive_names():
+    """Shared contract should own the platform-specific release archive filenames."""
+    contract = _load_artifact_contract_module()
+
+    assert contract.get_release_archive_name(ref_name="v1.2.3", platform_suffix="windows") == "CogStash-v1.2.3-windows.zip"
+    assert contract.get_release_archive_name(ref_name="v1.2.3", platform_suffix="macos") == "CogStash-v1.2.3-macos.zip"
+    assert contract.get_release_archive_name(ref_name="v1.2.3", platform_suffix="linux") == "CogStash-v1.2.3-linux.tar.gz"
+
+
+def test_build_scripts_import_shared_artifact_contract():
+    """Build scripts should import the shared artifact contract instead of duplicating names."""
+    build_source = _read_script_source("scripts/build.py")
+    build_installer_source = _read_script_source("scripts/build_installer.py")
+    import_pattern = re.compile(
+        r"^\s*(?:from\s+scripts\s+import\s+_artifacts|import\s+scripts\._artifacts\s+as\s+_artifacts)\s*$",
+        re.M,
+    )
+
+    assert import_pattern.search(build_source)
+    assert import_pattern.search(build_installer_source)
 
 
 def test_inno_setup_script_manages_installer_owned_path():

@@ -431,60 +431,70 @@ class CogStash:
         return append_note_to_file(text, self.config.output_file, smart_tags)
 
 
-def main():
-    from cogstash.core.output import safe_print
-    from cogstash.ui.windows import WINDOWS_MUTEX_NAME, acquire_single_instance
+def _reconfigure_logger(log_file: Path) -> None:
+    """Replace active log handlers so the UI app writes to the configured log file."""
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
+        handler.close()
+    logger.addHandler(_create_log_handler(log_file))
 
+
+def _bootstrap_app_config() -> tuple[Path, CogStashConfig]:
+    """Load config and reconfigure logging for the current session."""
     config_path = get_default_config_path()
     config = load_config(config_path)
+    assert config.log_file is not None, "log_file should be set by __post_init__"
+    _reconfigure_logger(config.log_file)
+    return config_path, config
 
-    # Reconfigure logger to use config's log_file
-    for h in logger.handlers[:]:
-        logger.removeHandler(h)
-        h.close()
-    logger.addHandler(_create_log_handler(config.log_file))
 
-    instance_guard = acquire_single_instance(WINDOWS_MUTEX_NAME)
-    if instance_guard is None:
-        logger.warning("CogStash is already running; refusing to launch a second GUI instance.")
-        try:
-            messagebox.showinfo("CogStash", "CogStash is already running in the system tray.")
-        except tk.TclError:
-            pass
-        return
+def _show_already_running_dialog() -> None:
+    """Tell the user another GUI instance is already active."""
+    try:
+        messagebox.showinfo("CogStash", "CogStash is already running in the system tray.")
+    except tk.TclError:
+        pass
 
-    configure_dpi()
 
-    root = tk.Tk()
-
-    # First-run wizard
+def _run_startup_dialog_flow(root: tk.Tk, config: CogStashConfig, config_path: Path) -> CogStashConfig:
+    """Run first-launch and version-based dialogs, returning the active config afterward."""
     if config.last_seen_version == "":
         from cogstash.ui.settings import WizardWindow
-        wiz = WizardWindow(root, config, config_path)
-        root.wait_window(wiz.win)
-        config = load_config(config_path)
-    else:
-        from cogstash import __version__
-        from cogstash.ui.install_state import should_show_installer_welcome
 
-        if should_show_installer_welcome(config, __version__):
-            from cogstash.ui.settings import InstallerWelcomeDialog
-            InstallerWelcomeDialog(root, config, config_path, __version__)
-            config.last_seen_version = __version__
-            config.last_seen_installer_version = __version__
-            save_config(config, config_path)
-        elif config.last_seen_version != __version__:
-            from cogstash.ui.settings import WhatsNewDialog
-            WhatsNewDialog(root, config, config_path, __version__)
-            config.last_seen_version = __version__
-            save_config(config, config_path)
+        wizard = WizardWindow(root, config, config_path)
+        root.wait_window(wizard.win)
+        return load_config(config_path)
 
+    from cogstash import __version__
+    from cogstash.ui.install_state import should_show_installer_welcome
+
+    if should_show_installer_welcome(config, __version__):
+        from cogstash.ui.settings import InstallerWelcomeDialog
+
+        InstallerWelcomeDialog(root, config, config_path, __version__)
+        config.last_seen_version = __version__
+        config.last_seen_installer_version = __version__
+        save_config(config, config_path)
+    elif config.last_seen_version != __version__:
+        from cogstash.ui.settings import WhatsNewDialog
+
+        WhatsNewDialog(root, config, config_path, __version__)
+        config.last_seen_version = __version__
+        save_config(config, config_path)
+    return config
+
+
+def _announce_startup(config: CogStashConfig, safe_print: Any) -> None:
+    """Print the standard startup status lines."""
     safe_print(f"CogStash is running. ({config.hotkey} to capture · Ctrl+C to quit)")
     safe_print(f"Notes → {config.output_file}")
 
-    app = CogStash(root, config)
-    app.config_path = config_path
-
+def _start_runtime_integrations(
+    app: CogStash,
+    config: CogStashConfig,
+    safe_print: Any,
+) -> app_runtime.AppRuntimeHandles:
+    """Start tray/hotkey integrations and surface the existing warning flow on failure."""
     runtime_handles = app_runtime.start_runtime(app.queue, config, themes=THEMES)
 
     try:
@@ -497,14 +507,43 @@ def main():
             messagebox.showwarning("CogStash Hotkey Warning", app.hotkey_warning)
         except tk.TclError:
             pass
+    return runtime_handles
+
+
+def _shutdown_app(runtime_handles: app_runtime.AppRuntimeHandles, instance_guard: Any) -> None:
+    """Stop background resources before the process exits."""
+    app_runtime.shutdown_runtime(runtime_handles)
+    instance_guard.close()
+
+
+def main():
+    from cogstash.core.output import safe_print
+    from cogstash.ui.windows import WINDOWS_MUTEX_NAME, acquire_single_instance
+
+    config_path, config = _bootstrap_app_config()
+
+    instance_guard = acquire_single_instance(WINDOWS_MUTEX_NAME)
+    if instance_guard is None:
+        logger.warning("CogStash is already running; refusing to launch a second GUI instance.")
+        _show_already_running_dialog()
+        return
+
+    configure_dpi()
+
+    root = tk.Tk()
+    config = _run_startup_dialog_flow(root, config, config_path)
+    _announce_startup(config, safe_print)
+
+    app = CogStash(root, config, config_path)
+
+    runtime_handles = _start_runtime_integrations(app, config, safe_print)
 
     try:
         root.mainloop()
     except KeyboardInterrupt:
         safe_print("\nCogStash stopped.")
     finally:
-        app_runtime.shutdown_runtime(runtime_handles)
-        instance_guard.close()
+        _shutdown_app(runtime_handles, instance_guard)
 
 
 if __name__ == "__main__":

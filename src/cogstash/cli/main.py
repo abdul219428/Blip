@@ -9,8 +9,10 @@ from cogstash.core import (
     VALID_THEMES,
     VALID_WINDOW_SIZES,
     CogStashConfig,
+    MutationStatus,
     append_note_to_file,
     compute_stats,
+    count_tags,
     delete_note,
     edit_note,
     filter_by_tag,
@@ -21,6 +23,7 @@ from cogstash.core import (
     safe_print,
     search_notes,
 )
+from cogstash.core.config import to_pretty_json, write_json_file
 from cogstash.core.notes import Note
 
 from .formatting import (
@@ -103,21 +106,16 @@ def cmd_tags(args, config: CogStashConfig, ansi_tag=None):
     """List all tags with note counts."""
     tag_map = ansi_tag or DEFAULT_ANSI_TAG
     notes = parse_notes(_output_file(config))
-
-    tag_counts: dict[str, int] = {}
-    for note in notes:
-        for tag in note.tags:
-            tag_counts[tag] = tag_counts.get(tag, 0) + 1
+    tag_counts = count_tags(notes)
 
     if not tag_counts:
         safe_print("No tags found.")
         return
 
     use_color = stream_supports_color(sys.stdout)
-    sorted_tags = sorted(tag_counts.items(), key=lambda item: (-item[1], item[0]))
-    max_len = max(len(f"#{tag}") for tag, _ in sorted_tags)
+    max_len = max(len(f"#{tag}") for tag in tag_counts)
 
-    for tag, count in sorted_tags:
+    for tag, count in tag_counts.items():
         label = f"#{tag}"
         noun = "note" if count == 1 else "notes"
         if use_color:
@@ -196,11 +194,21 @@ def cmd_edit(args, config: CogStashConfig, ansi_tag=None):
         sys.exit(1)
 
     new_text = " ".join(text_parts)
-    if not edit_note(_output_file(config), note, new_text):
+    result = edit_note(_output_file(config), note, new_text)
+    if result is MutationStatus.SUCCESS:
+        safe_print(f"Note {note.index} updated.")
+        return
+    if result is MutationStatus.STALE_NOTE:
+        safe_print("Error: note changed on disk; reload and try again.", file=sys.stderr)
+        sys.exit(1)
+    if result is MutationStatus.INVALID_INPUT:
+        safe_print("Error: no replacement text provided.", file=sys.stderr)
+        sys.exit(1)
+    if result is MutationStatus.IO_ERROR:
         safe_print("Error: failed to update note.", file=sys.stderr)
         sys.exit(1)
-
-    safe_print(f"Note {note.index} updated.")
+    safe_print("Error: could not update note.", file=sys.stderr)
+    sys.exit(1)
 
 
 def cmd_delete(args, config: CogStashConfig, ansi_tag=None):
@@ -216,18 +224,68 @@ def cmd_delete(args, config: CogStashConfig, ansi_tag=None):
             safe_print("Cancelled.")
             return
 
-    if not delete_note(_output_file(config), note):
+    result = delete_note(_output_file(config), note)
+    if result is MutationStatus.SUCCESS:
+        safe_print(f"Note {note.index} deleted.")
+        return
+    if result is MutationStatus.STALE_NOTE:
+        safe_print("Error: note changed on disk; reload and try again.", file=sys.stderr)
+        sys.exit(1)
+    if result is MutationStatus.IO_ERROR:
         safe_print("Error: failed to delete note.", file=sys.stderr)
         sys.exit(1)
+    safe_print("Error: could not delete note.", file=sys.stderr)
+    sys.exit(1)
 
-    safe_print(f"Note {note.index} deleted.")
+
+def _write_export_file(out_path: Path, export_format: str, notes: list[Note], today: str) -> None:
+    import csv
+
+    try:
+        if export_format == "json":
+            data = [
+                {
+                    "index": note.index,
+                    "timestamp": note.timestamp.strftime("%Y-%m-%d %H:%M"),
+                    "text": note.text,
+                    "tags": note.tags,
+                    "is_done": note.is_done,
+                }
+                for note in notes
+            ]
+            write_json_file(out_path, data)
+        elif export_format == "csv":
+            with open(out_path, "w", newline="", encoding="utf-8") as handle:
+                writer = csv.DictWriter(handle, fieldnames=["index", "timestamp", "text", "tags", "is_done"])
+                writer.writeheader()
+                for note in notes:
+                    writer.writerow(
+                        {
+                            "index": note.index,
+                            "timestamp": note.timestamp.strftime("%Y-%m-%d %H:%M"),
+                            "text": note.text,
+                            "tags": ";".join(note.tags),
+                            "is_done": note.is_done,
+                        }
+                    )
+        else:
+            lines = ["# CogStash Export\n\n", f"*Exported {len(notes)} notes on {today}*\n\n"]
+            for note in notes:
+                ts = note.timestamp.strftime("%Y-%m-%d %H:%M")
+                tags = " ".join(f"`#{tag}`" for tag in note.tags) if note.tags else ""
+                status = "☑" if note.is_done else ""
+                line = f"- **[{ts}]** {status} {note.text}"
+                if tags:
+                    line += f"  {tags}"
+                lines.append(line + "\n")
+            out_path.write_text("".join(lines), encoding="utf-8")
+    except OSError:
+        safe_print(f"Error: failed to export notes to {out_path}.", file=sys.stderr)
+        sys.exit(1)
 
 
 def cmd_export(args, config: CogStashConfig, ansi_tag=None):
     """Export all notes to JSON, CSV, or Markdown."""
-    import csv
-    import json as json_mod
-
     tag = getattr(args, "tag", None)
     notes = _apply_tag_filter(parse_notes(_output_file(config)), tag)
     if not notes:
@@ -240,45 +298,7 @@ def cmd_export(args, config: CogStashConfig, ansi_tag=None):
     today = datetime.now().strftime("%Y-%m-%d")
     ext = {"json": "json", "csv": "csv", "md": "md"}[args.format]
     out_path = Path(args.output) if args.output else Path(f"cogstash-export-{today}.{ext}")
-
-    if args.format == "json":
-        data = [
-            {
-                "index": note.index,
-                "timestamp": note.timestamp.strftime("%Y-%m-%d %H:%M"),
-                "text": note.text,
-                "tags": note.tags,
-                "is_done": note.is_done,
-            }
-            for note in notes
-        ]
-        out_path.write_text(json_mod.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-    elif args.format == "csv":
-        with open(out_path, "w", newline="", encoding="utf-8") as handle:
-            writer = csv.DictWriter(handle, fieldnames=["index", "timestamp", "text", "tags", "is_done"])
-            writer.writeheader()
-            for note in notes:
-                writer.writerow(
-                    {
-                        "index": note.index,
-                        "timestamp": note.timestamp.strftime("%Y-%m-%d %H:%M"),
-                        "text": note.text,
-                        "tags": ";".join(note.tags),
-                        "is_done": note.is_done,
-                    }
-                )
-    else:
-        lines = ["# CogStash Export\n\n", f"*Exported {len(notes)} notes on {today}*\n\n"]
-        for note in notes:
-            ts = note.timestamp.strftime("%Y-%m-%d %H:%M")
-            tags = " ".join(f"`#{tag}`" for tag in note.tags) if note.tags else ""
-            status = "☑" if note.is_done else ""
-            line = f"- **[{ts}]** {status} {note.text}"
-            if tags:
-                line += f"  {tags}"
-            lines.append(line + "\n")
-        out_path.write_text("".join(lines), encoding="utf-8")
-
+    _write_export_file(out_path, args.format, notes, today)
     safe_print(f"Exported {len(notes)} notes → {out_path}")
 
 
@@ -420,7 +440,7 @@ def _config_wizard(config: CogStashConfig, config_path: Path) -> None:
         safe_print("  Edit tags in ~/.cogstash.json directly (JSON format)")
 
     config_path.parent.mkdir(parents=True, exist_ok=True)
-    config_path.write_text(json_mod.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    write_json_file(config_path, data)
     safe_print(f"\n✅ Config saved to {config_path}")
 
 
@@ -450,7 +470,7 @@ def cmd_config(args, config: CogStashConfig, ansi_tag=None, config_path: Path | 
             sys.exit(1)
         value = config_map[args.key]
         if isinstance(value, dict):
-            safe_print(json_mod.dumps(value, indent=2, ensure_ascii=False))
+            safe_print(to_pretty_json(value))
         else:
             safe_print(value)
         return
@@ -478,7 +498,7 @@ def cmd_config(args, config: CogStashConfig, ansi_tag=None, config_path: Path | 
         except (json_mod.JSONDecodeError, OSError):
             data = {}
     data[args.key] = args.value
-    config_path.write_text(json_mod.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    write_json_file(config_path, data)
     safe_print(f"{args.key} = {args.value}")
 
 
