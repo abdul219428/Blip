@@ -29,7 +29,7 @@ def _run_main_startup(monkeypatch, tmp_path, listener_cls):
             return None
 
     class FakeApp:
-        def __init__(self, _root, _config):
+        def __init__(self, _root, _config, _config_path=None):
             created_apps.append(True)
             self.queue = object()
 
@@ -121,7 +121,7 @@ def test_app_main_startup_output_is_cp1252_safe(monkeypatch, tmp_path):
             self.stopped = True
 
     class FakeApp:
-        def __init__(self, _root, _config):
+        def __init__(self, _root, _config, _config_path=None):
             self.queue = object()
 
     class FakeGuard:
@@ -283,8 +283,8 @@ def test_app_open_settings_receives_runtime_hotkey_warning_after_startup_failure
     windows_mod.WINDOWS_MUTEX_NAME = "Local\\CogStash.Test"
     windows_mod.acquire_single_instance = lambda _name: FakeGuard()
 
-    def capture_app(root, app_config):
-        app = real_cogstash(root, app_config)
+    def capture_app(root, app_config, config_path=None):
+        app = real_cogstash(root, app_config, config_path)
         created_apps.append(app)
         return app
 
@@ -462,7 +462,7 @@ def test_app_main_installer_welcome_shown_for_installed_upgrade(monkeypatch, tmp
             return None
 
     class FakeApp:
-        def __init__(self, _root, _config):
+        def __init__(self, _root, _config, _config_path=None):
             self.queue = object()
 
     class FakeGuard:
@@ -535,7 +535,7 @@ def test_app_main_installer_welcome_shown_for_first_installed_launch(monkeypatch
             return None
 
     class FakeApp:
-        def __init__(self, _root, _config):
+        def __init__(self, _root, _config, _config_path=None):
             self.queue = object()
 
     class FakeGuard:
@@ -583,3 +583,106 @@ def test_app_main_installer_welcome_shown_for_first_installed_launch(monkeypatch
 
     assert len(welcome_calls) == 1
     assert saved_configs == [cogstash.__version__]
+
+
+def test_run_startup_dialog_flow_reloads_config_after_first_run_wizard(monkeypatch, tmp_path):
+    """First-run startup flow should wait for the wizard and then reload config from disk."""
+    import types
+
+    import cogstash.ui.app as app_mod
+
+    initial = app_mod.CogStashConfig(
+        output_file=tmp_path / "notes.md",
+        log_file=tmp_path / "cogstash.log",
+        last_seen_version="",
+    )
+    reloaded = app_mod.CogStashConfig(
+        output_file=tmp_path / "notes.md",
+        log_file=tmp_path / "cogstash.log",
+        last_seen_version="1.2.3",
+    )
+
+    class FakeRoot:
+        def __init__(self):
+            self.waited_on = None
+
+        def wait_window(self, win):
+            self.waited_on = win
+
+    created_wizards: list[tuple[object, object, object, object]] = []
+
+    class FakeWizardWindow:
+        def __init__(self, root, config, config_path):
+            self.win = object()
+            created_wizards.append((root, config, config_path, self.win))
+
+    monkeypatch.setattr(app_mod, "load_config", lambda _path: reloaded)
+    monkeypatch.setitem(sys.modules, "cogstash.ui.settings", types.SimpleNamespace(WizardWindow=FakeWizardWindow))
+
+    root = FakeRoot()
+    result = app_mod._run_startup_dialog_flow(root, initial, tmp_path / "config.json")
+    wizard_root, wizard_config, wizard_path, wizard_win = created_wizards[0]
+
+    assert result is reloaded
+    assert (wizard_root, wizard_config, wizard_path) == (root, initial, tmp_path / "config.json")
+    assert root.waited_on is wizard_win
+
+
+def test_build_tray_menu_wires_queue_actions(monkeypatch, tmp_path):
+    """Tray menu actions should open notes, enqueue browse/settings, and stop on quit."""
+    import queue as queue_mod
+
+    import cogstash.ui.app as app_mod
+
+    class FakeMenuItem:
+        def __init__(self, text, action, enabled=True):
+            self.text = text
+            self.action = action
+            self.enabled = enabled
+
+    class FakeMenuFactory:
+        SEPARATOR = object()
+
+        def __call__(self, *items):
+            return list(items)
+
+    fake_pystray = type(
+        "FakePystray",
+        (),
+        {"Menu": FakeMenuFactory(), "MenuItem": FakeMenuItem},
+    )()
+    opened_paths: list[object] = []
+    app_queue: queue_mod.Queue[str] = queue_mod.Queue()
+    config = app_mod.CogStashConfig(output_file=tmp_path / "notes.md")
+
+    monkeypatch.setattr(app_mod, "_open_output_file", lambda path: opened_paths.append(path))
+
+    menu = app_mod._build_tray_menu(fake_pystray, app_queue, config)
+
+    assert [item.text for item in menu if hasattr(item, "text")] == [
+        "CogStash ⚡",
+        f"Open {config.output_file.name}",
+        "Browse Notes",
+        "Settings",
+        "Quit",
+    ]
+
+    menu[2].action()
+    menu[3].action()
+    menu[4].action()
+
+    class FakeIcon:
+        def __init__(self):
+            self.stopped = False
+
+        def stop(self):
+            self.stopped = True
+
+    icon = FakeIcon()
+    menu[6].action(icon)
+
+    assert opened_paths == [config.output_file]
+    assert app_queue.get_nowait() == "BROWSE"
+    assert app_queue.get_nowait() == "SETTINGS"
+    assert app_queue.get_nowait() == "QUIT"
+    assert icon.stopped is True

@@ -111,11 +111,11 @@ def test_mark_done(tmp_path):
     f = tmp_path / "cogstash.md"
     f.write_text("- [2026-03-26 14:30] ☐ buy milk #todo\n", encoding="utf-8")
 
-    from cogstash.search import mark_done, parse_notes
+    from cogstash.search import MutationStatus, mark_done, parse_notes
     notes = parse_notes(f)
     result = mark_done(f, notes[0])
 
-    assert result is True
+    assert result is MutationStatus.SUCCESS
     content = f.read_text(encoding="utf-8")
     assert "☑" in content
     assert "☐" not in content
@@ -162,10 +162,10 @@ def test_edit_note_multiline(tmp_path):
         "- [2026-03-26 15:00] keep this\n",
         encoding="utf-8",
     )
-    from cogstash.search import edit_note, parse_notes
+    from cogstash.search import MutationStatus, edit_note, parse_notes
     notes = parse_notes(f)
     result = edit_note(f, notes[0], "new first\nnew second\nnew third")
-    assert result is True
+    assert result is MutationStatus.SUCCESS
     content = f.read_text(encoding="utf-8")
     assert "- [2026-03-26 14:30] new first\n" in content
     assert "  new second\n" in content
@@ -178,10 +178,10 @@ def test_edit_note_empty_rejected(tmp_path):
     """Empty new text returns False, file unchanged."""
     f = tmp_path / "cogstash.md"
     f.write_text("- [2026-03-26 14:30] original\n", encoding="utf-8")
-    from cogstash.search import edit_note, parse_notes
+    from cogstash.search import MutationStatus, edit_note, parse_notes
     notes = parse_notes(f)
     result = edit_note(f, notes[0], "   ")
-    assert result is False
+    assert result is MutationStatus.INVALID_INPUT
     assert "original" in f.read_text(encoding="utf-8")
 
 
@@ -194,10 +194,10 @@ def test_delete_note(tmp_path):
         "- [2026-03-26 15:00] keep me\n",
         encoding="utf-8",
     )
-    from cogstash.search import delete_note, parse_notes
+    from cogstash.search import MutationStatus, delete_note, parse_notes
     notes = parse_notes(f)
     result = delete_note(f, notes[0])
-    assert result is True
+    assert result is MutationStatus.SUCCESS
     content = f.read_text(encoding="utf-8")
     assert "delete me" not in content
     assert "continuation" not in content
@@ -214,7 +214,7 @@ def test_mark_done_stale_line_number_rejected(tmp_path):
         encoding="utf-8",
     )
 
-    from cogstash.search import mark_done, parse_notes
+    from cogstash.search import MutationStatus, mark_done, parse_notes
 
     note = parse_notes(f)[1]
     f.write_text(
@@ -223,7 +223,7 @@ def test_mark_done_stale_line_number_rejected(tmp_path):
         encoding="utf-8",
     )
 
-    assert mark_done(f, note) is False
+    assert mark_done(f, note) is MutationStatus.STALE_NOTE
     assert f.read_text(encoding="utf-8") == (
         "- [2026-03-26 15:00] ☐ target #todo\n"
         "- [2026-03-26 16:00] ☐ last #todo\n"
@@ -240,7 +240,7 @@ def test_edit_note_stale_line_number_rejected(tmp_path):
         encoding="utf-8",
     )
 
-    from cogstash.search import edit_note, parse_notes
+    from cogstash.search import MutationStatus, edit_note, parse_notes
 
     note = parse_notes(f)[1]
     current = (
@@ -249,7 +249,7 @@ def test_edit_note_stale_line_number_rejected(tmp_path):
     )
     f.write_text(current, encoding="utf-8")
 
-    assert edit_note(f, note, "updated #todo") is False
+    assert edit_note(f, note, "updated #todo") is MutationStatus.STALE_NOTE
     assert f.read_text(encoding="utf-8") == current
 
 
@@ -263,7 +263,7 @@ def test_delete_note_stale_line_number_rejected(tmp_path):
         encoding="utf-8",
     )
 
-    from cogstash.search import delete_note, parse_notes
+    from cogstash.search import MutationStatus, delete_note, parse_notes
 
     note = parse_notes(f)[1]
     current = (
@@ -272,7 +272,7 @@ def test_delete_note_stale_line_number_rejected(tmp_path):
     )
     f.write_text(current, encoding="utf-8")
 
-    assert delete_note(f, note) is False
+    assert delete_note(f, note) is MutationStatus.STALE_NOTE
     assert f.read_text(encoding="utf-8") == current
 
 
@@ -308,6 +308,7 @@ def test_search_reexports_core_helpers():
     import cogstash.core.notes as core_notes
     import cogstash.search as search_mod
 
+    assert search_mod.MutationStatus is core_notes.MutationStatus
     assert search_mod.Note is core_notes.Note
     assert search_mod.parse_notes is core_notes.parse_notes
     assert search_mod.search_notes is core_notes.search_notes

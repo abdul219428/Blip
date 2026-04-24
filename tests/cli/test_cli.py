@@ -532,6 +532,42 @@ def test_cmd_edit_search_multiple_matches(tmp_path, capsys):
     assert "Multiple matches" in err
 
 
+def test_cmd_edit_stale_note_shows_specific_error(tmp_path, capsys, monkeypatch):
+    from types import SimpleNamespace
+
+    import pytest
+
+    from cogstash.cli import cmd_edit
+    from cogstash.core import CogStashConfig, MutationStatus
+
+    f = _make_notes_file(tmp_path)
+    monkeypatch.setattr("cogstash.cli.main.edit_note", lambda *_args, **_kwargs: MutationStatus.STALE_NOTE)
+
+    with pytest.raises(SystemExit) as exc:
+        cmd_edit(SimpleNamespace(args=["3", "updated", "note"], search=None), CogStashConfig(output_file=f))
+
+    assert exc.value.code == 1
+    assert "changed on disk" in capsys.readouterr().err
+
+
+def test_cmd_edit_io_error_shows_failure_message(tmp_path, capsys, monkeypatch):
+    from types import SimpleNamespace
+
+    import pytest
+
+    from cogstash.cli import cmd_edit
+    from cogstash.core import CogStashConfig, MutationStatus
+
+    f = _make_notes_file(tmp_path)
+    monkeypatch.setattr("cogstash.cli.main.edit_note", lambda *_args, **_kwargs: MutationStatus.IO_ERROR)
+
+    with pytest.raises(SystemExit) as exc:
+        cmd_edit(SimpleNamespace(args=["3", "updated", "note"], search=None), CogStashConfig(output_file=f))
+
+    assert exc.value.code == 1
+    assert "failed to update note" in capsys.readouterr().err
+
+
 def test_cmd_delete_with_yes(tmp_path, capsys):
     """Delete with --yes skips confirmation and removes note."""
     f = _make_notes_file(tmp_path)
@@ -601,6 +637,42 @@ def test_cmd_delete_not_found(tmp_path):
 
     with pytest.raises(SystemExit):
         cmd_delete(SimpleNamespace(number=99, yes=True, search=None), CogStashConfig(output_file=f))
+
+
+def test_cmd_delete_stale_note_shows_specific_error(tmp_path, capsys, monkeypatch):
+    from types import SimpleNamespace
+
+    import pytest
+
+    from cogstash.cli import cmd_delete
+    from cogstash.core import CogStashConfig, MutationStatus
+
+    f = _make_notes_file(tmp_path)
+    monkeypatch.setattr("cogstash.cli.main.delete_note", lambda *_args, **_kwargs: MutationStatus.STALE_NOTE)
+
+    with pytest.raises(SystemExit) as exc:
+        cmd_delete(SimpleNamespace(number=3, yes=True, search=None), CogStashConfig(output_file=f))
+
+    assert exc.value.code == 1
+    assert "changed on disk" in capsys.readouterr().err
+
+
+def test_cmd_delete_io_error_shows_failure_message(tmp_path, capsys, monkeypatch):
+    from types import SimpleNamespace
+
+    import pytest
+
+    from cogstash.cli import cmd_delete
+    from cogstash.core import CogStashConfig, MutationStatus
+
+    f = _make_notes_file(tmp_path)
+    monkeypatch.setattr("cogstash.cli.main.delete_note", lambda *_args, **_kwargs: MutationStatus.IO_ERROR)
+
+    with pytest.raises(SystemExit) as exc:
+        cmd_delete(SimpleNamespace(number=3, yes=True, search=None), CogStashConfig(output_file=f))
+
+    assert exc.value.code == 1
+    assert "failed to delete note" in capsys.readouterr().err
 
 
 def test_cmd_export_json(tmp_path, monkeypatch, capsys):

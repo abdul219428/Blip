@@ -13,6 +13,7 @@ from .config import (
 from .notes import (
     DEFAULT_SMART_TAGS,
     DEFAULT_TAG_COLORS,
+    MutationStatus,
     Note,
     append_note_to_file,
     compute_stats,
@@ -32,6 +33,7 @@ __all__ = [
     "CogStashConfig",
     "DEFAULT_SMART_TAGS",
     "DEFAULT_TAG_COLORS",
+    "MutationStatus",
     "Note",
     "VALID_THEMES",
     "VALID_WINDOW_SIZES",

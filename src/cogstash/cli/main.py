@@ -9,6 +9,7 @@ from cogstash.core import (
     VALID_THEMES,
     VALID_WINDOW_SIZES,
     CogStashConfig,
+    MutationStatus,
     append_note_to_file,
     compute_stats,
     count_tags,
@@ -193,11 +194,21 @@ def cmd_edit(args, config: CogStashConfig, ansi_tag=None):
         sys.exit(1)
 
     new_text = " ".join(text_parts)
-    if not edit_note(_output_file(config), note, new_text):
+    result = edit_note(_output_file(config), note, new_text)
+    if result is MutationStatus.SUCCESS:
+        safe_print(f"Note {note.index} updated.")
+        return
+    if result is MutationStatus.STALE_NOTE:
+        safe_print("Error: note changed on disk; reload and try again.", file=sys.stderr)
+        sys.exit(1)
+    if result is MutationStatus.INVALID_INPUT:
+        safe_print("Error: no replacement text provided.", file=sys.stderr)
+        sys.exit(1)
+    if result is MutationStatus.IO_ERROR:
         safe_print("Error: failed to update note.", file=sys.stderr)
         sys.exit(1)
-
-    safe_print(f"Note {note.index} updated.")
+    safe_print("Error: could not update note.", file=sys.stderr)
+    sys.exit(1)
 
 
 def cmd_delete(args, config: CogStashConfig, ansi_tag=None):
@@ -213,11 +224,18 @@ def cmd_delete(args, config: CogStashConfig, ansi_tag=None):
             safe_print("Cancelled.")
             return
 
-    if not delete_note(_output_file(config), note):
+    result = delete_note(_output_file(config), note)
+    if result is MutationStatus.SUCCESS:
+        safe_print(f"Note {note.index} deleted.")
+        return
+    if result is MutationStatus.STALE_NOTE:
+        safe_print("Error: note changed on disk; reload and try again.", file=sys.stderr)
+        sys.exit(1)
+    if result is MutationStatus.IO_ERROR:
         safe_print("Error: failed to delete note.", file=sys.stderr)
         sys.exit(1)
-
-    safe_print(f"Note {note.index} deleted.")
+    safe_print("Error: could not delete note.", file=sys.stderr)
+    sys.exit(1)
 
 
 def _write_export_file(out_path: Path, export_format: str, notes: list[Note], today: str) -> None:

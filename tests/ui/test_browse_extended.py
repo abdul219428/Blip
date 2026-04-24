@@ -445,13 +445,13 @@ def test_browse_stale_edit_reloads_and_shows_notice(tmp_path, tk_root):
     f.write_text("- [2026-03-26 14:30] original text\n", encoding="utf-8")
 
     from cogstash.app import CogStashConfig
-    from cogstash.browse import BrowseWindow
+    from cogstash.browse import BrowseWindow, MutationStatus
 
     win = BrowseWindow(tk_root, CogStashConfig(output_file=f))
     note = win._all_notes[0]
 
     with (
-        patch("cogstash.ui.browse.edit_note", return_value=False),
+        patch("cogstash.ui.browse.edit_note", return_value=MutationStatus.STALE_NOTE),
         patch.object(win, "_load_notes") as reload_mock,
         patch.object(win, "_show_notice") as notice_mock,
         patch("tkinter.messagebox.showerror") as error_mock,
@@ -465,4 +465,49 @@ def test_browse_stale_edit_reloads_and_shows_notice(tmp_path, tk_root):
     reload_mock.assert_called_once()
     notice_mock.assert_called_once()
     error_mock.assert_not_called()
+    win.window.destroy()
+
+
+@needs_display
+def test_browse_mark_done_already_done_shows_notice(tmp_path, tk_root):
+    """Already-complete mark-done actions should show a non-blocking notice."""
+    f = tmp_path / "cogstash.md"
+    f.write_text("- [2026-03-26 14:30] ☑ done text #todo\n", encoding="utf-8")
+
+    from cogstash.app import CogStashConfig
+    from cogstash.browse import BrowseWindow, MutationStatus
+
+    win = BrowseWindow(tk_root, CogStashConfig(output_file=f))
+    note = win._all_notes[0]
+
+    with (
+        patch("cogstash.ui.browse.mark_done", return_value=MutationStatus.ALREADY_DONE),
+        patch.object(win, "_show_notice") as notice_mock,
+    ):
+        win._on_mark_done(note)
+
+    notice_mock.assert_called_once_with("Note already done")
+    win.window.destroy()
+
+
+@needs_display
+def test_browse_delete_io_error_shows_notice(tmp_path, tk_root):
+    """Delete I/O failures should show a non-blocking failure notice."""
+    f = tmp_path / "cogstash.md"
+    f.write_text("- [2026-03-26 14:30] original text\n", encoding="utf-8")
+
+    from cogstash.app import CogStashConfig
+    from cogstash.browse import BrowseWindow, MutationStatus
+
+    win = BrowseWindow(tk_root, CogStashConfig(output_file=f))
+    note = win._all_notes[0]
+
+    with (
+        patch("tkinter.messagebox.askyesno", return_value=True),
+        patch("cogstash.ui.browse.delete_note", return_value=MutationStatus.IO_ERROR),
+        patch.object(win, "_show_notice") as notice_mock,
+    ):
+        win._on_delete(note)
+
+    notice_mock.assert_called_once_with("Could not delete note")
     win.window.destroy()
