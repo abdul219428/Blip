@@ -331,8 +331,13 @@ def test_app_main_startup_output_is_cp1252_safe(monkeypatch, tmp_path):
     monkeypatch.setattr(app_mod, "configure_dpi", lambda: None)
     monkeypatch.setattr(app_mod.tk, "Tk", lambda: FakeRoot())
     monkeypatch.setattr(app_mod, "CogStash", FakeApp)
-    monkeypatch.setattr(app_mod, "create_tray_icon", lambda _queue, _config: None)
-    monkeypatch.setattr(app_mod.keyboard, "GlobalHotKeys", FakeListener)
+    monkeypatch.setattr(app_mod.app_runtime, "start_runtime", lambda *_a, **_k: app_mod.app_runtime.AppRuntimeHandles())
+    monkeypatch.setattr(
+        app_mod.app_runtime,
+        "start_hotkey_listener",
+        lambda _queue, hotkey: FakeListener({hotkey: lambda: None}),
+    )
+    monkeypatch.setattr(app_mod.app_runtime, "shutdown_runtime", lambda _handles: None)
     monkeypatch.setattr(
         app_mod.messagebox,
         "showinfo",

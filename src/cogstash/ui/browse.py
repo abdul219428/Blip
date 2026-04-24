@@ -11,11 +11,12 @@ import sys
 import tkinter as tk
 from datetime import datetime, timedelta
 
-from cogstash.search import (
+from cogstash.core import (
+    DEFAULT_SMART_TAGS,
     DEFAULT_TAG_COLORS,
+    CogStashConfig,
     MutationStatus,
     Note,
-    _atomic_write,
     delete_note,
     edit_note,
     filter_by_tag,
@@ -23,7 +24,8 @@ from cogstash.search import (
     parse_notes,
     search_notes,
 )
-from cogstash.ui.app import DEFAULT_SMART_TAGS, THEMES, CogStashConfig, platform_font
+from cogstash.core.notes import _atomic_write
+from cogstash.ui.app import THEMES, platform_font
 
 
 class BrowseWindow:

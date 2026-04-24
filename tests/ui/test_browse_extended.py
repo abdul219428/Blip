@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -14,8 +15,8 @@ def test_browse_window_creates(tmp_path, tk_root):
     f = tmp_path / "cogstash.md"
     f.write_text("- [2026-03-26 14:30] ☐ test note #todo\n", encoding="utf-8")
 
-    from cogstash.app import CogStashConfig
-    from cogstash.browse import BrowseWindow
+    from cogstash.core import CogStashConfig
+    from cogstash.ui.browse import BrowseWindow
 
     config = CogStashConfig(output_file=f)
     win = BrowseWindow(tk_root, config)
@@ -33,8 +34,8 @@ def test_browse_search_filters(tmp_path, tk_root):
         encoding="utf-8",
     )
 
-    from cogstash.app import CogStashConfig
-    from cogstash.browse import BrowseWindow
+    from cogstash.core import CogStashConfig
+    from cogstash.ui.browse import BrowseWindow
 
     config = CogStashConfig(output_file=f)
     win = BrowseWindow(tk_root, config)
@@ -59,8 +60,8 @@ def test_browse_tag_filter(tmp_path, tk_root):
         encoding="utf-8",
     )
 
-    from cogstash.app import CogStashConfig
-    from cogstash.browse import BrowseWindow
+    from cogstash.core import CogStashConfig
+    from cogstash.ui.browse import BrowseWindow
 
     config = CogStashConfig(output_file=f)
     win = BrowseWindow(tk_root, config)
@@ -77,8 +78,8 @@ def test_browse_tag_filter(tmp_path, tk_root):
 @needs_display
 def test_browse_custom_tag_pills(tk_root, tmp_path):
     """Custom tags appear as filter pills in the browse window."""
-    from cogstash.app import CogStashConfig
-    from cogstash.browse import BrowseWindow
+    from cogstash.core import CogStashConfig
+    from cogstash.ui.browse import BrowseWindow
     notes_file = tmp_path / "cogstash.md"
     notes_file.write_text("- [2026-03-27 10:00] meeting #work\n", encoding="utf-8")
     config = CogStashConfig(output_file=notes_file)
@@ -95,8 +96,8 @@ def test_browse_context_menu_exists(tmp_path, tk_root):
     f = tmp_path / "cogstash.md"
     f.write_text("- [2026-03-26 14:30] test note #todo\n", encoding="utf-8")
 
-    from cogstash.app import CogStashConfig
-    from cogstash.browse import BrowseWindow
+    from cogstash.core import CogStashConfig
+    from cogstash.ui.browse import BrowseWindow
 
     config = CogStashConfig(output_file=f)
     win = BrowseWindow(tk_root, config)
@@ -110,8 +111,8 @@ def test_browse_context_menu_releases_grab_after_popup(tmp_path, tk_root):
     f = tmp_path / "cogstash.md"
     f.write_text("- [2026-03-26 14:30] test note #todo\n", encoding="utf-8")
 
-    from cogstash.app import CogStashConfig
-    from cogstash.browse import BrowseWindow
+    from cogstash.core import CogStashConfig
+    from cogstash.ui.browse import BrowseWindow
 
     class FakeMenu:
         last_instance = None
@@ -156,8 +157,8 @@ def test_browse_context_menu_commands_remain_callable_after_popup(tmp_path, tk_r
     f = tmp_path / "cogstash.md"
     f.write_text("- [2026-03-26 14:30] test note #todo\n", encoding="utf-8")
 
-    from cogstash.app import CogStashConfig
-    from cogstash.browse import BrowseWindow
+    from cogstash.core import CogStashConfig
+    from cogstash.ui.browse import BrowseWindow
 
     class FakeMenu:
         last_instance = None
@@ -227,8 +228,8 @@ def test_browse_edit_note(tmp_path, tk_root):
     f = tmp_path / "cogstash.md"
     f.write_text("- [2026-03-26 14:30] original text\n", encoding="utf-8")
 
-    from cogstash.app import CogStashConfig
-    from cogstash.browse import BrowseWindow
+    from cogstash.core import CogStashConfig
+    from cogstash.ui.browse import BrowseWindow
 
     config = CogStashConfig(output_file=f)
     win = BrowseWindow(tk_root, config)
@@ -256,8 +257,8 @@ def test_browse_edit_empty_text_shows_error(tmp_path, tk_root):
     f = tmp_path / "cogstash.md"
     f.write_text("- [2026-03-26 14:30] original text\n", encoding="utf-8")
 
-    from cogstash.app import CogStashConfig
-    from cogstash.browse import BrowseWindow
+    from cogstash.core import CogStashConfig
+    from cogstash.ui.browse import BrowseWindow
 
     config = CogStashConfig(output_file=f)
     win = BrowseWindow(tk_root, config)
@@ -284,8 +285,8 @@ def test_browse_edit_cancel_releases_grab(tmp_path, tk_root):
     f = tmp_path / "cogstash.md"
     f.write_text("- [2026-03-26 14:30] original text\n", encoding="utf-8")
 
-    from cogstash.app import CogStashConfig
-    from cogstash.browse import BrowseWindow
+    from cogstash.core import CogStashConfig
+    from cogstash.ui.browse import BrowseWindow
 
     config = CogStashConfig(output_file=f)
     win = BrowseWindow(tk_root, config)
@@ -316,8 +317,8 @@ def test_browse_search_enter_moves_focus_from_entry(tmp_path, tk_root):
     f = tmp_path / "cogstash.md"
     f.write_text("- [2026-03-26 14:30] test note\n", encoding="utf-8")
 
-    from cogstash.app import CogStashConfig
-    from cogstash.browse import BrowseWindow
+    from cogstash.core import CogStashConfig
+    from cogstash.ui.browse import BrowseWindow
 
     config = CogStashConfig(output_file=f)
     win = BrowseWindow(tk_root, config)
@@ -340,8 +341,8 @@ def test_browse_delete_note(tmp_path, tk_root):
         encoding="utf-8",
     )
 
-    from cogstash.app import CogStashConfig
-    from cogstash.browse import BrowseWindow
+    from cogstash.core import CogStashConfig
+    from cogstash.ui.browse import BrowseWindow
 
     config = CogStashConfig(output_file=f)
     win = BrowseWindow(tk_root, config)
@@ -371,8 +372,8 @@ def test_browse_delete_confirmation_uses_multiline_preview(tmp_path, tk_root):
         encoding="utf-8",
     )
 
-    from cogstash.app import CogStashConfig
-    from cogstash.browse import BrowseWindow
+    from cogstash.core import CogStashConfig
+    from cogstash.ui.browse import BrowseWindow
 
     win = BrowseWindow(tk_root, CogStashConfig(output_file=f))
     note = win._all_notes[0]
@@ -400,8 +401,8 @@ def test_browse_delete_undo_restores_note(tmp_path, tk_root):
         encoding="utf-8",
     )
 
-    from cogstash.app import CogStashConfig
-    from cogstash.browse import BrowseWindow
+    from cogstash.core import CogStashConfig
+    from cogstash.ui.browse import BrowseWindow
 
     win = BrowseWindow(tk_root, CogStashConfig(output_file=f))
     note = win._all_notes[0]
@@ -424,8 +425,8 @@ def test_browse_copy_shows_non_blocking_notice(tmp_path, tk_root):
     f = tmp_path / "cogstash.md"
     f.write_text("- [2026-03-26 14:30] copied text\n", encoding="utf-8")
 
-    from cogstash.app import CogStashConfig
-    from cogstash.browse import BrowseWindow
+    from cogstash.core import CogStashConfig
+    from cogstash.ui.browse import BrowseWindow
 
     win = BrowseWindow(tk_root, CogStashConfig(output_file=f))
     note = win._all_notes[0]
@@ -444,8 +445,9 @@ def test_browse_stale_edit_reloads_and_shows_notice(tmp_path, tk_root):
     f = tmp_path / "cogstash.md"
     f.write_text("- [2026-03-26 14:30] original text\n", encoding="utf-8")
 
-    from cogstash.app import CogStashConfig
-    from cogstash.browse import BrowseWindow, MutationStatus
+    from cogstash.core import CogStashConfig
+    from cogstash.core.notes import MutationStatus
+    from cogstash.ui.browse import BrowseWindow
 
     win = BrowseWindow(tk_root, CogStashConfig(output_file=f))
     note = win._all_notes[0]
@@ -474,8 +476,9 @@ def test_browse_mark_done_already_done_shows_notice(tmp_path, tk_root):
     f = tmp_path / "cogstash.md"
     f.write_text("- [2026-03-26 14:30] ☑ done text #todo\n", encoding="utf-8")
 
-    from cogstash.app import CogStashConfig
-    from cogstash.browse import BrowseWindow, MutationStatus
+    from cogstash.core import CogStashConfig
+    from cogstash.core.notes import MutationStatus
+    from cogstash.ui.browse import BrowseWindow
 
     win = BrowseWindow(tk_root, CogStashConfig(output_file=f))
     note = win._all_notes[0]
@@ -496,8 +499,9 @@ def test_browse_delete_io_error_shows_notice(tmp_path, tk_root):
     f = tmp_path / "cogstash.md"
     f.write_text("- [2026-03-26 14:30] original text\n", encoding="utf-8")
 
-    from cogstash.app import CogStashConfig
-    from cogstash.browse import BrowseWindow, MutationStatus
+    from cogstash.core import CogStashConfig
+    from cogstash.core.notes import MutationStatus
+    from cogstash.ui.browse import BrowseWindow
 
     win = BrowseWindow(tk_root, CogStashConfig(output_file=f))
     note = win._all_notes[0]
@@ -511,3 +515,8 @@ def test_browse_delete_io_error_shows_notice(tmp_path, tk_root):
 
     notice_mock.assert_called_once_with("Could not delete note")
     win.window.destroy()
+
+def test_browse_module_avoids_search_wrapper_imports():
+    browse_source = Path("src/cogstash/ui/browse.py").read_text(encoding="utf-8")
+
+    assert "from cogstash.search import" not in browse_source

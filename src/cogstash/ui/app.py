@@ -8,17 +8,12 @@ Escape → hides window
 from __future__ import annotations
 
 import logging
-import os
 import queue
-import subprocess
 import sys
-import threading
 import tkinter as tk
 from pathlib import Path
 from tkinter import messagebox
 from typing import Any
-
-from pynput import keyboard
 
 from cogstash.core import (
     DEFAULT_SMART_TAGS,
@@ -30,6 +25,7 @@ from cogstash.core import (
     save_config,
 )
 from cogstash.core import parse_smart_tags as _parse_smart_tags
+from cogstash.ui import app_runtime, windows_runtime
 
 parse_smart_tags = _parse_smart_tags
 
@@ -94,105 +90,8 @@ def platform_font() -> str:
 
 
 def configure_dpi() -> None:
-    """Enable DPI awareness on Windows so the UI renders crisply on HiDPI displays."""
-    if sys.platform == "win32":
-        try:
-            import ctypes
-            ctypes.windll.shcore.SetProcessDpiAwareness(1)
-        except (AttributeError, OSError):
-            pass
-
-
-def _hex_to_rgba(color: str) -> tuple[int, int, int, int]:
-    """Convert a hex color into an RGBA tuple."""
-    value = color.lstrip("#")
-    return tuple(int(value[index:index + 2], 16) for index in (0, 2, 4)) + (255,)
-
-
-def _load_bundled_tray_image(Image: Any) -> Any | None:
-    """Load the bundled tray icon when running from a frozen app build."""
-    if not getattr(sys, "frozen", False):
-        return None
-    bundle_dir = Path(getattr(sys, "_MEIPASS", "."))
-    icon_path = bundle_dir / "assets" / "cogstash_icon.png"
-    if not icon_path.exists():
-        return None
-    return Image.open(icon_path).resize((64, 64))
-
-
-def _build_fallback_tray_image(Image: Any, ImageDraw: Any, ImageFont: Any, theme: dict[str, str]) -> Any:
-    """Generate a fallback tray icon when no bundled asset is available."""
-    image = Image.new("RGBA", (64, 64), _hex_to_rgba(theme["bg"]))
-    draw = ImageDraw.Draw(image)
-    try:
-        font: ImageFont.FreeTypeFont | ImageFont.ImageFont = ImageFont.truetype("arial", 40)
-    except OSError:
-        font = ImageFont.load_default()
-    bbox = draw.textbbox((0, 0), "⚡", font=font)
-    x = (64 - (bbox[2] - bbox[0])) // 2 - bbox[0]
-    y = (64 - (bbox[3] - bbox[1])) // 2 - bbox[1]
-    draw.text((x, y), "⚡", fill=_hex_to_rgba(theme["fg"]), font=font)
-    return image
-
-
-def _load_tray_image(Image: Any, ImageDraw: Any, ImageFont: Any, theme: dict[str, str]) -> Any:
-    """Load the bundled tray icon or create a generated fallback."""
-    image = _load_bundled_tray_image(Image)
-    if image is not None:
-        return image
-    return _build_fallback_tray_image(Image, ImageDraw, ImageFont, theme)
-
-
-def _open_output_file(output_file: Path) -> None:
-    """Open the configured notes file using the platform default handler."""
-    path = str(output_file)
-    if sys.platform == "win32":
-        os.startfile(path)
-    elif sys.platform == "darwin":
-        subprocess.run(["open", path], check=False)
-    else:
-        subprocess.run(["xdg-open", path], check=False)
-
-
-def _build_tray_menu(pystray: Any, app_queue: queue.Queue[str], config: CogStashConfig) -> Any:
-    """Create the tray menu and wire its actions to the app queue."""
-    assert config.output_file is not None, "output_file should be set by __post_init__"
-
-    return pystray.Menu(
-        pystray.MenuItem("CogStash ⚡", None, enabled=False),
-        pystray.Menu.SEPARATOR,
-        pystray.MenuItem(f"Open {config.output_file.name}", lambda: _open_output_file(config.output_file)),
-        pystray.MenuItem("Browse Notes", lambda: app_queue.put("BROWSE")),
-        pystray.MenuItem("Settings", lambda: app_queue.put("SETTINGS")),
-        pystray.Menu.SEPARATOR,
-        pystray.MenuItem("Quit", lambda icon: _quit_tray_icon(icon, app_queue)),
-    )
-
-
-def _quit_tray_icon(icon: Any, app_queue: queue.Queue[str]) -> None:
-    """Stop the tray icon and signal the app to quit."""
-    icon.stop()
-    app_queue.put("QUIT")
-
-
-def _start_tray_icon(icon: Any) -> None:
-    """Run the tray icon on a daemon thread."""
-    threading.Thread(target=icon.run, daemon=True).start()
-
-
-def create_tray_icon(app_queue: queue.Queue, config: CogStashConfig) -> None:
-    """Create and run a system tray icon on a daemon thread."""
-    try:
-        import pystray
-        from PIL import Image, ImageDraw, ImageFont
-    except ImportError:
-        logger.warning("pystray or Pillow not installed — skipping tray icon")
-        return
-
-    image = _load_tray_image(Image, ImageDraw, ImageFont, THEMES[config.theme])
-    menu = _build_tray_menu(pystray, app_queue, config)
-    icon = pystray.Icon("cogstash", image, "CogStash", menu)
-    _start_tray_icon(icon)
+    """Compatibility forwarder for UI Windows runtime DPI setup."""
+    windows_runtime.configure_dpi()
 
 
 class CogStash:
@@ -201,7 +100,7 @@ class CogStash:
         self.config = config
         self.config_path = config_path or get_default_config_path()
         self.hotkey_warning: str | None = None
-        self.queue: queue.Queue[str] = queue.Queue()
+        self.queue: queue.Queue[app_runtime.AppCommand] = queue.Queue()
         self.is_visible = False
         self.theme = THEMES[config.theme]
         self.win_size = WINDOW_SIZES[config.window_size]
@@ -423,21 +322,15 @@ class CogStash:
 
     def poll_queue(self):
         """Check the queue for messages from the pynput/tray threads."""
-        try:
-            while True:
-                msg = self.queue.get_nowait()
-                if msg == "SHOW":
-                    self.show_window()
-                elif msg == "BROWSE":
-                    self._open_browse()
-                elif msg == "SETTINGS":
-                    self._open_settings()
-                elif msg == "QUIT":
-                    self.root.quit()
-                    return
-        except queue.Empty:
-            pass
-        self.root.after(100, self.poll_queue)
+        should_continue = app_runtime.drain_app_queue(
+            self.queue,
+            on_show=self.show_window,
+            on_browse=self._open_browse,
+            on_settings=self._open_settings,
+            on_quit=self.root.quit,
+        )
+        if should_continue:
+            self.root.after(100, self.poll_queue)
 
     def _open_browse(self):
         """Open the Browse Notes window."""
@@ -595,15 +488,16 @@ def _announce_startup(config: CogStashConfig, safe_print: Any) -> None:
     safe_print(f"CogStash is running. ({config.hotkey} to capture · Ctrl+C to quit)")
     safe_print(f"Notes → {config.output_file}")
 
-
-def _register_global_hotkey(app: CogStash, config: CogStashConfig, safe_print: Any) -> Any | None:
-    """Register the global hotkey and surface the existing warning flow on failure."""
-    def on_hotkey() -> None:
-        app.queue.put("SHOW")
+def _start_runtime_integrations(
+    app: CogStash,
+    config: CogStashConfig,
+    safe_print: Any,
+) -> app_runtime.AppRuntimeHandles:
+    """Start tray/hotkey integrations and surface the existing warning flow on failure."""
+    runtime_handles = app_runtime.start_runtime(app.queue, config, themes=THEMES)
 
     try:
-        listener = keyboard.GlobalHotKeys({config.hotkey: on_hotkey})
-        listener.start()
+        runtime_handles.hotkey_listener = app_runtime.start_hotkey_listener(app.queue, config.hotkey)
     except Exception:
         app.hotkey_warning = _build_hotkey_failure_warning(config)
         logger.error("Failed to register global hotkey %s", config.hotkey, exc_info=True)
@@ -612,14 +506,12 @@ def _register_global_hotkey(app: CogStash, config: CogStashConfig, safe_print: A
             messagebox.showwarning("CogStash Hotkey Warning", app.hotkey_warning)
         except tk.TclError:
             pass
-        return None
-    return listener
+    return runtime_handles
 
 
-def _shutdown_app(listener: Any | None, instance_guard: Any) -> None:
+def _shutdown_app(runtime_handles: app_runtime.AppRuntimeHandles, instance_guard: Any) -> None:
     """Stop background resources before the process exits."""
-    if listener is not None:
-        listener.stop()
+    app_runtime.shutdown_runtime(runtime_handles)
     instance_guard.close()
 
 
@@ -643,15 +535,14 @@ def main():
 
     app = CogStash(root, config, config_path)
 
-    create_tray_icon(app.queue, config)
-    listener = _register_global_hotkey(app, config, safe_print)
+    runtime_handles = _start_runtime_integrations(app, config, safe_print)
 
     try:
         root.mainloop()
     except KeyboardInterrupt:
         safe_print("\nCogStash stopped.")
     finally:
-        _shutdown_app(listener, instance_guard)
+        _shutdown_app(runtime_handles, instance_guard)
 
 
 if __name__ == "__main__":

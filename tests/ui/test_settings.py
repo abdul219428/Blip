@@ -274,3 +274,38 @@ def test_installer_welcome_dialog_does_not_claim_path_is_changeable_in_settings(
     assert not any("Startup and PATH settings can be changed in Settings" in text for text in labels)
 
     dialog.win.destroy()
+
+
+@needs_display
+def test_settings_save_general_delegates_startup_toggle_to_windows_runtime(tk_root, tmp_path, monkeypatch):
+    from cogstash.ui.app import CogStashConfig
+    from cogstash.ui.settings import SettingsWindow
+
+    calls: list[bool] = []
+    config = CogStashConfig(launch_at_startup=False)
+    config_path = tmp_path / "test.json"
+    sw = SettingsWindow(tk_root, config, config_path)
+    sw.launch_var.set(True)
+
+    monkeypatch.setattr("cogstash.ui.windows_runtime.set_launch_at_startup", lambda enabled: calls.append(enabled))
+
+    sw._save_general()
+
+    assert calls == [True]
+    sw.win.destroy()
+
+
+@needs_display
+def test_settings_open_link_delegates_to_windows_runtime(tk_root, tmp_path, monkeypatch):
+    from cogstash.ui.app import CogStashConfig
+    from cogstash.ui.settings import SettingsWindow
+
+    calls: list[str] = []
+    sw = SettingsWindow(tk_root, CogStashConfig(), tmp_path / "test.json")
+
+    monkeypatch.setattr("cogstash.ui.windows_runtime.open_target_in_shell", lambda target: calls.append(target))
+
+    sw._open_link("https://example.com")
+
+    assert calls == ["https://example.com"]
+    sw.win.destroy()

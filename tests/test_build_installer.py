@@ -6,12 +6,37 @@ import importlib.util
 import re
 import runpy
 import sys
+import uuid
 from pathlib import Path
 
 
+def _scripts_dir() -> Path:
+    return Path(__file__).resolve().parents[1] / "scripts"
+
+
+def _ensure_scripts_dir_on_path() -> None:
+    scripts_dir = str(_scripts_dir())
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+
+
+def _load_artifacts_module():
+    _ensure_scripts_dir_on_path()
+    module_path = _scripts_dir() / "_artifacts.py"
+    spec = importlib.util.spec_from_file_location("_artifacts", module_path)
+    assert spec is not None
+    assert spec.loader is not None
+    if spec.name in sys.modules:
+        return sys.modules[spec.name]
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 def _load_build_installer_module():
-    repo_root = Path(__file__).resolve().parents[1]
-    module_path = repo_root / "scripts" / "build_installer.py"
+    _ensure_scripts_dir_on_path()
+    module_path = _scripts_dir() / "build_installer.py"
     spec = importlib.util.spec_from_file_location("build_installer", module_path)
     assert spec is not None
     assert spec.loader is not None
@@ -21,8 +46,8 @@ def _load_build_installer_module():
 
 
 def _load_build_module():
-    repo_root = Path(__file__).resolve().parents[1]
-    module_path = repo_root / "scripts" / "build.py"
+    _ensure_scripts_dir_on_path()
+    module_path = _scripts_dir() / "build.py"
     spec = importlib.util.spec_from_file_location("build_script", module_path)
     assert spec is not None
     assert spec.loader is not None
@@ -59,6 +84,61 @@ def test_inno_setup_script_uses_per_user_defaults():
     assert "PrivilegesRequired=lowest" in content
     assert "OutputBaseFilename=CogStash-v{#AppVersion}-setup" in content
     assert 'Name: "{group}\\CogStash"; Filename: "{app}\\CogStash.exe"' in content
+
+
+def test_artifact_contract_build_names():
+    module = _load_artifacts_module()
+
+    assert module.get_executable_name(target="ui", bundle_mode="onefile", version="1.2.3") == "CogStash-1.2.3"
+    assert module.get_executable_name(target="ui", bundle_mode="onedir", version="1.2.3") == "CogStash-1.2.3-onedir"
+    assert module.get_executable_name(target="cli", bundle_mode="onefile", version="1.2.3") == "CogStash-CLI-1.2.3"
+
+
+def test_artifact_contract_windows_paths():
+    module = _load_artifacts_module()
+
+    dist_dir = Path("C:/tmp/dist")
+    layout = module.windows_artifact_layout(version="1.2.3", dist_dir=dist_dir)
+
+    assert layout.onedir_dir == dist_dir / "CogStash-1.2.3-onedir"
+    assert layout.onedir_exe == layout.onedir_dir / "CogStash-1.2.3-onedir.exe"
+    assert layout.cli_exe == dist_dir / "CogStash-CLI-1.2.3.exe"
+    assert layout.staged_app_dirname == "CogStash"
+    assert layout.staged_ui_exe_name == "CogStash.exe"
+    assert layout.staged_cli_exe_name == "CogStash-CLI.exe"
+
+
+def test_artifact_contract_release_archive_names():
+    module = _load_artifacts_module()
+
+    assert module.get_release_archive_name(tag="v1.2.3", platform_suffix="windows") == "CogStash-v1.2.3-windows.zip"
+    assert module.get_release_archive_name(tag="v1.2.3", platform_suffix="macos") == "CogStash-v1.2.3-macos.zip"
+    assert module.get_release_archive_name(tag="v1.2.3", platform_suffix="linux") == "CogStash-v1.2.3-linux.tar.gz"
+
+
+def test_artifact_contract_staged_names():
+    module = _load_artifacts_module()
+
+    assert module.get_staged_app_dirname() == "CogStash"
+    assert module.get_staged_ui_exe_name() == "CogStash.exe"
+    assert module.get_staged_cli_exe_name() == "CogStash-CLI.exe"
+
+
+def test_build_script_consumes_shared_artifact_contract():
+    module = _load_build_module()
+
+    assert module.get_executable_name.__module__ == "_artifacts"
+    assert module.get_executable_name(target="ui", bundle_mode="onefile", version="1.2.3") == "CogStash-1.2.3"
+    assert module.get_executable_name(target="cli", bundle_mode="onefile", version="1.2.3") == "CogStash-CLI-1.2.3"
+
+
+def test_build_installer_consumes_shared_artifact_contract():
+    module = _load_build_installer_module()
+
+    assert module.windows_artifact_layout.__module__ == "_artifacts"
+    assert module.get_staged_app_dirname.__module__ == "_artifacts"
+    assert module.get_staged_ui_exe_name.__module__ == "_artifacts"
+    assert module.get_staged_cli_exe_name.__module__ == "_artifacts"
 
 
 def test_inno_setup_script_supports_optional_startup_task():
@@ -191,24 +271,26 @@ def test_installed_startup_state_contract_is_implemented_in_config_and_ui():
     assert ".cogstash-installed" in iss_content
 
 
-def test_stage_windows_payload_copies_bundle_and_renames_exe(tmp_path):
+def test_stage_windows_payload_copies_bundle_and_renames_exe():
     """Stage helper should normalize app names and include the CLI executable."""
     module = _load_build_installer_module()
     version = "1.2.3"
-    bundle_dir = tmp_path / "dist" / f"CogStash-{version}-onedir"
+    repo_root = Path(__file__).resolve().parents[1]
+    scratch_root = repo_root / ".tmp" / f"test-stage-windows-payload-{uuid.uuid4().hex}"
+    bundle_dir = scratch_root / "dist" / f"CogStash-{version}-onedir"
     bundle_dir.mkdir(parents=True)
     (bundle_dir / f"CogStash-{version}-onedir.exe").write_text("exe", encoding="utf-8")
     (bundle_dir / "support.dll").write_text("dll", encoding="utf-8")
     (bundle_dir / "assets").mkdir()
     (bundle_dir / "assets" / "icon.png").write_text("png", encoding="utf-8")
-    cli_binary = tmp_path / "dist" / f"CogStash-CLI-{version}.exe"
+    cli_binary = scratch_root / "dist" / f"CogStash-CLI-{version}.exe"
     cli_binary.write_text("cli", encoding="utf-8")
 
     staged_dir = module.stage_windows_payload(
         bundle_dir=bundle_dir,
         cli_binary=cli_binary,
         version=version,
-        staging_root=tmp_path / "build" / "installer",
+        staging_root=scratch_root / "build" / "installer",
     )
 
     assert staged_dir.name == "CogStash"
@@ -219,7 +301,7 @@ def test_stage_windows_payload_copies_bundle_and_renames_exe(tmp_path):
     assert (staged_dir / "assets" / "icon.png").read_text(encoding="utf-8") == "png"
 
 
-def test_compile_installer_invokes_iscc_with_expected_defines(monkeypatch, tmp_path):
+def test_compile_installer_invokes_iscc_with_expected_defines(monkeypatch):
     """ISCC should receive version, source, and output defines."""
     module = _load_build_installer_module()
     calls = []
@@ -229,9 +311,13 @@ def test_compile_installer_invokes_iscc_with_expected_defines(monkeypatch, tmp_p
 
     monkeypatch.setattr(module.subprocess, "run", fake_run)
 
-    iss_path = tmp_path / "CogStash.iss"
-    source_dir = tmp_path / "payload"
-    output_dir = tmp_path / "dist"
+    repo_root = Path(__file__).resolve().parents[1]
+    scratch_root = repo_root / ".tmp" / f"test-compile-installer-{uuid.uuid4().hex}"
+    scratch_root.mkdir(parents=True)
+    iss_path = scratch_root / "CogStash.iss"
+    iss_path.write_text("; mock", encoding="utf-8")
+    source_dir = scratch_root / "payload"
+    output_dir = scratch_root / "dist"
 
     module.compile_installer(
         compiler="iscc.exe",
@@ -367,6 +453,25 @@ def test_release_workflow_builds_and_uploads_windows_installer():
     assert "dist\\CogStash-*-onedir\\CogStash-*-onedir.exe" in content
     assert "--help output unexpectedly contained Traceback" in content
     assert "--version output unexpectedly contained Traceback" in content
+
+
+def test_release_workflow_uses_shared_artifact_contract():
+    repo_root = Path(__file__).resolve().parents[1]
+    workflow_path = repo_root / ".github" / "workflows" / "release.yml"
+
+    content = workflow_path.read_text(encoding="utf-8")
+
+    assert "sys.path.insert(0, \"scripts\")" in content
+    assert "from _artifacts import get_executable_name" in content
+    assert "from _artifacts import get_release_archive_name" in content
+    assert "get_executable_name(target='ui', bundle_mode='onefile'" in content
+    assert "get_executable_name(target='cli', bundle_mode='onefile'" in content
+    assert "get_release_archive_name(tag=\"${{ github.ref_name }}\", platform_suffix=\"windows\")" in content
+    assert "get_release_archive_name(tag=\"${{ github.ref_name }}\", platform_suffix=\"macos\")" in content
+    assert "get_release_archive_name(tag=\"${{ github.ref_name }}\", platform_suffix=\"linux\")" in content
+    assert "CogStash-${{ github.ref_name }}-windows.zip" not in content
+    assert "CogStash-${{ github.ref_name }}-macos.zip" not in content
+    assert "CogStash-${{ github.ref_name }}-linux.tar.gz" not in content
 
 
 def test_release_workflow_uploads_ui_and_cli_artifacts():

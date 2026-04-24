@@ -21,7 +21,7 @@ def _make_notes_file(tmp_path):
 def test_format_note_color():
     """ANSI escape codes present when use_color=True."""
     from cogstash.cli import format_note
-    from cogstash.search import Note
+    from cogstash.core import Note
 
     note = Note(
         index=1,
@@ -38,7 +38,7 @@ def test_format_note_color():
 def test_format_note_plain():
     """No ANSI codes when use_color=False."""
     from cogstash.cli import format_note
-    from cogstash.search import Note
+    from cogstash.core import Note
 
     note = Note(
         index=1,
@@ -55,7 +55,7 @@ def test_format_note_plain():
 def test_format_done_note():
     """Done notes get strikethrough + dimmed styling."""
     from cogstash.cli import format_note
-    from cogstash.search import Note
+    from cogstash.core import Note
 
     note = Note(
         index=1,
@@ -331,7 +331,7 @@ def test_format_note_custom_tag(tmp_path):
     from datetime import datetime
 
     from cogstash.cli import format_note
-    from cogstash.search import Note
+    from cogstash.core import Note
 
     note = Note(
         index=1,

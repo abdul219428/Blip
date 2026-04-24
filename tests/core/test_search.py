@@ -2,6 +2,7 @@
 
 import builtins
 from datetime import datetime
+from pathlib import Path
 
 
 def test_parse_notes_basic(tmp_path):
@@ -9,7 +10,7 @@ def test_parse_notes_basic(tmp_path):
     f = tmp_path / "cogstash.md"
     f.write_text("- [2026-03-26 14:30] ☐ buy milk #todo\n", encoding="utf-8")
 
-    from cogstash.search import parse_notes
+    from cogstash.core.notes import parse_notes
     notes = parse_notes(f)
 
     assert len(notes) == 1
@@ -32,7 +33,7 @@ def test_parse_notes_multiline(tmp_path):
         encoding="utf-8",
     )
 
-    from cogstash.search import parse_notes
+    from cogstash.core.notes import parse_notes
     notes = parse_notes(f)
 
     assert len(notes) == 1
@@ -41,7 +42,7 @@ def test_parse_notes_multiline(tmp_path):
 
 def test_parse_notes_missing_file(tmp_path):
     """Missing file returns empty list."""
-    from cogstash.search import parse_notes
+    from cogstash.core.notes import parse_notes
     notes = parse_notes(tmp_path / "nonexistent.md")
     assert notes == []
 
@@ -51,7 +52,7 @@ def test_parse_notes_no_prefix(tmp_path):
     f = tmp_path / "cogstash.md"
     f.write_text("- [2026-03-26 14:30] plain note\n", encoding="utf-8")
 
-    from cogstash.search import parse_notes
+    from cogstash.core.notes import parse_notes
     notes = parse_notes(f)
 
     assert notes[0].is_done is False
@@ -73,7 +74,7 @@ def _make_notes_file(tmp_path):
 
 def test_search_keyword(tmp_path):
     """Substring match finds correct notes."""
-    from cogstash.search import parse_notes, search_notes
+    from cogstash.core.notes import parse_notes, search_notes
     notes = parse_notes(_make_notes_file(tmp_path))
     results = search_notes(notes, "buy")
     assert len(results) == 2
@@ -81,7 +82,7 @@ def test_search_keyword(tmp_path):
 
 def test_search_case_insensitive(tmp_path):
     """Search is case-insensitive."""
-    from cogstash.search import parse_notes, search_notes
+    from cogstash.core.notes import parse_notes, search_notes
     notes = parse_notes(_make_notes_file(tmp_path))
     results = search_notes(notes, "MILK")
     assert len(results) == 1
@@ -90,7 +91,7 @@ def test_search_case_insensitive(tmp_path):
 
 def test_search_multi_word(tmp_path):
     """Multiple words are AND'd."""
-    from cogstash.search import parse_notes, search_notes
+    from cogstash.core.notes import parse_notes, search_notes
     notes = parse_notes(_make_notes_file(tmp_path))
     results = search_notes(notes, "buy eggs")
     assert len(results) == 1
@@ -99,7 +100,7 @@ def test_search_multi_word(tmp_path):
 
 def test_filter_by_tag(tmp_path):
     """Filters to only notes with given tag."""
-    from cogstash.search import filter_by_tag, parse_notes
+    from cogstash.core.notes import filter_by_tag, parse_notes
     notes = parse_notes(_make_notes_file(tmp_path))
     results = filter_by_tag(notes, "todo")
     assert len(results) == 2
@@ -129,7 +130,7 @@ def test_note_line_span_single(tmp_path):
         "- [2026-03-26 15:00] meeting\n",
         encoding="utf-8",
     )
-    from cogstash.search import _note_line_span, parse_notes
+    from cogstash.core.notes import _note_line_span, parse_notes
     notes = parse_notes(f)
     lines = f.read_text(encoding="utf-8").splitlines(keepends=True)
     start, end = _note_line_span(lines, notes[0].line_number)
@@ -146,7 +147,7 @@ def test_note_line_span_multiline(tmp_path):
         "- [2026-03-26 15:00] next note\n",
         encoding="utf-8",
     )
-    from cogstash.search import _note_line_span, parse_notes
+    from cogstash.core.notes import _note_line_span, parse_notes
     notes = parse_notes(f)
     lines = f.read_text(encoding="utf-8").splitlines(keepends=True)
     start, end = _note_line_span(lines, notes[0].line_number)
@@ -277,7 +278,7 @@ def test_delete_note_stale_line_number_rejected(tmp_path):
 
 
 def test_compute_stats_current_streak_reuses_date_set(tmp_path, monkeypatch):
-    from cogstash.search import compute_stats, parse_notes
+    from cogstash.core.notes import compute_stats, parse_notes
 
     f = tmp_path / "cogstash.md"
     f.write_text(
@@ -304,6 +305,14 @@ def test_compute_stats_current_streak_reuses_date_set(tmp_path, monkeypatch):
     assert set_calls == 1
 
 
+def test_ui_browse_imports_notes_from_core():
+    browse_source = Path("src/cogstash/ui/browse.py").read_text(encoding="utf-8")
+
+    assert "from cogstash.search import" not in browse_source
+    assert "from cogstash.core import (" in browse_source
+    assert "from cogstash.core.notes import _atomic_write" in browse_source
+
+
 def test_search_reexports_core_helpers():
     import cogstash.core.notes as core_notes
     import cogstash.search as search_mod
@@ -326,3 +335,17 @@ def test_search_reexports_private_helpers():
 
     assert search_mod._atomic_write is core_notes._atomic_write
     assert search_mod._note_line_span is core_notes._note_line_span
+
+
+def test_root_wrappers_identify_as_compatibility_shims():
+    wrapper_paths = [
+        Path("src/cogstash/app.py"),
+        Path("src/cogstash/browse.py"),
+        Path("src/cogstash/settings.py"),
+        Path("src/cogstash/search.py"),
+        Path("src/cogstash/_windows.py"),
+    ]
+
+    for wrapper_path in wrapper_paths:
+        source = wrapper_path.read_text(encoding="utf-8").lower()
+        assert "compatibility shim" in source
