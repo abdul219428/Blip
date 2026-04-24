@@ -106,6 +106,8 @@ def test_artifact_contract_windows_paths():
     assert layout.staged_app_dirname == "CogStash"
     assert layout.staged_ui_exe_name == "CogStash.exe"
     assert layout.staged_cli_exe_name == "CogStash-CLI.exe"
+    assert layout.staged_cli_bin_dirname == "bin"
+    assert layout.staged_cli_shim_name == "cogstash.cmd"
 
 
 def test_artifact_contract_release_archive_names():
@@ -122,6 +124,8 @@ def test_artifact_contract_staged_names():
     assert module.get_staged_app_dirname() == "CogStash"
     assert module.get_staged_ui_exe_name() == "CogStash.exe"
     assert module.get_staged_cli_exe_name() == "CogStash-CLI.exe"
+    assert module.get_staged_cli_bin_dirname() == "bin"
+    assert module.get_staged_cli_shim_name() == "cogstash.cmd"
 
 
 def test_build_script_consumes_shared_artifact_contract():
@@ -139,6 +143,8 @@ def test_build_installer_consumes_shared_artifact_contract():
     assert module.get_staged_app_dirname.__module__ == "_artifacts"
     assert module.get_staged_ui_exe_name.__module__ == "_artifacts"
     assert module.get_staged_cli_exe_name.__module__ == "_artifacts"
+    assert module.get_staged_cli_bin_dirname.__module__ == "_artifacts"
+    assert module.get_staged_cli_shim_name.__module__ == "_artifacts"
 
 
 def test_inno_setup_script_supports_optional_startup_task():
@@ -164,7 +170,7 @@ def test_inno_setup_script_offers_optional_path_task_with_correct_description():
 
     assert 'Name: "addtopath"; Description: "Add CogStash CLI to PATH"' in content
     assert "ChangesEnvironment=yes" in content
-    assert "ExpandConstant('{app}')" in content
+    assert "ExpandConstant('{app}\\bin')" in content
 
 
 def test_shared_artifact_contract_defines_versioned_artifact_names():
@@ -185,6 +191,8 @@ def test_shared_artifact_contract_defines_windows_layout_names():
     assert contract.get_windows_installer_app_dirname() == "CogStash"
     assert contract.get_windows_installer_exe_name() == "CogStash.exe"
     assert contract.get_windows_installer_cli_exe_name() == "CogStash-CLI.exe"
+    assert contract.get_windows_installer_cli_bin_dirname() == "bin"
+    assert contract.get_windows_installer_cli_shim_name() == "cogstash.cmd"
 
 
 def test_shared_artifact_contract_defines_release_archive_names():
@@ -272,7 +280,7 @@ def test_installed_startup_state_contract_is_implemented_in_config_and_ui():
 
 
 def test_stage_windows_payload_copies_bundle_and_renames_exe():
-    """Stage helper should normalize app names and include the CLI executable."""
+    """Stage helper should normalize app names and expose the CLI through a PATH-facing shim."""
     module = _load_build_installer_module()
     version = "1.2.3"
     repo_root = Path(__file__).resolve().parents[1]
@@ -296,6 +304,11 @@ def test_stage_windows_payload_copies_bundle_and_renames_exe():
     assert staged_dir.name == "CogStash"
     assert (staged_dir / "CogStash.exe").read_text(encoding="utf-8") == "exe"
     assert (staged_dir / "CogStash-CLI.exe").read_text(encoding="utf-8") == "cli"
+    cli_shim = staged_dir / "bin" / "cogstash.cmd"
+    assert cli_shim.is_file()
+    shim_contents = cli_shim.read_text(encoding="utf-8")
+    assert "@echo off" in shim_contents
+    assert '"%~dp0..\\CogStash-CLI.exe" %*' in shim_contents
     assert not (staged_dir / f"CogStash-{version}-onedir.exe").exists()
     assert (staged_dir / "support.dll").read_text(encoding="utf-8") == "dll"
     assert (staged_dir / "assets" / "icon.png").read_text(encoding="utf-8") == "png"
@@ -537,6 +550,7 @@ def test_installer_script_installs_cli_binary_without_shortcut():
 
     iss = iss_path.read_text(encoding="utf-8")
     assert "CogStash-CLI.exe" in iss
+    assert "{app}\\bin" in iss
     # No Start Menu or Desktop shortcut entries for CogStash CLI
     assert 'Name: "{group}\\CogStash CLI"' not in iss
     assert 'Name: "{autodesktop}\\CogStash CLI"' not in iss

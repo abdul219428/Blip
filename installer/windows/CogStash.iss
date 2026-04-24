@@ -82,7 +82,7 @@ procedure AddAppToUserPath();
 var
   OldPath, AppDir: String;
 begin
-  AppDir := ExpandConstant('{app}');
+  AppDir := ExpandConstant('{app}\bin');
   if not RegQueryStringValue(HKEY_CURRENT_USER, 'Environment', 'Path', OldPath) then
     OldPath := '';
   if Pos(LowerCase(AppDir + ';'), LowerCase(OldPath + ';')) = 0 then

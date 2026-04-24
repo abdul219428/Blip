@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 
 APP_NAME = "CogStash"
 CLI_NAME = "CogStash-CLI"
@@ -9,6 +10,8 @@ CLI_NAME = "CogStash-CLI"
 STAGED_APP_DIRNAME = APP_NAME
 STAGED_UI_EXE_NAME = f"{APP_NAME}.exe"
 STAGED_CLI_EXE_NAME = f"{CLI_NAME}.exe"
+STAGED_CLI_BIN_DIRNAME = "bin"
+STAGED_CLI_SHIM_NAME = "cogstash.cmd"
 
 
 def get_executable_name(*, target: str, bundle_mode: str, version: str) -> str:
@@ -64,12 +67,34 @@ def get_staged_cli_exe_name() -> str:
     return STAGED_CLI_EXE_NAME
 
 
+def get_staged_cli_bin_dirname() -> str:
+    """Return the PATH-facing CLI bin directory inside the installer staging directory."""
+    return STAGED_CLI_BIN_DIRNAME
+
+
+def get_windows_installer_cli_bin_dirname() -> str:
+    """Compatibility name for the staged Windows CLI bin directory."""
+    return get_staged_cli_bin_dirname()
+
+
+def get_staged_cli_shim_name() -> str:
+    """Return the PATH-facing CLI shim filename inside the installer staging directory."""
+    return STAGED_CLI_SHIM_NAME
+
+
+def get_windows_installer_cli_shim_name() -> str:
+    """Compatibility name for the staged Windows CLI shim filename."""
+    return get_staged_cli_shim_name()
+
+
 def get_windows_installer_cli_exe_name() -> str:
     """Compatibility name for the staged Windows CLI executable."""
     return get_staged_cli_exe_name()
 
 
-def get_release_archive_name(*, tag: str | None = None, ref_name: str | None = None, platform_suffix: str) -> str:
+def get_release_archive_name(
+    *, tag: Optional[str] = None, ref_name: Optional[str] = None, platform_suffix: str
+) -> str:
     """Return the release archive filename for a tag and platform."""
     release_ref = tag if tag is not None else ref_name
     if release_ref is None:
@@ -93,6 +118,8 @@ class WindowsArtifactLayout:
     staged_app_dirname: str = STAGED_APP_DIRNAME
     staged_ui_exe_name: str = STAGED_UI_EXE_NAME
     staged_cli_exe_name: str = STAGED_CLI_EXE_NAME
+    staged_cli_bin_dirname: str = STAGED_CLI_BIN_DIRNAME
+    staged_cli_shim_name: str = STAGED_CLI_SHIM_NAME
 
 
 def windows_artifact_layout(*, version: str, dist_dir: Path) -> WindowsArtifactLayout:
