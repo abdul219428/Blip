@@ -7,10 +7,15 @@ import argparse
 import re
 import shutil
 import subprocess
+import sys
 from importlib.metadata import version as package_version
 from pathlib import Path
 
-from scripts import _artifacts
+try:
+    from scripts import _artifacts
+except ModuleNotFoundError:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import _artifacts  # type: ignore[no-redef]
 
 get_staged_app_dirname = _artifacts.get_staged_app_dirname
 get_staged_cli_exe_name = _artifacts.get_staged_cli_exe_name

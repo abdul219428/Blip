@@ -10,7 +10,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-from scripts import _artifacts
+try:
+    from scripts import _artifacts
+except ModuleNotFoundError:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import _artifacts  # type: ignore[no-redef]
 
 get_executable_name = _artifacts.get_executable_name
 get_executable_name.__module__ = "_artifacts"
