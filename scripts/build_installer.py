@@ -18,11 +18,15 @@ except ModuleNotFoundError:
     import _artifacts  # type: ignore[no-redef]
 
 get_staged_app_dirname = _artifacts.get_staged_app_dirname
+get_staged_cli_bin_dirname = _artifacts.get_staged_cli_bin_dirname
 get_staged_cli_exe_name = _artifacts.get_staged_cli_exe_name
+get_staged_cli_shim_name = _artifacts.get_staged_cli_shim_name
 get_staged_ui_exe_name = _artifacts.get_staged_ui_exe_name
 windows_artifact_layout = _artifacts.windows_artifact_layout
 get_staged_app_dirname.__module__ = "_artifacts"
+get_staged_cli_bin_dirname.__module__ = "_artifacts"
 get_staged_cli_exe_name.__module__ = "_artifacts"
+get_staged_cli_shim_name.__module__ = "_artifacts"
 get_staged_ui_exe_name.__module__ = "_artifacts"
 windows_artifact_layout.__module__ = "_artifacts"
 
@@ -68,6 +72,11 @@ def find_windows_cli_binary(dist_dir: Path, version: str) -> Path:
     return cli_binary
 
 
+def _cli_shim_contents() -> str:
+    """Return the batch shim used for PATH-based CLI invocation on Windows."""
+    return '@echo off\n"%~dp0..\\' + get_staged_cli_exe_name() + '" %*\n'
+
+
 def stage_windows_payload(*, bundle_dir: Path, cli_binary: Path, version: str, staging_root: Path) -> Path:
     """Copy the versioned onedir bundle into a versionless installer payload."""
     layout = windows_artifact_layout(version=version, dist_dir=bundle_dir.parent)
@@ -82,6 +91,9 @@ def stage_windows_payload(*, bundle_dir: Path, cli_binary: Path, version: str, s
     staged_exe = staged_dir / get_staged_ui_exe_name()
     versioned_exe.rename(staged_exe)
     shutil.copy2(cli_binary, staged_dir / get_staged_cli_exe_name())
+    cli_bin_dir = staged_dir / get_staged_cli_bin_dirname()
+    cli_bin_dir.mkdir()
+    (cli_bin_dir / get_staged_cli_shim_name()).write_text(_cli_shim_contents(), encoding="utf-8")
     return staged_dir
 
 
