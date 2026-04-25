@@ -1108,6 +1108,32 @@ def test_cmd_config_set(tmp_path, capsys):
     assert "dracula" in output
 
 
+def test_cmd_config_set_recovers_from_non_object_json(tmp_path, capsys):
+    """config set should recover when the config file contains a non-object JSON value."""
+    import json
+    from types import SimpleNamespace
+
+    from cogstash.cli import cmd_config
+    from cogstash.core import CogStashConfig
+
+    config_path = tmp_path / ".cogstash.json"
+
+    for raw in ("[]", '"hello"', "42", "null"):
+        config_path.write_text(raw, encoding="utf-8")
+
+        cmd_config(
+            SimpleNamespace(action="set", key="theme", value="dracula"),
+            CogStashConfig(theme="tokyo-night"),
+            config_path=config_path,
+        )
+
+        data = json.loads(config_path.read_text(encoding="utf-8"))
+        assert data["theme"] == "dracula"
+
+    output = capsys.readouterr().out
+    assert "theme = dracula" in output
+
+
 def test_cmd_config_set_invalid_theme(tmp_path, capsys):
     """cogstash config set rejects invalid theme."""
     config_path = tmp_path / ".cogstash.json"
@@ -1146,6 +1172,33 @@ def test_cmd_config_wizard(tmp_path, monkeypatch, capsys):
     )
     output = capsys.readouterr().out
     assert "saved" in output.lower() or "Config" in output
+
+
+def test_cmd_config_wizard_recovers_from_non_object_json(tmp_path, monkeypatch, capsys):
+    """config wizard should recover when the config file contains a non-object JSON value."""
+    import json
+    from types import SimpleNamespace
+
+    from cogstash.cli import cmd_config
+    from cogstash.core import CogStashConfig
+
+    config_path = tmp_path / ".cogstash.json"
+
+    for raw in ("[]", '"hello"', "42", "null"):
+        config_path.write_text(raw, encoding="utf-8")
+        monkeypatch.setattr("builtins.input", lambda _: "")
+
+        cmd_config(
+            SimpleNamespace(action=None, key=None, value=None),
+            CogStashConfig(),
+            config_path=config_path,
+        )
+
+        data = json.loads(config_path.read_text(encoding="utf-8"))
+        assert isinstance(data, dict)
+
+    output = capsys.readouterr().out
+    assert "saved" in output.lower() or "config" in output.lower()
 
 
 def test_cmd_config_get_invalid_key(tmp_path, capsys):
