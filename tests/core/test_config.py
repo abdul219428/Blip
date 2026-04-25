@@ -111,6 +111,56 @@ def test_load_config_null_path_values_fall_back_to_defaults(tmp_path, caplog):
     assert "Invalid log_file" in caplog.text
 
 
+def test_load_config_launch_at_startup_true_round_trips(tmp_path):
+    from cogstash.core import load_config
+
+    cfg_file = tmp_path / "cogstash.json"
+    cfg_file.write_text(json.dumps({"launch_at_startup": True}), encoding="utf-8")
+
+    config = load_config(cfg_file)
+
+    assert config.launch_at_startup is True
+
+
+def test_load_config_invalid_launch_at_startup_string_falls_back_to_default(tmp_path, caplog):
+    from cogstash.core import load_config
+
+    cfg_file = tmp_path / "cogstash.json"
+    cfg_file.write_text(json.dumps({"launch_at_startup": "false"}), encoding="utf-8")
+
+    with caplog.at_level("WARNING", logger="cogstash"):
+        config = load_config(cfg_file)
+
+    assert config.launch_at_startup is False
+    assert "Invalid launch_at_startup" in caplog.text
+
+
+def test_load_config_invalid_launch_at_startup_object_falls_back_to_default(tmp_path, caplog):
+    from cogstash.core import load_config
+
+    cfg_file = tmp_path / "cogstash.json"
+    cfg_file.write_text(json.dumps({"launch_at_startup": {"bad": True}}), encoding="utf-8")
+
+    with caplog.at_level("WARNING", logger="cogstash"):
+        config = load_config(cfg_file)
+
+    assert config.launch_at_startup is False
+    assert "Invalid launch_at_startup" in caplog.text
+
+
+def test_load_config_invalid_launch_at_startup_null_falls_back_to_default(tmp_path, caplog):
+    from cogstash.core import load_config
+
+    cfg_file = tmp_path / "cogstash.json"
+    cfg_file.write_text(json.dumps({"launch_at_startup": None}), encoding="utf-8")
+
+    with caplog.at_level("WARNING", logger="cogstash"):
+        config = load_config(cfg_file)
+
+    assert config.launch_at_startup is False
+    assert "Invalid launch_at_startup" in caplog.text
+
+
 def test_load_config_non_object_json_list_falls_back_to_defaults(tmp_path, caplog):
     from cogstash.core import load_config
 
