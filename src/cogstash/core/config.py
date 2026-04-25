@@ -62,6 +62,15 @@ def _validated_path_value(merged: dict[str, object], *, key: str, default: str) 
     return Path(raw_value).expanduser()
 
 
+def _validated_bool_value(merged: dict[str, object], *, key: str, default: bool) -> bool:
+    """Return a config boolean field or a safe default when the stored value is invalid."""
+    raw_value = merged.get(key, default)
+    if not isinstance(raw_value, bool):
+        logger.warning("Invalid %s value %r — falling back to %s", key, raw_value, default)
+        return default
+    return raw_value
+
+
 def load_config(config_path: Path) -> CogStashConfig:
     """Load config from JSON file, merging with defaults."""
     default_output_file = str(Path.home() / "cogstash.md")
@@ -130,7 +139,7 @@ def load_config(config_path: Path) -> CogStashConfig:
         theme=merged["theme"],
         window_size=merged["window_size"],
         tags=valid_tags if valid_tags else None,
-        launch_at_startup=bool(merged.get("launch_at_startup", False)),
+        launch_at_startup=_validated_bool_value(merged, key="launch_at_startup", default=False),
         last_seen_version=str(merged.get("last_seen_version", "")),
         last_seen_installer_version=str(merged.get("last_seen_installer_version", "")),
     )
