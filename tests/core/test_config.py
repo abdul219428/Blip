@@ -70,6 +70,19 @@ def test_load_config_unknown_window_size(tmp_path):
     assert config.window_size == "default"
 
 
+def test_load_config_invalid_hotkey_type_falls_back_to_default(tmp_path, caplog):
+    from cogstash.core import load_config
+
+    cfg_file = tmp_path / "cogstash.json"
+    cfg_file.write_text(json.dumps({"hotkey": []}), encoding="utf-8")
+
+    with caplog.at_level("WARNING", logger="cogstash"):
+        config = load_config(cfg_file)
+
+    assert config.hotkey == "<ctrl>+<shift>+<space>"
+    assert "Invalid hotkey" in caplog.text
+
+
 def test_load_config_invalid_output_file_type_falls_back_to_default(tmp_path, caplog):
     from cogstash.core import load_config
 
