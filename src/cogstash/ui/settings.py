@@ -36,6 +36,9 @@ def validate_notes_file_path(value: str) -> tuple[bool, str | None]:
     """Validate the notes file path entered in settings and onboarding flows."""
     if not value.strip():
         return False, "Notes file path is required."
+    candidate = Path(value).expanduser()
+    if candidate.exists() and candidate.is_dir():
+        return False, "Notes file path must point to a file, not a directory."
     return True, None
 
 
