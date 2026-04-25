@@ -10,7 +10,7 @@ from pynput import keyboard
 
 from cogstash.core import DEFAULT_SMART_TAGS, CogStashConfig, merge_tags, save_config
 from cogstash.ui import windows_runtime
-from cogstash.ui.app import (
+from cogstash.ui.ui_shared import (
     THEMES,
     WINDOW_SIZES,
     platform_font,

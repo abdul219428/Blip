@@ -25,7 +25,7 @@ from cogstash.core import (
     search_notes,
 )
 from cogstash.core.notes import _atomic_write
-from cogstash.ui.app import THEMES, platform_font
+from cogstash.ui.ui_shared import THEMES, platform_font
 
 
 class BrowseWindow:
