@@ -303,15 +303,26 @@ def test_app_open_settings_uses_shared_config_path(tk_root, tmp_path):
 
 def test_settings_module_imports_core_owned_config_helpers():
     settings_source = Path("src/cogstash/ui/settings.py").read_text(encoding="utf-8")
-    _, ui_app_import_block = settings_source.split("from cogstash.ui.app import (", 1)
-    ui_app_import_block = ui_app_import_block.split(")", 1)[0]
+    _, ui_shared_import_block = settings_source.split("from cogstash.ui.ui_shared import (", 1)
+    ui_shared_import_block = ui_shared_import_block.split(")", 1)[0]
 
     assert "from cogstash.core import " in settings_source
+    assert "from cogstash.ui.app import " not in settings_source
     assert "DEFAULT_SMART_TAGS" in settings_source
     assert "CogStashConfig" in settings_source
     assert "merge_tags" in settings_source
     assert "save_config" in settings_source
-    assert "DEFAULT_SMART_TAGS" not in ui_app_import_block
-    assert "CogStashConfig" not in ui_app_import_block
-    assert "merge_tags" not in ui_app_import_block
-    assert "save_config" not in ui_app_import_block
+    assert "THEMES" in ui_shared_import_block
+    assert "WINDOW_SIZES" in ui_shared_import_block
+    assert "platform_font" in ui_shared_import_block
+    assert "DEFAULT_SMART_TAGS" not in ui_shared_import_block
+    assert "CogStashConfig" not in ui_shared_import_block
+    assert "merge_tags" not in ui_shared_import_block
+    assert "save_config" not in ui_shared_import_block
+
+
+def test_browse_module_imports_shared_ui_contract_not_app():
+    browse_source = Path("src/cogstash/ui/browse.py").read_text(encoding="utf-8")
+
+    assert "from cogstash.ui.ui_shared import THEMES, platform_font" in browse_source
+    assert "from cogstash.ui.app import THEMES, platform_font" not in browse_source

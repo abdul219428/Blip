@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import logging
 import queue
-import sys
 import tkinter as tk
 from pathlib import Path
 from tkinter import messagebox
@@ -26,23 +25,9 @@ from cogstash.core import (
 )
 from cogstash.core import parse_smart_tags as _parse_smart_tags
 from cogstash.ui import app_runtime, windows_runtime
+from cogstash.ui.ui_shared import THEMES, WINDOW_SIZES, platform_font
 
 parse_smart_tags = _parse_smart_tags
-
-# ── Data ──────────────────────────────────────────────────────────────────────
-THEMES = {
-    "tokyo-night": {"bg": "#1a1b26", "fg": "#a9b1d6", "entry_bg": "#24283b", "accent": "#7aa2f7", "muted": "#565f89", "error": "#f7768e"},
-    "light":       {"bg": "#faf4ed", "fg": "#575279", "entry_bg": "#f2e9e1", "accent": "#d7827e", "muted": "#9893a5", "error": "#b4637a"},
-    "dracula":     {"bg": "#282a36", "fg": "#f8f8f2", "entry_bg": "#44475a", "accent": "#bd93f9", "muted": "#6272a4", "error": "#ff5555"},
-    "gruvbox":     {"bg": "#282828", "fg": "#ebdbb2", "entry_bg": "#3c3836", "accent": "#b8bb26", "muted": "#665c54", "error": "#fb4934"},
-    "mono":        {"bg": "#0a0a0a", "fg": "#d0d0d0", "entry_bg": "#1a1a1a", "accent": "#d0d0d0", "muted": "#4a4a4a", "error": "#ff3333"},
-}
-
-WINDOW_SIZES = {
-    "compact": {"width": 320, "lines": 2, "max_lines": 5},
-    "default": {"width": 400, "lines": 3, "max_lines": 8},
-    "wide":    {"width": 520, "lines": 4, "max_lines": 10},
-}
 
 # ── Config ────────────────────────────────────────────────────────────────────
 LOG_FILE    = Path.home() / "cogstash.log"
@@ -77,16 +62,6 @@ def _build_hotkey_failure_warning(config: CogStashConfig) -> str:
         f"See the log file for technical details: {config.log_file}\n"
         "If needed, change the hotkey in config for now, then restart CogStash."
     )
-
-
-def platform_font() -> str:
-    """Return the native font family for the current OS."""
-    fonts = {
-        "win32": "Segoe UI",
-        "darwin": "Helvetica Neue",
-        "linux": "sans-serif",
-    }
-    return fonts.get(sys.platform, "TkDefaultFont")
 
 
 def configure_dpi() -> None:
