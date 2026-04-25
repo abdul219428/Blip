@@ -404,6 +404,14 @@ def _load_mutable_config_data(config_path: Path) -> dict[str, object]:
     return dict(data)
 
 
+def _validate_cli_config_path_value(value: str, *, key: str) -> str | None:
+    """Validate a CLI-supplied config path value, returning an error when invalid."""
+    candidate = Path(value).expanduser()
+    if candidate.exists() and candidate.is_dir():
+        return f"Error: {key} must point to a file, not a directory."
+    return None
+
+
 def _config_wizard(config: CogStashConfig, config_path: Path) -> None:
     """Interactive configuration wizard — walks through all settings."""
     valid_themes = _get_valid_themes()
@@ -441,13 +449,21 @@ def _config_wizard(config: CogStashConfig, config_path: Path) -> None:
     safe_print(f"  Current: {config.output_file}")
     value = input("  New path: ").strip()
     if value:
-        data["output_file"] = value
+        error = _validate_cli_config_path_value(value, key="output_file")
+        if error:
+            safe_print(f"  ⚠ {error[7:]}")
+        else:
+            data["output_file"] = value
 
     safe_print("\n❺ Log File")
     safe_print(f"  Current: {config.log_file}")
     value = input("  New path: ").strip()
     if value:
-        data["log_file"] = value
+        error = _validate_cli_config_path_value(value, key="log_file")
+        if error:
+            safe_print(f"  ⚠ {error[7:]}")
+        else:
+            data["log_file"] = value
 
     safe_print("\n❻ Custom Tags")
     if config.tags:
@@ -507,6 +523,11 @@ def cmd_config(args, config: CogStashConfig, ansi_tag=None, config_path: Path | 
     if args.key == "window_size" and args.value not in valid_sizes:
         safe_print(f"Error: invalid window_size '{args.value}'. Valid: {', '.join(valid_sizes)}", file=sys.stderr)
         sys.exit(1)
+    if args.key in {"output_file", "log_file"}:
+        error = _validate_cli_config_path_value(args.value, key=args.key)
+        if error:
+            safe_print(error, file=sys.stderr)
+            sys.exit(1)
 
     data = _load_mutable_config_data(config_path)
     data[args.key] = args.value

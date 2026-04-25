@@ -11,9 +11,9 @@ _HEX_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 _DEFAULT_HOTKEY = "<ctrl>+<shift>+<space>"
 _DEFAULT_THEME = "tokyo-night"
 _DEFAULT_WINDOW_SIZE = "default"
-# Keep this in sync with THEMES in cogstash.ui.app. tests/core/test_config.py guards the key set.
+# Keep this in sync with THEMES in cogstash.ui.ui_shared. tests/core/test_config.py guards the key set.
 VALID_THEMES = {"tokyo-night", "light", "dracula", "gruvbox", "mono"}
-# Keep this in sync with WINDOW_SIZES in cogstash.ui.app. tests/core/test_config.py guards the key set.
+# Keep this in sync with WINDOW_SIZES in cogstash.ui.ui_shared. tests/core/test_config.py guards the key set.
 VALID_WINDOW_SIZES = {"compact", "default", "wide"}
 
 logger = logging.getLogger("cogstash")
@@ -60,6 +60,15 @@ def _validated_path_value(merged: dict[str, object], *, key: str, default: str) 
         logger.warning("Invalid %s value %r — falling back to %s", key, raw_value, default)
         raw_value = default
     return Path(raw_value).expanduser()
+
+
+def _validated_string_value(merged: dict[str, object], *, key: str, default: str) -> str:
+    """Return a config string field or a safe default when the stored value is invalid."""
+    raw_value = merged.get(key, default)
+    if not isinstance(raw_value, str):
+        logger.warning("Invalid %s value %r — falling back to %s", key, raw_value, default)
+        return default
+    return raw_value
 
 
 def _validated_bool_value(merged: dict[str, object], *, key: str, default: bool) -> bool:
@@ -133,7 +142,7 @@ def load_config(config_path: Path) -> CogStashConfig:
             valid_tags[name] = {"emoji": emoji, "color": color}
 
     return CogStashConfig(
-        hotkey=merged["hotkey"],
+        hotkey=_validated_string_value(merged, key="hotkey", default=_DEFAULT_HOTKEY),
         output_file=_validated_path_value(merged, key="output_file", default=default_output_file),
         log_file=_validated_path_value(merged, key="log_file", default=default_log_file),
         theme=merged["theme"],

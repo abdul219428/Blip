@@ -1153,6 +1153,58 @@ def test_cmd_config_set_invalid_theme(tmp_path, capsys):
         )
 
 
+def test_cmd_config_set_rejects_directory_output_file(tmp_path, capsys):
+    """config set should reject directory targets for output_file."""
+    import json
+    from types import SimpleNamespace
+
+    import pytest
+
+    from cogstash.cli import cmd_config
+    from cogstash.core import CogStashConfig
+
+    config_path = tmp_path / ".cogstash.json"
+    config_path.write_text("{}", encoding="utf-8")
+    output_dir = tmp_path / "notes-dir"
+    output_dir.mkdir()
+
+    with pytest.raises(SystemExit):
+        cmd_config(
+            SimpleNamespace(action="set", key="output_file", value=str(output_dir)),
+            CogStashConfig(),
+            config_path=config_path,
+        )
+
+    assert json.loads(config_path.read_text(encoding="utf-8")) == {}
+    assert "must point to a file, not a directory" in capsys.readouterr().err
+
+
+def test_cmd_config_set_rejects_directory_log_file(tmp_path, capsys):
+    """config set should reject directory targets for log_file."""
+    import json
+    from types import SimpleNamespace
+
+    import pytest
+
+    from cogstash.cli import cmd_config
+    from cogstash.core import CogStashConfig
+
+    config_path = tmp_path / ".cogstash.json"
+    config_path.write_text("{}", encoding="utf-8")
+    log_dir = tmp_path / "logs-dir"
+    log_dir.mkdir()
+
+    with pytest.raises(SystemExit):
+        cmd_config(
+            SimpleNamespace(action="set", key="log_file", value=str(log_dir)),
+            CogStashConfig(),
+            config_path=config_path,
+        )
+
+    assert json.loads(config_path.read_text(encoding="utf-8")) == {}
+    assert "must point to a file, not a directory" in capsys.readouterr().err
+
+
 def test_cmd_config_wizard(tmp_path, monkeypatch, capsys):
     """Interactive wizard updates config file."""
     config_path = tmp_path / ".cogstash.json"
@@ -1172,6 +1224,60 @@ def test_cmd_config_wizard(tmp_path, monkeypatch, capsys):
     )
     output = capsys.readouterr().out
     assert "saved" in output.lower() or "Config" in output
+
+
+def test_cmd_config_wizard_skips_directory_output_file(tmp_path, monkeypatch, capsys):
+    """config wizard should skip directory targets for output_file instead of saving them."""
+    import json
+    from types import SimpleNamespace
+
+    from cogstash.cli import cmd_config
+    from cogstash.core import CogStashConfig
+
+    config_path = tmp_path / ".cogstash.json"
+    config_path.write_text("{}", encoding="utf-8")
+    output_dir = tmp_path / "notes-dir"
+    output_dir.mkdir()
+
+    responses = iter(["", "", "", str(output_dir), "", ""])
+    monkeypatch.setattr("builtins.input", lambda _: next(responses))
+
+    cmd_config(
+        SimpleNamespace(action=None, key=None, value=None),
+        CogStashConfig(),
+        config_path=config_path,
+    )
+
+    data = json.loads(config_path.read_text(encoding="utf-8"))
+    assert "output_file" not in data
+    assert "must point to a file, not a directory" in capsys.readouterr().out
+
+
+def test_cmd_config_wizard_skips_directory_log_file(tmp_path, monkeypatch, capsys):
+    """config wizard should skip directory targets for log_file instead of saving them."""
+    import json
+    from types import SimpleNamespace
+
+    from cogstash.cli import cmd_config
+    from cogstash.core import CogStashConfig
+
+    config_path = tmp_path / ".cogstash.json"
+    config_path.write_text("{}", encoding="utf-8")
+    log_dir = tmp_path / "logs-dir"
+    log_dir.mkdir()
+
+    responses = iter(["", "", "", "", str(log_dir), ""])
+    monkeypatch.setattr("builtins.input", lambda _: next(responses))
+
+    cmd_config(
+        SimpleNamespace(action=None, key=None, value=None),
+        CogStashConfig(),
+        config_path=config_path,
+    )
+
+    data = json.loads(config_path.read_text(encoding="utf-8"))
+    assert "log_file" not in data
+    assert "must point to a file, not a directory" in capsys.readouterr().out
 
 
 def test_cmd_config_wizard_recovers_from_non_object_json(tmp_path, monkeypatch, capsys):
