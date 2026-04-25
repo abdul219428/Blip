@@ -783,6 +783,51 @@ def test_cmd_export_md(tmp_path, monkeypatch, capsys):
     assert "buy milk" in content
 
 
+def test_cmd_export_md_indents_multiline_note_bodies(tmp_path):
+    from types import SimpleNamespace
+
+    from cogstash.cli import cmd_export
+    from cogstash.core import CogStashConfig
+
+    notes_file = tmp_path / "cogstash.md"
+    notes_file.write_text(
+        "- [2026-03-28 09:00] first line #todo\n"
+        "  second line\n"
+        "  third line\n",
+        encoding="utf-8",
+    )
+    out_path = tmp_path / "multiline.md"
+
+    cmd_export(SimpleNamespace(format="md", output=str(out_path)), CogStashConfig(output_file=notes_file))
+
+    content = out_path.read_text(encoding="utf-8")
+    assert "- **[2026-03-28 09:00]**  first line #todo  `#todo`" in content
+    assert "  second line" in content
+    assert "  third line" in content
+
+
+def test_cmd_export_md_keeps_mixed_single_and_multiline_entries_stable(tmp_path):
+    from types import SimpleNamespace
+
+    from cogstash.cli import cmd_export
+    from cogstash.core import CogStashConfig
+
+    notes_file = tmp_path / "cogstash.md"
+    notes_file.write_text(
+        "- [2026-03-28 09:00] single line #idea\n"
+        "- [2026-03-28 10:00] multi start #todo\n"
+        "  multi tail\n",
+        encoding="utf-8",
+    )
+    out_path = tmp_path / "mixed.md"
+
+    cmd_export(SimpleNamespace(format="md", output=str(out_path)), CogStashConfig(output_file=notes_file))
+
+    content = out_path.read_text(encoding="utf-8")
+    assert "- **[2026-03-28 09:00]**  single line #idea  `#idea`" in content
+    assert "- **[2026-03-28 10:00]**  multi start #todo  `#todo`\n  multi tail\n" in content
+
+
 def test_cmd_export_custom_output(tmp_path, capsys):
     """--output flag writes to specified path."""
     import json

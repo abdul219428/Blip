@@ -52,12 +52,23 @@ def write_json_file(path: Path, data: object) -> None:
     path.write_text(to_pretty_json(data), encoding="utf-8")
 
 
+def _validated_path_value(merged: dict[str, object], *, key: str, default: str) -> Path:
+    """Return a config path field or a safe default when the stored value is invalid."""
+    raw_value = merged.get(key, default)
+    if not isinstance(raw_value, str):
+        logger.warning("Invalid %s value %r — falling back to %s", key, raw_value, default)
+        raw_value = default
+    return Path(raw_value).expanduser()
+
+
 def load_config(config_path: Path) -> CogStashConfig:
     """Load config from JSON file, merging with defaults."""
+    default_output_file = str(Path.home() / "cogstash.md")
+    default_log_file = str(Path.home() / "cogstash.log")
     defaults = {
         "hotkey": _DEFAULT_HOTKEY,
-        "output_file": str(Path.home() / "cogstash.md"),
-        "log_file": str(Path.home() / "cogstash.log"),
+        "output_file": default_output_file,
+        "log_file": default_log_file,
         "theme": _DEFAULT_THEME,
         "window_size": _DEFAULT_WINDOW_SIZE,
         "launch_at_startup": False,
@@ -109,8 +120,8 @@ def load_config(config_path: Path) -> CogStashConfig:
 
     return CogStashConfig(
         hotkey=merged["hotkey"],
-        output_file=Path(merged["output_file"]).expanduser(),
-        log_file=Path(merged["log_file"]).expanduser(),
+        output_file=_validated_path_value(merged, key="output_file", default=default_output_file),
+        log_file=_validated_path_value(merged, key="log_file", default=default_log_file),
         theme=merged["theme"],
         window_size=merged["window_size"],
         tags=valid_tags if valid_tags else None,
