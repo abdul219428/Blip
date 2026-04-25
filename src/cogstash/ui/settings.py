@@ -32,6 +32,13 @@ def validate_hotkey(value: str) -> tuple[bool, str | None]:
     return True, None
 
 
+def validate_notes_file_path(value: str) -> tuple[bool, str | None]:
+    """Validate the notes file path entered in settings and onboarding flows."""
+    if not value.strip():
+        return False, "Notes file path is required."
+    return True, None
+
+
 class SettingsWindow:
     """Tab-based settings window accessible from the tray menu."""
 
@@ -241,8 +248,13 @@ class SettingsWindow:
         if not is_valid:
             messagebox.showerror("Invalid Hotkey", error, parent=self.win)
             return
+        notes_path = self.notes_file_var.get()
+        is_valid, error = validate_notes_file_path(notes_path)
+        if not is_valid:
+            messagebox.showerror("Invalid Notes File", error, parent=self.win)
+            return
         self.config.hotkey = hotkey
-        self.config.output_file = Path(self.notes_file_var.get()).expanduser()
+        self.config.output_file = Path(notes_path).expanduser()
         new_launch = self.launch_var.get()
         if new_launch != self.config.launch_at_startup:
             windows_runtime.set_launch_at_startup(new_launch)
@@ -789,8 +801,13 @@ class WizardWindow:
         if not is_valid:
             messagebox.showerror("Invalid Hotkey", error, parent=self.win)
             return
+        notes_path = self.notes_file_var.get()
+        is_valid, error = validate_notes_file_path(notes_path)
+        if not is_valid:
+            messagebox.showerror("Invalid Notes File", error, parent=self.win)
+            return
         self.config.hotkey = hotkey
-        self.config.output_file = Path(self.notes_file_var.get()).expanduser()
+        self.config.output_file = Path(notes_path).expanduser()
         self.config.theme = self.selected_theme.get()
         self.config.window_size = self.selected_size.get()
         self.config.last_seen_version = __version__
