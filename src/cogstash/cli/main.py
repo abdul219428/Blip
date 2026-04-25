@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
 
@@ -385,19 +386,29 @@ def _get_valid_window_sizes() -> list[str]:
     return sorted(VALID_WINDOW_SIZES)
 
 
-def _config_wizard(config: CogStashConfig, config_path: Path) -> None:
-    """Interactive configuration wizard — walks through all settings."""
+def _load_mutable_config_data(config_path: Path) -> dict[str, object]:
+    """Load writable config JSON, falling back to an empty object on bad shapes."""
     import json as json_mod
 
+    if not config_path.exists():
+        return {}
+
+    try:
+        data = json_mod.loads(config_path.read_text(encoding="utf-8"))
+    except (json_mod.JSONDecodeError, OSError):
+        return {}
+
+    if not isinstance(data, Mapping):
+        return {}
+
+    return dict(data)
+
+
+def _config_wizard(config: CogStashConfig, config_path: Path) -> None:
+    """Interactive configuration wizard — walks through all settings."""
     valid_themes = _get_valid_themes()
     valid_sizes = _get_valid_window_sizes()
-
-    data = {}
-    if config_path.exists():
-        try:
-            data = json_mod.loads(config_path.read_text(encoding="utf-8"))
-        except (json_mod.JSONDecodeError, OSError):
-            data = {}
+    data = _load_mutable_config_data(config_path)
 
     safe_print("⚙️  CogStash Configuration Wizard")
     safe_print("Press Enter to keep current value\n")
@@ -454,8 +465,6 @@ def _config_wizard(config: CogStashConfig, config_path: Path) -> None:
 
 def cmd_config(args, config: CogStashConfig, ansi_tag=None, config_path: Path | None = None):
     """View or modify CogStash configuration."""
-    import json as json_mod
-
     if config_path is None:
         config_path = get_default_config_path()
 
@@ -499,12 +508,7 @@ def cmd_config(args, config: CogStashConfig, ansi_tag=None, config_path: Path | 
         safe_print(f"Error: invalid window_size '{args.value}'. Valid: {', '.join(valid_sizes)}", file=sys.stderr)
         sys.exit(1)
 
-    data = {}
-    if config_path.exists():
-        try:
-            data = json_mod.loads(config_path.read_text(encoding="utf-8"))
-        except (json_mod.JSONDecodeError, OSError):
-            data = {}
+    data = _load_mutable_config_data(config_path)
     data[args.key] = args.value
     write_json_file(config_path, data)
     safe_print(f"{args.key} = {args.value}")
