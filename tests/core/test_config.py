@@ -111,6 +111,59 @@ def test_load_config_null_path_values_fall_back_to_defaults(tmp_path, caplog):
     assert "Invalid log_file" in caplog.text
 
 
+def test_load_config_non_object_json_list_falls_back_to_defaults(tmp_path, caplog):
+    from cogstash.core import load_config
+
+    cfg_file = tmp_path / "cogstash.json"
+    cfg_file.write_text("[]", encoding="utf-8")
+
+    with caplog.at_level("WARNING", logger="cogstash"):
+        config = load_config(cfg_file)
+
+    assert config.theme == "tokyo-night"
+    assert config.output_file == Path.home() / "cogstash.md"
+    assert "top-level JSON value must be an object" in caplog.text
+
+
+def test_load_config_non_object_json_string_falls_back_to_defaults(tmp_path, caplog):
+    from cogstash.core import load_config
+
+    cfg_file = tmp_path / "cogstash.json"
+    cfg_file.write_text('"hello"', encoding="utf-8")
+
+    with caplog.at_level("WARNING", logger="cogstash"):
+        config = load_config(cfg_file)
+
+    assert config.theme == "tokyo-night"
+    assert "top-level JSON value must be an object" in caplog.text
+
+
+def test_load_config_non_object_json_number_falls_back_to_defaults(tmp_path, caplog):
+    from cogstash.core import load_config
+
+    cfg_file = tmp_path / "cogstash.json"
+    cfg_file.write_text("42", encoding="utf-8")
+
+    with caplog.at_level("WARNING", logger="cogstash"):
+        config = load_config(cfg_file)
+
+    assert config.theme == "tokyo-night"
+    assert "top-level JSON value must be an object" in caplog.text
+
+
+def test_load_config_non_object_json_null_falls_back_to_defaults(tmp_path, caplog):
+    from cogstash.core import load_config
+
+    cfg_file = tmp_path / "cogstash.json"
+    cfg_file.write_text("null", encoding="utf-8")
+
+    with caplog.at_level("WARNING", logger="cogstash"):
+        config = load_config(cfg_file)
+
+    assert config.theme == "tokyo-night"
+    assert "top-level JSON value must be an object" in caplog.text
+
+
 def test_get_default_config_path_uses_home(monkeypatch, tmp_path):
     import cogstash.core as core_mod
     import cogstash.core.config as config_mod
