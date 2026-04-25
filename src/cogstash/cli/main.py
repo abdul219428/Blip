@@ -271,17 +271,25 @@ def _write_export_file(out_path: Path, export_format: str, notes: list[Note], to
         else:
             lines = ["# CogStash Export\n\n", f"*Exported {len(notes)} notes on {today}*\n\n"]
             for note in notes:
-                ts = note.timestamp.strftime("%Y-%m-%d %H:%M")
-                tags = " ".join(f"`#{tag}`" for tag in note.tags) if note.tags else ""
-                status = "☑" if note.is_done else ""
-                line = f"- **[{ts}]** {status} {note.text}"
-                if tags:
-                    line += f"  {tags}"
-                lines.append(line + "\n")
+                lines.append(_format_markdown_export_note(note))
             out_path.write_text("".join(lines), encoding="utf-8")
     except OSError:
         safe_print(f"Error: failed to export notes to {out_path}.", file=sys.stderr)
         sys.exit(1)
+
+
+def _format_markdown_export_note(note: Note) -> str:
+    """Render one note as a stable Markdown list item, preserving multiline bodies."""
+    ts = note.timestamp.strftime("%Y-%m-%d %H:%M")
+    tags = " ".join(f"`#{tag}`" for tag in note.tags) if note.tags else ""
+    status = "☑" if note.is_done else ""
+    text_lines = note.text.splitlines() or [""]
+    line = f"- **[{ts}]** {status} {text_lines[0]}"
+    if tags:
+        line += f"  {tags}"
+    rendered_lines = [line.rstrip()]
+    rendered_lines.extend(f"  {continuation}" for continuation in text_lines[1:])
+    return "\n".join(rendered_lines) + "\n"
 
 
 def cmd_export(args, config: CogStashConfig, ansi_tag=None):
