@@ -168,6 +168,27 @@ def test_settings_empty_notes_path_shows_error_and_does_not_save(tk_root, tmp_pa
 
 
 @needs_display
+def test_settings_directory_notes_path_shows_error_and_does_not_save(tk_root, tmp_path):
+    from cogstash.ui.app import CogStashConfig
+    from cogstash.ui.settings import SettingsWindow
+
+    config_path = tmp_path / "test.json"
+    notes_dir = tmp_path / "notes-dir"
+    notes_dir.mkdir()
+    sw = SettingsWindow(tk_root, CogStashConfig(), config_path)
+    sw.notes_file_var.set(str(notes_dir))
+
+    with patch("tkinter.messagebox.showerror") as error_mock:
+        sw._save_general()
+
+    assert sw.config.output_file == Path.home() / "cogstash.md"
+    assert not config_path.exists()
+    error_mock.assert_called_once()
+    assert "Notes File" in error_mock.call_args.args[0]
+    sw.win.destroy()
+
+
+@needs_display
 def test_settings_test_hotkey_shows_success_for_valid_input(tk_root, tmp_path, monkeypatch):
     """Test Hotkey should confirm valid hotkey syntax and guidance."""
     from cogstash.ui.app import CogStashConfig
@@ -236,6 +257,28 @@ def test_wizard_empty_notes_path_shows_error_and_does_not_save(tk_root, tmp_path
     config_path = tmp_path / ".cogstash.json"
     wiz = WizardWindow(tk_root, config, config_path)
     wiz.notes_file_var.set("")
+
+    with patch("tkinter.messagebox.showerror") as error_mock:
+        wiz._finish()
+
+    assert config.output_file == Path.home() / "cogstash.md"
+    assert not config_path.exists()
+    error_mock.assert_called_once()
+    assert "Notes File" in error_mock.call_args.args[0]
+    wiz.win.destroy()
+
+
+@needs_display
+def test_wizard_directory_notes_path_shows_error_and_does_not_save(tk_root, tmp_path):
+    from cogstash.ui.app import CogStashConfig
+    from cogstash.ui.settings import WizardWindow
+
+    config = CogStashConfig()
+    config_path = tmp_path / ".cogstash.json"
+    notes_dir = tmp_path / "notes-dir"
+    notes_dir.mkdir()
+    wiz = WizardWindow(tk_root, config, config_path)
+    wiz.notes_file_var.set(str(notes_dir))
 
     with patch("tkinter.messagebox.showerror") as error_mock:
         wiz._finish()
